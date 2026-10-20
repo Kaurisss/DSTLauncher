@@ -85,6 +85,7 @@ const downloadingId = ref('');
 /** 进度输出块的 DOM 引用，发起更新后滚动过去 */
 const updateBlock = ref(null);
 let pollTimer = null;
+let disposed = false;
 
 function stopPoll() {
   if (pollTimer) {
@@ -105,6 +106,7 @@ async function pollUpdate() {
   } catch (_) {
     return // 轮询失败不打断，下一轮再试
   }
+  if (disposed) return;
   updating.value = !!st.running;
   progress.value = st.progress || '';
   updateError.value = st.error || '';
@@ -131,6 +133,7 @@ async function pollUpdate() {
 }
 
 function startPoll() {
+  if (disposed) return;
   stopPoll();
   pollTimer = setInterval(pollUpdate, 2000);
 }
@@ -212,11 +215,15 @@ async function stopUpdate() {
 
 onMounted(async () => {
   await load();
+  if (disposed) return;
   // 面板重启后若上次更新还没结束，恢复轮询而不是丢掉进度
   await pollUpdate();
   if (updating.value) startPoll();
 });
-onUnmounted(stopPoll);
+onUnmounted(() => {
+  disposed = true;
+  stopPoll();
+});
 // 用 current 而不是 currentId 做触发：刷新页面时 currentId 从 localStorage
 // 恢复、值不变，watch 不会触发，列表就一直空着；而 current 要等房间列表
 // 加载完才从 null 变成房间对象，正好在数据就绪时拉一次模组列表

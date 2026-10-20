@@ -110,27 +110,48 @@ func TestExtractZipRejectsPathTraversal(t *testing.T) {
 	}
 }
 
-func TestExtractPercentOnlyAcceptsSteamCmdFormat(t *testing.T) {
+func TestExtractProgressOnlyAcceptsSteamCmdFormat(t *testing.T) {
 	cases := []struct {
 		line string
 		want string
 	}{
-		// SteamCMD 的权威下载进度行
-		{"Update state (0x61) downloading, progress: 41.63 (1869568807 / 4490782099)", "41.63%"},
-		{"Update state (0x61) downloading, progress: 100.00 (4490782099 / 4490782099)", "100.00%"},
+		{"Update state (0x11) preallocating, progress: 0.00 (0 / 4490782099)", "预分配磁盘空间 0.00%"},
+		{"Update state (0x61) downloading, progress: 41.63 (1869568807 / 4490782099)", "下载服务器文件 41.63%"},
+		{"Update state (0x61) downloading, progress: 100.00 (4490782099 / 4490782099)", "下载服务器文件 100.00%"},
 		// 噪音行必须忽略：曾因泛化 NN% 匹配把面板进度从 100% 打回 0%
 		{"Preallocating 100%", ""},
 		{"Memory Load: 39%", ""},
-		// 下载完成后的其他阶段也打印 progress，必须忽略，
-		// 否则面板会从 99% 回跳到 4%/38%/0%（实测过）
-		{"Update state (0x81) verifying install, progress: 4.05 (181928000 / 4490782099)", ""},
+		// 校验进度明确标注阶段；未知阶段不猜测百分比。
+		{"Update state (0x81) verifying install, progress: 4.05 (181928000 / 4490782099)", "校验服务器文件 4.05%"},
+		{"Update state (0x61) DOWNLOADING, progress: 7 (314354746 / 4490782099)", "下载服务器文件 7%"},
+		{"downloading progress: 50 (1 / 2)", ""},
+		{"Update state (0x61) downloading, progress: 1..2 (1 / 2)", ""},
 		{"Update state (0x0) unknown, progress: 0.00 (0 / 0)", ""},
 		{"Unloading Steam API...", ""},
 		{"", ""},
 	}
 	for _, c := range cases {
-		if got := extractPercent(c.line); got != c.want {
-			t.Errorf("extractPercent(%q) = %q, want %q", c.line, got, c.want)
+		if got := extractProgress(c.line); got != c.want {
+			t.Errorf("extractProgress(%q) = %q, want %q", c.line, got, c.want)
+		}
+	}
+}
+
+func TestInstallProgressReportsEachStage(t *testing.T) {
+	manager := NewManager(t.TempDir(), ArchAuto)
+	for _, step := range []struct {
+		line string
+		want string
+	}{
+		{"\x1b[0m Update state (0x11) preallocating, progress: 35.27 (1584028185 / 4490782099)", "预分配磁盘空间 35.27%"},
+		{"Update state (0x61) downloading, progress: 2.50 (112269552 / 4490782099)", "下载服务器文件 2.50%"},
+		{"Update state (0x81) verifying install, progress: 4.05 (181928000 / 4490782099)", "校验服务器文件 4.05%"},
+		{"Memory Load: 39%", "校验服务器文件 4.05%"},
+	} {
+		manager.appendOutput(step.line)
+		got, _, _ := manager.Progress()
+		if got != step.want {
+			t.Errorf("appendOutput(%q): progress = %q, want %q", step.line, got, step.want)
 		}
 	}
 }

@@ -1,20 +1,24 @@
 <script setup>
-// 卡片外壳。标题 / 说明 / 右上角按钮都用插槽，内容放默认插槽。
+// 保留旧页面的插槽与 flush 契约，内部使用新主题的 Card。
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
+
 defineProps({
-  /** 内容区不留内边距，适合控制台这类需要贴边的区域 */
   flush: { type: Boolean, default: false },
 });
 </script>
 
 <template>
-  <article class="card">
-    <header v-if="$slots.title || $slots.actions" class="card-head">
-      <h2>
-        <slot name="title" />
-        <small v-if="$slots.hint"><slot name="hint" /></small>
-      </h2>
-      <div v-if="$slots.actions" class="card-actions"><slot name="actions" /></div>
-    </header>
-    <div class="card-body" :class="{ 'card-body-flush': flush }"><slot /></div>
-  </article>
+  <Card class="min-h-0 gap-0 overflow-visible py-0">
+    <CardHeader v-if="$slots.title || $slots.actions" class="flex flex-wrap items-center gap-4 py-4">
+      <div class="flex min-w-0 flex-col gap-1">
+        <CardTitle role="heading" aria-level="2"><slot name="title" /></CardTitle>
+        <CardDescription v-if="$slots.hint"><slot name="hint" /></CardDescription>
+      </div>
+      <div v-if="$slots.actions" class="ml-auto flex flex-wrap items-center gap-2"><slot name="actions" /></div>
+    </CardHeader>
+    <Separator v-if="$slots.title || $slots.actions" />
+    <CardContent :class="cn('min-h-0 flex-1', flush ? 'p-0' : 'p-6')"><slot /></CardContent>
+  </Card>
 </template>

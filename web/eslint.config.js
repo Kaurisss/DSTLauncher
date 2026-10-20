@@ -71,6 +71,12 @@ export default [
   },
 
   {
+    // 生成的包装组件透传 undefined，沿用底层组件的默认值。
+    files: ['src/components/ui/*/*.vue'],
+    rules: { 'vue/require-default-prop': 'off' },
+  },
+
+  {
     // 构建期脚本跑在 Node 里，需要额外放开 Node 全局
     files: ['scripts/**/*.mjs', 'vite.config.js', 'eslint.config.js'],
     languageOptions: {

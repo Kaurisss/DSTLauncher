@@ -1,28 +1,10 @@
 <script setup>
-// 右下角提示条渲染。点一下可以提前关掉。
+import { Toaster } from '@/components/ui/sonner';
+import { useTheme } from '@/composables/useTheme.js';
 
-import Icon from '@/components/ui/Icon.vue';
-import { useToasts, dismiss } from '@/lib/toast.js';
-
-const items = useToasts();
-
-const ICON = { err: 'alert', warn: 'alert' };
-const iconOf = kind => ICON[kind] ?? 'check';
+const { resolved } = useTheme();
 </script>
 
 <template>
-  <div class="toast-host">
-    <TransitionGroup name="toast">
-      <div
-        v-for="t in items"
-        :key="t.id"
-        class="toast"
-        :class="t.kind ? 'is-' + t.kind : ''"
-        @click="dismiss(t.id)"
-      >
-        <Icon :name="iconOf(t.kind)" size="16" />
-        <span>{{ t.message }}</span>
-      </div>
-    </TransitionGroup>
-  </div>
+  <Toaster :theme="resolved" position="bottom-right" close-button />
 </template>

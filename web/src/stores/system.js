@@ -26,7 +26,7 @@ export const useSystemStore = defineStore('system', () => {
   // candidates 是可选的安装，locked 表示运行中不允许改。
   const server = ref(null);
 
-  let timer = null;
+  let polling = null;
   let wasInstalling = false;
 
   function apply(d) {
@@ -48,7 +48,7 @@ export const useSystemStore = defineStore('system', () => {
     const d = await installApi.status();
     apply(d);
 
-    if (installing.value && !timer) startPoll();
+    if (installing.value) startPoll();
     // 一轮安装刚结束：给个结论，并停掉轮询
     if (!installing.value && wasInstalling) {
       toast(error.value ? '安装失败：' + error.value : '服务器文件已就绪', error.value ? 'err' : '');
@@ -58,24 +58,29 @@ export const useSystemStore = defineStore('system', () => {
   }
 
   function startPoll() {
-    timer = setInterval(async () => {
+    if (polling) return polling;
+    polling = (async () => {
       try {
-        await refresh();
-      } catch (_) {
-        stopPoll();
+        while (installing.value) {
+          await new Promise(resolve => setTimeout(resolve, 3000));
+          await refresh();
+        }
+      } finally {
+        polling = null;
       }
-    }, 3000);
-  }
-
-  function stopPoll() {
-    if (timer) {
-      clearInterval(timer);
-      timer = null;
-    }
+    })();
+    polling.catch(err => {
+      error.value = `无法获取安装进度：${err.message}。请刷新页面重试`;
+      toast(error.value, 'err');
+    });
+    return polling;
   }
 
   async function startInstall() {
     await installApi.start();
+    error.value = '';
+    output.value = [];
+    progress.value = '正在准备安装 DST 专用服务器…';
     installing.value = true;
     wasInstalling = true;
     startPoll();
@@ -83,9 +88,20 @@ export const useSystemStore = defineStore('system', () => {
 
   async function update() {
     await installApi.update();
+    error.value = '';
     installing.value = true;
     wasInstalling = true;
     startPoll();
+  }
+
+  async function ensureInstalled() {
+    await refresh();
+    if (installed.value && !installing.value && !error.value) return;
+    if (!installing.value) await startInstall();
+    await startPoll();
+    if (error.value || !installed.value) {
+      throw new Error(error.value || '安装未完成：未找到服务器文件，请重试安装');
+    }
   }
 
   /* ---------- 服务器文件位置 ---------- */
@@ -111,6 +127,6 @@ export const useSystemStore = defineStore('system', () => {
     installed, installing, progress, error, output, version,
     external, root, executable, source, arch,
     server, loadServer, saveServer,
-    refresh, startInstall, update,
+    refresh, startInstall, ensureInstalled, update,
   };
 });

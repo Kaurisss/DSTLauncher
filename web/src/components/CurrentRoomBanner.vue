@@ -1,30 +1,25 @@
 <script setup>
-// 当前房间标识条：所有页面共用，明确「现在操作的是哪个房间」。
-//
-// 放在 App 外壳里（TopBar 下方），而不是每个视图各写一份，
-// 避免漏页； Rooms 页也一样显示，保持全局一致。
 import { computed } from 'vue';
-
-import Icon from '@/components/ui/Icon.vue';
-import UiPill from '@/components/ui/UiPill.vue';
+import { HugeiconsIcon } from '@hugeicons/vue';
+import { ServerStack01Icon } from '@hugeicons/core-free-icons';
+import { Badge } from '@/components/ui/badge';
 import { useRoomsStore } from '@/stores/rooms.js';
+import { GAME_MODE_LABEL } from '@/lib/format.js';
 
 const rooms = useRoomsStore();
-
 const room = computed(() => rooms.current);
-const mode = computed(() => room.value?.gameMode || '');
+const mode = computed(() => GAME_MODE_LABEL[room.value?.gameMode] || room.value?.gameMode || '');
+const state = computed(() => !rooms.statusLoaded ? '等待状态' : (rooms.running ? '运行中' : '已停止'));
 </script>
 
 <template>
-  <div v-if="room" class="room-banner">
-    <Icon class="room-banner-icon" name="server" size="14" />
-    <span class="room-banner-label">当前房间</span>
-    <strong class="room-banner-name">{{ room.name }}</strong>
-    <span class="room-banner-key">{{ room.key }}<template v-if="mode"> · {{ mode }}</template></span>
-
-    <UiPill class="room-banner-state" :tone="rooms.running ? 'ok' : 'muted'">
-      <span class="dot" :class="{ running: rooms.running }" />
-      {{ rooms.running ? '运行中' : '已停止' }}
-    </UiPill>
-  </div>
+  <section v-if="room" aria-label="当前房间" aria-live="polite" class="flex min-w-0 flex-wrap items-center gap-3 border-b bg-muted/50 px-4 py-3 text-sm md:px-6">
+    <HugeiconsIcon :icon="ServerStack01Icon" class="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
+      <span class="text-xs text-muted-foreground">当前房间</span>
+      <strong class="min-w-0 break-all font-semibold">{{ room.name }}</strong>
+      <span class="break-all text-xs text-muted-foreground">{{ room.key }}<template v-if="mode"> · {{ mode }}</template></span>
+    </div>
+    <Badge :variant="rooms.running ? 'default' : 'secondary'">{{ state }}</Badge>
+  </section>
 </template>

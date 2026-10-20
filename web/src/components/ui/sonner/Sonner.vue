@@ -1,0 +1,85 @@
+<script setup>
+import {
+  CheckmarkCircle01Icon,
+  InformationCircleIcon,
+  Loading03Icon,
+  CancelCircleIcon,
+  Alert02Icon,
+  Cancel01Icon,
+} from '@hugeicons/core-free-icons';
+import { HugeiconsIcon } from '@hugeicons/vue';
+import { reactiveOmit } from "@vueuse/core";
+import { cn } from "cn";
+import { Toaster as Sonner } from "vue-sonner";
+
+const props = defineProps({
+  id: { type: String, required: false },
+  invert: { type: Boolean, required: false },
+  theme: { type: String, required: false },
+  position: { type: String, required: false },
+  closeButtonPosition: { type: String, required: false },
+  hotkey: { type: Array, required: false },
+  richColors: { type: Boolean, required: false },
+  expand: { type: Boolean, required: false },
+  duration: { type: Number, required: false },
+  gap: { type: Number, required: false },
+  visibleToasts: { type: Number, required: false },
+  closeButton: { type: Boolean, required: false },
+  toastOptions: { type: Object, required: false },
+  class: { type: String, required: false },
+  style: { type: Object, required: false },
+  offset: { type: [Object, String, Number], required: false },
+  mobileOffset: { type: [Object, String, Number], required: false },
+  dir: { type: String, required: false },
+  swipeDirections: { type: Array, required: false },
+  icons: { type: Object, required: false },
+  containerAriaLabel: { type: String, required: false },
+});
+const delegatedProps = reactiveOmit(props, "class", "toastOptions");
+</script>
+
+<template>
+  <Sonner
+    :class="cn('toaster group', props.class)"
+    :style="{
+      '--normal-bg': 'var(--popover)',
+      '--normal-text': 'var(--popover-foreground)',
+      '--normal-border': 'var(--border)',
+      '--border-radius': 'var(--radius)',
+      '--gray2': 'color-mix(in srgb, var(--popover) 90%, transparent)',
+      '--gray3': 'var(--border)',
+      '--gray4': 'var(--border)',
+      '--gray5': 'var(--border)',
+      '--gray12': 'var(--popover-foreground)',
+    }"
+    :toast-options="
+      props.toastOptions ?? {
+        classes: {
+          toast: 'rounded-2xl',
+        },
+      }
+    "
+    v-bind="delegatedProps"
+  >
+    <template #success-icon>
+      <HugeiconsIcon :icon="CheckmarkCircle01Icon" class="size-4" />
+    </template>
+    <template #info-icon>
+      <HugeiconsIcon :icon="InformationCircleIcon" class="size-4" />
+    </template>
+    <template #warning-icon>
+      <HugeiconsIcon :icon="Alert02Icon" class="size-4" />
+    </template>
+    <template #error-icon>
+      <HugeiconsIcon :icon="CancelCircleIcon" class="size-4" />
+    </template>
+    <template #loading-icon>
+      <div>
+        <HugeiconsIcon :icon="Loading03Icon" class="size-4 animate-spin" />
+      </div>
+    </template>
+    <template #close-icon>
+      <HugeiconsIcon :icon="Cancel01Icon" class="size-4" />
+    </template>
+  </Sonner>
+</template>

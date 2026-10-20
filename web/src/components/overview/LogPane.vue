@@ -67,7 +67,7 @@ function scrollToEnd() {
   });
 }
 
-watch(() => lines.value.length, () => {
+watch(lines, () => {
   if (autoscroll.value) scrollToEnd();
 });
 
@@ -76,8 +76,9 @@ onMounted(scrollToEnd);
 async function submit() {
   const cmd = input.value.trim();
   if (!cmd) return;
+  const roomId = rooms.currentId;
   const { ok } = await guard(() => rooms.sendCmd(props.shard, cmd));
-  if (ok) {
+  if (ok && roomId === rooms.currentId) {
     appendCmd(props.shard, cmd);
     input.value = '';
     autoscroll.value = true;

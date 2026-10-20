@@ -10,6 +10,7 @@ import AppSidebar from '@/components/AppSidebar.vue';
 import TopBar from '@/components/TopBar.vue';
 import CurrentRoomBanner from '@/components/CurrentRoomBanner.vue';
 import ToastHost from '@/components/ToastHost.vue';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 
 import OverviewView from '@/views/OverviewView.vue';
 import RoomsView from '@/views/RoomsView.vue';
@@ -37,6 +38,9 @@ const VIEWS = {
 
 /** 兜底：万一 activeTab 与 VIEWS 不一致，也不会渲染出空白页。 */
 const currentView = computed(() => VIEWS[ui.activeTab] || OverviewView);
+// 全局管理页保留草稿；房间业务页重建实例，隔离旧房间的异步响应和草稿。
+const viewKey = computed(() => ['rooms', 'saves'].includes(ui.activeTab)
+  ? ui.activeTab : `${ui.activeTab}:${rooms.currentId}`);
 
 const ui = useUiStore();
 const rooms = useRoomsStore();
@@ -45,6 +49,7 @@ const logs = useLogs();
 let statusTimer = null;
 let roomsTimer = null;
 let lastRoomId = undefined;
+let disposed = false;
 
 // 换房间要重连日志；启停洞穴会改变分片列表，也要跟着增删对应分片的连接
 watch(
@@ -63,6 +68,7 @@ watch(
 onMounted(async () => {
   // 首次加载会设置 currentId，从而触发上面的 watcher 完成状态刷新与日志连接
   await guard(() => rooms.load());
+  if (disposed) return;
 
   // 表单枚举值失败不影响使用，不阻塞进入面板。
   // 安装状态由概览页的 InstallPanel 自己拉取，这里不重复请求。
@@ -73,6 +79,7 @@ onMounted(async () => {
 });
 
 onUnmounted(() => {
+  disposed = true;
   clearInterval(statusTimer);
   clearInterval(roomsTimer);
   logs.disconnect();
@@ -80,25 +87,21 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="shell">
+  <SidebarProvider>
+    <a href="#page-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:p-3 focus:text-foreground focus:shadow-md">跳到内容</a>
     <AppSidebar />
 
-    <div class="main">
+    <SidebarInset class="min-w-0">
       <TopBar />
       <!-- 全局当前房间标识：每个页面都能看到正在操作的是哪个房间 -->
       <CurrentRoomBanner />
 
-      <main class="page">
-        <!-- 只用入场淡入，不加 mode="out-in"：
-             连续快速切换时 out-in 需要等待离场动画结束，中断会让新旧元素都不在 DOM 里，
-             表现为右侧内容消失。入场动画被重复触发是安全的。
-             另外视图组件必须是单一根节点（见 OverviewView 顶部注释）。 -->
-        <Transition name="fade">
-          <component :is="currentView" :key="ui.activeTab" />
-        </Transition>
-      </main>
-    </div>
-  </div>
+      <div id="page-content" tabindex="-1" class="w-full max-w-[2400px] min-w-0 p-4 md:p-6">
+        <!-- 不延迟旧视图卸载，快速导航和换房始终只保留一个业务实例。 -->
+        <component :is="currentView" :key="viewKey" />
+      </div>
+    </SidebarInset>
+  </SidebarProvider>
 
   <ToastHost />
 </template>

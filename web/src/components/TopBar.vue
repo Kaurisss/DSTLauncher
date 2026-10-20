@@ -1,10 +1,13 @@
 <script setup>
-// 顶栏：当前页面标题、房间选择器、运行状态、主题切换。
-
 import { computed } from 'vue';
+import { HugeiconsIcon } from '@hugeicons/vue';
+import { ComputerIcon, Moon02Icon, Sun03Icon } from '@hugeicons/core-free-icons';
 
-import Icon from '@/components/ui/Icon.vue';
-import UiPill from '@/components/ui/UiPill.vue';
+import { Button } from '@/components/ui/button';
+import { Field, FieldLabel } from '@/components/ui/field';
+import { NativeSelect } from '@/components/ui/native-select';
+import { Separator } from '@/components/ui/separator';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useUiStore } from '@/stores/ui.js';
 import { useTheme } from '@/composables/useTheme.js';
@@ -14,62 +17,50 @@ import { GAME_MODE_LABEL } from '@/lib/format.js';
 const rooms = useRoomsStore();
 const ui = useUiStore();
 const theme = useTheme();
-
-const pageTitle = computed(() => {
-  const t = ui.tabs.find(x => x.key === ui.activeTab);
-  return t ? t.label : '控制台';
-});
-
+const pageTitle = computed(() => ui.tabs.find(t => t.key === ui.activeTab)?.label || '控制台');
 const pageSub = computed(() => {
-  const r = rooms.current;
-  if (!r) return '还没有房间';
-  const mode = GAME_MODE_LABEL[r.gameMode] || r.gameMode;
-  return `${r.key} · ${mode} · ${r.maxPlayers} 人`;
+  const room = rooms.current;
+  if (!room) return '还没有房间';
+  return `${room.key} · ${GAME_MODE_LABEL[room.gameMode] || room.gameMode} · ${room.maxPlayers} 人`;
 });
-
-const stateTone = computed(() => (rooms.running ? 'ok' : 'muted'));
-
+const themeIcon = computed(() => ({ auto: ComputerIcon, light: Sun03Icon, dark: Moon02Icon })[theme.mode.value]);
 const themeTitle = computed(() => {
   const shown = theme.resolved.value === 'dark' ? '深色' : '浅色';
   return `当前：${theme.label.value}（显示为${shown}）\n点击切换为：${theme.nextLabel.value}`;
 });
-
-function onRoomChange(e) {
-  rooms.select(e.target.value);
-}
-
 function onTheme() {
-  toast(`主题：${theme.cycle()}`);
+  theme.cycle();
+  toast(`主题：${theme.label.value}`);
 }
 </script>
 
 <template>
-  <header class="topbar">
-    <div class="topbar-title">
-      <h1>{{ pageTitle }}</h1>
-      <span>{{ pageSub }}</span>
+  <header class="flex shrink-0 flex-wrap items-center gap-3 border-b bg-background p-4 md:sticky md:top-0 md:z-20 md:px-6">
+    <SidebarTrigger aria-controls="app-navigation" aria-label="切换导航" title="展开或收起导航" />
+    <Separator orientation="vertical" class="h-4" />
+    <div class="min-w-0 flex-1">
+      <h1 class="text-base font-semibold">{{ pageTitle }}</h1>
+      <p class="truncate text-xs text-muted-foreground" :title="pageSub">{{ pageSub }}</p>
     </div>
 
-    <div class="spacer" />
-
-    <UiPill :tone="stateTone">
-      <Icon :name="rooms.running ? 'activity' : 'stop'" size="12" />
-      {{ rooms.running ? '运行中' : '已停止' }}
-    </UiPill>
-
-    <div class="topbar-field">
-      <label for="roomSelect">房间</label>
-      <select id="roomSelect" class="select" :value="rooms.currentId ?? ''" @change="onRoomChange">
-        <option v-if="!rooms.list.length" value="">（暂无房间）</option>
-        <option v-for="r in rooms.list" :key="r.id" :value="r.id">
-          {{ r.name }}
-        </option>
-      </select>
+    <div class="ml-auto flex w-full min-w-0 items-center gap-3 sm:w-auto">
+      <Field orientation="horizontal" class="min-w-0 flex-1 sm:w-auto sm:flex-none *:data-[slot=field-label]:flex-none">
+        <FieldLabel for="roomSelect">房间</FieldLabel>
+        <NativeSelect
+          id="roomSelect"
+          class="min-w-0 flex-1 sm:w-48 sm:flex-none"
+          :model-value="rooms.currentId ?? ''"
+          :disabled="!rooms.list.length"
+          @update:model-value="rooms.select"
+        >
+          <option v-if="!rooms.list.length" value="">（暂无房间）</option>
+          <option v-for="room in rooms.list" :key="room.id" :value="room.id">{{ room.name }}</option>
+        </NativeSelect>
+      </Field>
+      <Button variant="outline" size="sm" :title="themeTitle" aria-label="切换主题" @click="onTheme">
+        <HugeiconsIcon :icon="themeIcon" data-icon="inline-start" aria-hidden="true" />
+        {{ theme.label.value }}
+      </Button>
     </div>
-
-    <button class="btn btn-icon" :title="themeTitle" aria-label="切换主题" @click="onTheme">
-      <Icon class="icon-sun" name="sun" size="18" />
-      <Icon class="icon-moon" name="moon" size="18" />
-    </button>
   </header>
 </template>

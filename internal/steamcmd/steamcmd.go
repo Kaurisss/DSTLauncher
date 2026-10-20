@@ -27,15 +27,8 @@ const (
 	maxOutputLines  = 400
 )
 
-// steamProgressRE 只匹配 SteamCMD 的「下载」阶段进度行：
-//
-//	Update state (0x61) downloading, progress: 41.63 (1869568807 / 4490782099)
-//
-// 必须同时要求 downloading 关键字与 progress 字段：
-//   - 只写 `NN%` 会把 `Preallocating 100%`、`Memory Load: 39%` 这类噪音当进度；
-//   - 只写 `progress:` 会匹到校验/解压阶段的 Other 行（也带 progress 字段），
-//     实测面板会出现「99% → 4% → 38% → 0%」的回退跳动。
-var steamProgressRE = regexp.MustCompile(`(?i)downloading[^\n]*progress:\s*([\d.]+)\s*\(`)
+// 各阶段百分比独立计算，必须同时显示阶段名，避免把校验进度当成下载回退。
+var steamProgressRE = regexp.MustCompile(`(?i)Update state \(0x[0-9a-f]+\)\s+(preallocating|downloading|verifying install),\s*progress:\s*(\d+(?:\.\d+)?)\s*\(`)
 
 // Detected is an installed dedicated-server directory discovered in a Steam library.
 type Detected struct {
@@ -487,17 +480,26 @@ func (m *Manager) appendOutputLocked(line string) {
 	if len(m.output) > maxOutputLines {
 		m.output = append([]string(nil), m.output[len(m.output)-maxOutputLines:]...)
 	}
-	if percent := extractPercent(line); percent != "" {
-		m.progress = "下载服务器文件 " + percent
+	if progress := extractProgress(line); progress != "" {
+		m.progress = progress
 	}
 }
 
-func extractPercent(line string) string {
+func extractProgress(line string) string {
 	match := steamProgressRE.FindStringSubmatch(line)
-	if len(match) < 2 {
+	if len(match) < 3 {
 		return ""
 	}
-	return match[1] + "%"
+	var stage string
+	switch strings.ToLower(match[1]) {
+	case "preallocating":
+		stage = "预分配磁盘空间"
+	case "downloading":
+		stage = "下载服务器文件"
+	case "verifying install":
+		stage = "校验服务器文件"
+	}
+	return stage + " " + match[2] + "%"
 }
 
 type outputWriter struct {

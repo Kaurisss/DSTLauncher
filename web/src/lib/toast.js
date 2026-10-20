@@ -1,31 +1,12 @@
-// 右下角提示条。
-//
-// 做成模块级单例：任何模块都能直接 import { toast } 调用，
-// 不需要层层传 props 或注入，ToastHost 组件只负责渲染。
+// 保留原有 toast / guard 调用契约，渲染统一交给根节点的 Sonner。
+import { toast as notify } from 'vue-sonner';
 
-import { ref } from 'vue';
-
-const items = ref([]);
-let seq = 0;
-
-export function useToasts() {
-  return items;
-}
-
-/**
- * 弹一条提示。
- * @param {string} message 文案
- * @param {''|'err'|'warn'} kind 类型，err 停留更久
- */
+/** @param {''|'err'|'warn'} kind */
 export function toast(message, kind = '') {
-  const id = ++seq;
-  items.value.push({ id, message, kind });
-  setTimeout(() => dismiss(id), kind === 'err' ? 6000 : 3200);
-}
-
-export function dismiss(id) {
-  const i = items.value.findIndex(t => t.id === id);
-  if (i >= 0) items.value.splice(i, 1);
+  const options = { duration: kind === 'err' ? 6000 : 3200 };
+  if (kind === 'err') return notify.error(message, options);
+  if (kind === 'warn') return notify.warning(message, options);
+  return notify.success(message, options);
 }
 
 /**

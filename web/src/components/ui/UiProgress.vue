@@ -1,19 +1,16 @@
 <script setup>
-// 进度条。value 为 0-100；传负数表示进度未知（显示为满格的浅色条）。
+// 保留 value 契约；负数由 Reka Progress 作为未知进度处理。
 import { computed } from 'vue';
+import { Progress } from '@/components/ui/progress';
 
 const props = defineProps({
   value: { type: Number, default: 0 },
 });
-
-const width = computed(() => {
-  const v = props.value < 0 ? 100 : Math.min(100, Math.max(0, props.value));
-  return v + '%';
-});
+const value = computed(() => Number.isFinite(props.value) && props.value >= 0
+  ? Math.min(100, props.value)
+  : null);
 </script>
 
 <template>
-  <div class="progress">
-    <div class="progress-bar" :style="{ width }" />
-  </div>
+  <Progress :model-value="value" :max="100" />
 </template>

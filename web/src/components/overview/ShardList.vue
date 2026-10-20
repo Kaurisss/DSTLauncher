@@ -4,6 +4,7 @@
 import { computed } from 'vue';
 
 import UiEmpty from '@/components/ui/UiEmpty.vue';
+import { Button } from '@/components/ui/button';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
 import { useProcessControl } from '@/composables/useProcessControl.js';
@@ -75,10 +76,12 @@ function staleTip(s) {
       </span>
       <span class="shard-actions">
         <template v-if="isLive(s)">
-          <button class="btn btn-sm btn-danger" @click="proc.stop(s.shard)">停止</button>
-          <button class="btn btn-sm" @click="proc.restart(s.shard)">重启</button>
+          <Button variant="destructive" size="sm" :disabled="rooms.starting" @click="proc.stop(s.shard)">停止</Button>
+          <Button variant="outline" size="sm" :disabled="rooms.starting || system.installing" @click="proc.restart(s.shard)">重启</Button>
         </template>
-        <button v-else class="btn btn-sm btn-primary" @click="proc.start(s.shard)">启动</button>
+        <Button v-else size="sm" :disabled="rooms.starting" @click="proc.start(s.shard)">
+          {{ rooms.starting ? '请稍候…' : (system.installed ? '启动' : '安装并启动') }}
+        </Button>
       </span>
     </div>
   </template>

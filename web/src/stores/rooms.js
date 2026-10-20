@@ -7,6 +7,7 @@ import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
 
 import { roomApi, procApi } from '@/lib/api.js';
+import { useSystemStore } from '@/stores/system.js';
 
 /**
  * 当前房间的本地记忆。
@@ -41,7 +42,11 @@ export const useRoomsStore = defineStore('rooms', () => {
   const meta = ref(null);
   /** 仅当前房间的分片状态，刷新频率比列表高 */
   const statuses = ref([]);
+  const statusLoaded = ref(false);
   const loaded = ref(false);
+  const starting = ref(false);
+  let statusRequest = 0;
+  let lastStatusRequest = 0;
 
   /** 当前选中的房间。列表为空时返回 null。 */
   const current = computed(() => {
@@ -64,7 +69,12 @@ export const useRoomsStore = defineStore('rooms', () => {
 
   // 选中变化就落盘。集中在这里写，避免 create / update / remove / load
   // 各处的赋值漏掉持久化。
-  watch(currentId, storeRoomId);
+  watch(currentId, id => {
+    lastStatusRequest = ++statusRequest;
+    statuses.value = [];
+    statusLoaded.value = false;
+    storeRoomId(id);
+  }, { flush: 'sync' });
 
   /* ---------- 加载 ---------- */
 
@@ -96,12 +106,18 @@ export const useRoomsStore = defineStore('rooms', () => {
   }
 
   async function refreshStatus() {
+    const request = ++statusRequest;
     const room = current.value;
     if (!room) {
       statuses.value = [];
+      statusLoaded.value = false;
       return;
     }
-    statuses.value = (await procApi.status(room.id)) || [];
+    const fresh = (await procApi.status(room.id)) || [];
+    if (request < lastStatusRequest || room.id !== currentId.value) return;
+    lastStatusRequest = request;
+    statuses.value = fresh;
+    statusLoaded.value = true;
     // 同步给列表中的同一房间，保证房间卡片与顶部状态标签一致
     const inList = list.value.find(r => r.id === room.id);
     if (inList) inList.statuses = statuses.value;
@@ -145,9 +161,20 @@ export const useRoomsStore = defineStore('rooms', () => {
   /* ---------- 进程控制 ---------- */
 
   async function start(shard) {
+    const system = useSystemStore();
     const room = current.value;
     if (!room) throw new Error('请先选择房间');
-    await procApi.start(room.id, shard);
+    if (starting.value) throw new Error('正在准备开服，请等待安装或启动完成');
+    if (room.needToken) throw new Error('当前为在线模式，请先在房间设置中填写 Klei 服务器令牌');
+    starting.value = true;
+    try {
+      // 安装期间切换房间也只启动本次点击的房间。
+      const roomId = room.id;
+      await system.ensureInstalled();
+      await procApi.start(roomId, shard);
+    } finally {
+      starting.value = false;
+    }
   }
 
   async function stop(shard, timeout) {
@@ -169,7 +196,7 @@ export const useRoomsStore = defineStore('rooms', () => {
   }
 
   return {
-    list, currentId, meta, statuses, loaded,
+    list, currentId, meta, statuses, statusLoaded, loaded, starting,
     current, shards, running, hasToken,
     load, loadMeta, refreshStatus, select,
     create, update, remove,

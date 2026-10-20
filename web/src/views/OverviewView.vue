@@ -4,6 +4,7 @@
 import { computed } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
+import { Button } from '@/components/ui/button';
 import UiStat from '@/components/ui/UiStat.vue';
 import ShardList from '@/components/overview/ShardList.vue';
 import InstallPanel from '@/components/overview/InstallPanel.vue';
@@ -69,7 +70,7 @@ const serverValue = computed(() => {
 
 const serverSub = computed(() => {
   if (system.installing) return system.progress || '准备中…';
-  return system.installed ? '可检查更新' : '需先安装服务器文件';
+  return system.installed ? '可检查更新' : '首次启动会自动安装服务器文件';
 });
 
 const serverTone = computed(() => {
@@ -122,12 +123,12 @@ const serverTone = computed(() => {
       <UiCard>
         <template #title>房间状态</template>
         <template #actions>
-          <button class="btn btn-sm btn-primary" :disabled="!rooms.current" @click="proc.start('')">
-            全部启动
-          </button>
-          <button class="btn btn-sm btn-danger" :disabled="!rooms.current" @click="proc.stop('')">
+          <Button size="sm" :disabled="!rooms.current || rooms.starting" @click="proc.start('')">
+            {{ rooms.starting ? '准备开服中…' : (system.installed ? '全部启动' : '安装并启动') }}
+          </Button>
+          <Button variant="destructive" size="sm" :disabled="!rooms.current || rooms.starting" @click="proc.stop('')">
             全部停止
-          </button>
+          </Button>
         </template>
         <ShardList />
       </UiCard>
