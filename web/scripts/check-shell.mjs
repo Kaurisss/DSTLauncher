@@ -44,6 +44,7 @@ const themeModule = await vite.ssrLoadModule('/src/composables/useTheme.js');
 const { confirmAction, confirmState, handleCancel, handleConfirm } = await vite.ssrLoadModule('/src/lib/confirm.js');
 const { useProcessControl } = await vite.ssrLoadModule('/src/composables/useProcessControl.js');
 const { default: Banner } = await vite.ssrLoadModule('/src/components/CurrentRoomBanner.vue');
+const { default: RoomCard } = await vite.ssrLoadModule('/src/components/rooms/RoomCard.vue');
 const logs = useLogs();
 let pinia;
 beforeEach(() => {
@@ -57,6 +58,29 @@ beforeEach(() => {
   setActivePinia(pinia);
 });
 after(() => { logs.disconnect(); logs.clearAll(); });
+
+test('房间卡片使用整卡选择按钮，独立操作与分片信息保持可用', async () => {
+  const room = {
+    id: 2, name: '测试房间', key: 'Cluster_2', gameMode: 'survival',
+    tickRate: 30, maxSnapshots: 10, hasSave: true, needToken: true,
+    shards: [{ name: 'Master', serverPort: 10999, masterServerPort: 27018, authenticationPort: 8768 },
+      { name: 'Caves', disabled: true }],
+  };
+  for (const selected of [false, true]) {
+    const html = await renderToString(createSSRApp(RoomCard, { room, selected }));
+    const selection = html.match(/<button\b[^>]*class="room-select"[^>]*>[\s\S]*?<\/button>/)?.[0];
+    assert.ok(selection, '整卡选择使用原生按钮');
+    assert.match(selection, /type="button"/);
+    assert.match(selection, /aria-label="选择房间 测试房间"/);
+    assert.ok(selection.includes(`aria-pressed="${selected}"`));
+    assert.equal((html.match(/<button\b/g) || []).length, 4, '选择按钮与三个操作按钮为同级控件');
+    assert.equal((selection.match(/<button\b/g) || []).length, 1, '禁止嵌套按钮');
+    assert.doesNotMatch(html, />\s*选中\s*<\/button>/);
+    for (const text of ['编辑', '上传存档', '删除', '10999 / 27018 / 8768', '未启用', 'Cluster_2', '缺令牌']) {
+      assert.ok(html.includes(text), `保留 ${text}`);
+    }
+  }
+});
 
 function roomsStore() {
   const rooms = useRoomsStore(pinia);

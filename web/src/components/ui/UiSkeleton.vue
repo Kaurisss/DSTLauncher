@@ -10,7 +10,7 @@ defineProps({
    * - 'default' | 'text': 通用文本行
    * - 'list' | 'mod': 模组/分片等列表项（实测 58px 高，含开关/名称/徽章/操作按钮）
    * - 'table': 备份/存档表格（实测 thead 40px + 每行 48px，含表头与操作按钮）
-   * - 'options' | 'world': 世界配置项网格（实测 354x114px 卡片，含 96x96 图标与下拉框）
+   * - 'options' | 'world': 世界配置项网格（复用真实选项的响应式布局）
    * - 'code' | 'editor': 配置文件/代码预览块（实测 313px 高）
    * - 'card': 房间卡片（实测 353x299px 卡片）
    * - 'form': 表单选项（实测标签 + 32px 输入框）
@@ -63,17 +63,13 @@ const widthOf = i => WIDTHS[(i - 1) % WIDTHS.length];
     </div>
   </div>
 
-  <!-- 世界配置项网格骨架：精确匹配 354x114px 卡片（96x96 图标 + 下拉框） -->
-  <div v-else-if="variant === 'options' || variant === 'world'" class="grid grid-cols-1 gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
-    <div
-      v-for="i in rows"
-      :key="i"
-      class="flex h-[114px] items-center gap-2.5 rounded-lg border border-border/50 bg-card/40 p-2"
-    >
-      <Skeleton class="size-24 shrink-0 rounded-xl" />
-      <div class="flex flex-1 flex-col gap-2 py-1">
-        <Skeleton class="h-4 w-28" />
-        <Skeleton class="h-8 w-full max-w-40 rounded-lg" />
+  <!-- 复用真实选项的网格、方形图标位与窄屏尺寸，避免切换时布局跳动。 -->
+  <div v-else-if="variant === 'options' || variant === 'world'" class="opt-group-body">
+    <div v-for="i in rows" :key="i" class="opt-row">
+      <Skeleton class="opt-row-icon rounded-none bg-border" />
+      <div class="opt-row-main">
+        <Skeleton class="h-4 w-28 max-w-full bg-border" />
+        <Skeleton class="h-8 w-full max-w-40 rounded-lg bg-border" />
       </div>
     </div>
   </div>

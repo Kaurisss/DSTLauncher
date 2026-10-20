@@ -8,6 +8,8 @@ import { computed, onMounted, ref, watch } from 'vue';
 
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import Icon from '@/components/ui/Icon.vue';
 import { useLogs } from '@/composables/useLogs.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard } from '@/lib/toast.js';
@@ -90,23 +92,37 @@ async function submit() {
 </script>
 
 <template>
-  <section class="log-pane">
+  <section class="log-pane" :aria-label="`${shard} 日志`">
     <header class="log-pane-head">
-      <span class="log-pane-name">{{ shard }}</span>
-      <span v-if="subtitle" class="log-pane-sub">{{ subtitle }}</span>
-      <span class="pill" :class="connected ? 'pill-ok' : 'pill-warn'">
-        {{ connected ? '已连接' : '重连中' }}
-      </span>
-      <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs text-muted-foreground" title="关闭后可以安静地往上翻历史，滚回底部会自动重新打开">
-        <Switch v-model="autoscroll" />
-        <span>自动滚动</span>
-      </label>
-      <button class="btn btn-sm" @click="clear(shard)">清屏</button>
+      <div class="log-pane-title">
+        <Icon name="terminal" :size="15" />
+        <span class="log-pane-name">{{ shard }}</span>
+        <span v-if="subtitle" class="log-pane-sub">{{ subtitle }}</span>
+        <span class="log-connection" :class="connected ? 'is-connected' : ''">
+          {{ connected ? '已连接' : '重连中' }}
+        </span>
+      </div>
+
+      <div class="log-pane-tools">
+        <label class="log-autoscroll" title="关闭后可以安静地往上翻历史，滚回底部会自动重新打开">
+          <Switch v-model="autoscroll" :aria-label="`${shard} 自动滚动`" />
+          <span>自动滚动</span>
+        </label>
+        <Button variant="ghost" size="sm" @click="clear(shard)">清屏</Button>
+      </div>
     </header>
 
-    <div ref="box" class="console" @scroll="onScroll">
+    <div
+      ref="box"
+      class="console"
+      tabindex="0"
+      role="region"
+      :aria-label="`${shard} 日志输出`"
+      @scroll="onScroll"
+    >
       <div v-if="!lines.length" class="console-empty">
-        暂无 {{ shard }} 的日志输出。启动该分片后，这里的输出会实时刷新。
+        <p>暂无 {{ shard }} 的日志输出。</p>
+        <p>启动该分片后，这里的输出会实时刷新。</p>
       </div>
       <div v-for="l in lines" :key="l.id" class="log-line" :class="'k-' + l.kind">
         <span class="log-text">{{ l.text }}</span>
@@ -114,13 +130,16 @@ async function submit() {
     </div>
 
     <form class="console-form" @submit.prevent="submit">
+      <span class="console-prompt" aria-hidden="true">$</span>
       <Input
         v-model="input"
+        class="flex-1 min-w-0"
         autocomplete="off"
+        :aria-label="`${shard} 控制台命令`"
         :disabled="!running"
         :placeholder="running ? '控制台命令，如 c_save() / c_listallplayers()' : shard + ' 未运行'"
       />
-      <button class="btn btn-primary" type="submit" :disabled="!running">执行</button>
+      <Button type="submit" size="sm" :disabled="!running">执行</Button>
     </form>
   </section>
 </template>

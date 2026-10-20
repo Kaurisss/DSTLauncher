@@ -18,7 +18,6 @@ import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiField from '@/components/ui/UiField.vue';
 import UiSkeleton from '@/components/ui/UiSkeleton.vue';
-import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -52,6 +51,16 @@ const onlyChanged = ref(false);
 
 /** 选项标签页：世界规则 / 世界生成 */
 const category = ref('settings');
+const categorySwitching = ref(false);
+
+watch(category, (_category, _previous, onCleanup) => {
+  categorySwitching.value = true;
+  // 留出一次浏览器绘制，让骨架屏先出现，再挂载大量选项控件。
+  let frame = requestAnimationFrame(() => {
+    frame = requestAnimationFrame(() => { categorySwitching.value = false; });
+  });
+  onCleanup(() => window.cancelAnimationFrame(frame));
+});
 
 /* ---------- 派生状态 ---------- */
 
@@ -143,7 +152,8 @@ const visibleGroups = computed(() => {
 /* ---------- 取值读写 ---------- */
 
 function isChanged(o) {
-  return Object.prototype.hasOwnProperty.call(draft, o.name);
+  // 用 in 追踪键的增删；原生 hasOwnProperty.call 不会建立 Vue 依赖。
+  return o.name in draft && Object.prototype.hasOwnProperty.call(draft, o.name);
 }
 
 function valueOf(o) {
@@ -252,7 +262,7 @@ onMounted(() => selectShard(rooms.shards[0]));
 
 <template>
   <!-- 必须保持单一根节点：App.vue 用 <Transition> 包裹视图组件 -->
-  <div>
+  <div class="stack">
     <UiCard>
       <template #title>世界配置</template>
       <template #hint>{{ rooms.current ? rooms.current.name + ' · ' + shardHint : '' }}</template>
@@ -274,7 +284,7 @@ onMounted(() => selectShard(rooms.shards[0]));
       <UiSkeleton v-else-if="loading" variant="form" :rows="2" />
       <p v-else-if="loadError" class="field-tip">读取失败：{{ loadError }}</p>
 
-      <template v-else-if="view">
+      <div v-else-if="view" class="world-config-body">
         <!-- 游戏只在启动时读配置，运行中修改不会生效 -->
         <div v-if="frozen" class="notice">
           <Icon name="info" size="16" />
@@ -284,10 +294,10 @@ onMounted(() => selectShard(rooms.shards[0]));
           </span>
         </div>
 
-        <div class="form-grid">
-          <UiField label="世界生成预设" for-id="w-worldgen" tip="决定地图长什么样">
+        <div class="world-presets">
+          <UiField block label="世界生成预设" for-id="w-worldgen" tip="决定地图长什么样">
             <Select v-model="worldgenPreset" :disabled="worldgenFrozen">
-              <SelectTrigger id="w-worldgen">
+              <SelectTrigger id="w-worldgen" class="w-full">
                 <SelectValue :placeholder="worldgenPreset || '选择预设'" />
               </SelectTrigger>
               <SelectContent position="popper">
@@ -300,9 +310,9 @@ onMounted(() => selectShard(rooms.shards[0]));
             </Select>
           </UiField>
 
-          <UiField label="世界规则预设" for-id="w-settings" tip="决定游戏规则">
+          <UiField block label="世界规则预设" for-id="w-settings" tip="决定游戏规则">
             <Select v-model="settingsPreset" :disabled="frozen">
-              <SelectTrigger id="w-settings">
+              <SelectTrigger id="w-settings" class="w-full">
                 <SelectValue :placeholder="settingsPreset || '选择预设'" />
               </SelectTrigger>
               <SelectContent position="popper">
@@ -316,12 +326,13 @@ onMounted(() => selectShard(rooms.shards[0]));
           </UiField>
         </div>
 
-        <div class="switches" style="margin-top: 14px">
-          <UiSwitch v-model="enabled" label="启用本文件" :disabled="frozen" />
-        </div>
+        <label class="world-enabled">
+          <Switch v-model="enabled" aria-label="启用本文件" :disabled="frozen" />
+          <span>启用本文件</span>
+        </label>
 
         <div v-if="!enabled" class="notice">
-          已关闭 <code>override_enabled</code>：游戏仍会读取本文件，但不会应用里面的设置。
+          <span>已关闭 <code>override_enabled</code>：游戏仍会读取本文件，但不会应用里面的设置。</span>
         </div>
         <div v-if="worldGenerated" class="notice">
           <Icon name="info" size="16" />
@@ -346,11 +357,11 @@ onMounted(() => selectShard(rooms.shards[0]));
           </span>
         </div>
 
-        <p class="path-line" style="margin-top: 12px">{{ view.file }}</p>
-      </template>
+        <p class="path-line">{{ view.file }}</p>
+      </div>
     </UiCard>
 
-    <UiCard v-if="view && !loading && !loadError" class="world-options-card">
+    <UiCard v-if="view && !loading && !loadError" class="world-options-card" :aria-busy="categorySwitching">
       <template #title>选项</template>
       <template #hint>共 {{ totalOptions }} 项</template>
 
@@ -378,22 +389,28 @@ onMounted(() => selectShard(rooms.shards[0]));
       </div>
 
       <div class="world-toolbar world-toolbar-sub">
-        <Input v-model="keyword" placeholder="搜索选项（中英文均可）" class="max-w-xs" />
+        <Input v-model="keyword" placeholder="搜索选项（中英文均可）" class="world-search" />
         <label class="inline-flex items-center gap-2 cursor-pointer select-none text-sm text-foreground">
           <Switch v-model="onlyChanged" />
           <span>只看已改动</span>
         </label>
-        <span class="world-count">
-          {{ changedCount ? '已改 ' + changedCount + ' 项' : '未做改动' }}
-        </span>
-        <button class="btn btn-sm" :disabled="!dirty || frozen" @click="resetAll">重置</button>
-        <button class="btn btn-sm btn-primary" :disabled="!dirty || frozen || saving" @click="save">
-          {{ saving ? '保存中…' : '保存' }}
-        </button>
+        <div class="world-toolbar-actions">
+          <span class="world-count">
+            {{ changedCount ? '已改 ' + changedCount + ' 项' : '未做改动' }}
+          </span>
+          <button class="btn btn-sm" :disabled="!dirty || frozen" @click="resetAll">重置</button>
+          <button class="btn btn-sm btn-primary" :disabled="!dirty || frozen || saving" @click="save">
+            {{ saving ? '保存中…' : '保存' }}
+          </button>
+        </div>
       </div>
 
+      <div v-if="categorySwitching" class="world-category-skeleton" role="status">
+        <span class="sr-only">正在加载选项…</span>
+        <UiSkeleton variant="options" :rows="12" aria-hidden="true" />
+      </div>
       <UiEmpty
-        v-if="!visibleGroups.length"
+        v-else-if="!visibleGroups.length"
         icon="inbox"
         :text="onlyChanged ? '还没有改动过任何选项' : '没有匹配的选项'"
       />
