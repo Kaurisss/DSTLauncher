@@ -247,9 +247,10 @@ watch(() => rooms.current, () => {
         <Icon name="download" size="14" />{{ updating ? '更新中…' : (checking ? '检查中…' : '更新模组') }}
       </button>
       <button
-        class="btn btn-sm"
+        class="btn btn-sm transition-none"
         :class="{ 'btn-primary': workshopOpen }"
         :disabled="!rooms.current"
+        :aria-expanded="workshopOpen"
         @click="workshopOpen = !workshopOpen"
       >
         <Icon name="globe" size="14" />创意工坊
@@ -257,12 +258,12 @@ watch(() => rooms.current, () => {
       <button class="btn btn-sm" @click="load">刷新</button>
     </template>
 
-    <UiSkeleton v-if="!rooms.loaded" :rows="4" />
+    <UiSkeleton v-if="!rooms.loaded" variant="list" :rows="4" />
     <UiEmpty v-else-if="!rooms.current" icon="package" text="请先在「房间」页新建一个房间" />
     <!-- 骨架屏只给首屏：后台刷新（每 15 秒的房间轮询触发的 load）不能
          把整个内容区（含创意工坊搜索结果、更新进度块）拆掉重建，
          否则表现为整页周期性闪烁、搜索结果周期性消失 -->
-    <UiSkeleton v-else-if="loading && !mods.length" :rows="4" />
+    <UiSkeleton v-else-if="loading && !mods.length" variant="list" :rows="4" />
     <UiEmpty v-else-if="loadError" icon="alert" :text="'读取模组失败：' + loadError" />
 
     <template v-else>

@@ -58,9 +58,9 @@ watch(() => rooms.current, load);
       存档目录：{{ clusterDir }}
     </p>
 
-    <UiSkeleton v-if="!rooms.loaded" :rows="5" />
+    <UiSkeleton v-if="!rooms.loaded" variant="code" />
     <UiEmpty v-else-if="!rooms.current" icon="fileCode" text="请先在「房间」页新建一个房间" />
-    <UiSkeleton v-else-if="loading" :rows="5" />
+    <UiSkeleton v-else-if="loading" variant="code" />
     <UiEmpty v-else-if="loadError" icon="alert" :text="'读取失败：' + loadError" />
     <UiEmpty v-else-if="!files.length" icon="fileCode" text="尚未生成配置文件" />
     <ConfigFiles v-else :files="files" />

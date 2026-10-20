@@ -96,9 +96,9 @@ function exportSave(name) {
       备份前会自动让运行中的服务器落盘（c_save），避免拷到半截存档。
     </p>
 
-    <UiSkeleton v-if="!rooms.loaded" :rows="3" />
+    <UiSkeleton v-if="!rooms.loaded" variant="table" :rows="3" />
     <UiEmpty v-else-if="!rooms.current" icon="archive" text="请先在「房间」页新建一个房间" />
-    <UiSkeleton v-else-if="loading" :rows="3" />
+    <UiSkeleton v-else-if="loading" variant="table" :rows="3" />
     <UiEmpty v-else-if="loadError" icon="alert" :text="'读取备份失败：' + loadError" />
     <UiEmpty v-else-if="!items.length" icon="archive" text="暂无备份" />
     <BackupTable v-else :items="items" @restore="restore" @remove="remove" @export="exportSave" />

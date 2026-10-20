@@ -93,7 +93,7 @@ async function remove(item) {
       没有房间认领的存档只能在本页清理。
     </p>
 
-    <UiSkeleton v-if="loading" :rows="3" />
+    <UiSkeleton v-if="loading" variant="table" :rows="4" />
     <UiEmpty v-else-if="loadError" icon="alert" :text="'读取失败：' + loadError" />
     <UiEmpty v-else-if="!items.length" icon="folder" text="磁盘上还没有任何存档" />
 

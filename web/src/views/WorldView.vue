@@ -260,17 +260,18 @@ onMounted(() => selectShard(rooms.shards[0]));
         <button
           v-for="s in rooms.shards"
           :key="s"
-          class="btn btn-sm"
+          class="btn btn-sm transition-none"
           :class="{ 'btn-primary': s === shard }"
+          :aria-pressed="s === shard"
           @click="selectShard(s)"
         >
           {{ shardLabel(s) }}
         </button>
       </template>
 
-      <UiSkeleton v-if="!rooms.loaded" :rows="4" />
+      <UiSkeleton v-if="!rooms.loaded" variant="form" :rows="2" />
       <UiEmpty v-else-if="!rooms.current" icon="globe" text="请先在「房间」页新建一个房间" />
-      <UiSkeleton v-else-if="loading" :rows="4" />
+      <UiSkeleton v-else-if="loading" variant="form" :rows="2" />
       <p v-else-if="loadError" class="field-tip">读取失败：{{ loadError }}</p>
 
       <template v-else-if="view">
@@ -358,6 +359,7 @@ onMounted(() => selectShard(rooms.shards[0]));
           <button
             class="seg-btn"
             :class="{ 'is-active': category === 'settings' }"
+            :aria-pressed="category === 'settings'"
             type="button"
             @click="category = 'settings'"
           >
@@ -366,6 +368,7 @@ onMounted(() => selectShard(rooms.shards[0]));
           <button
             class="seg-btn"
             :class="{ 'is-active': category === 'worldgen' }"
+            :aria-pressed="category === 'worldgen'"
             type="button"
             @click="category = 'worldgen'"
           >

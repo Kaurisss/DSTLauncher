@@ -98,7 +98,7 @@ async function save() {
 </script>
 
 <template>
-  <UiSkeleton v-if="loading" :rows="2" />
+  <UiSkeleton v-if="loading" variant="form" :rows="3" />
 
   <p v-else-if="loadError" class="field-tip">读取配置项失败：{{ loadError }}</p>
 
