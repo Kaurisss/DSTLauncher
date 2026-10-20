@@ -83,6 +83,7 @@ func main() {
 		showVer     = flag.Bool("v", false, "显示版本号")
 		serverDir   = flag.String("serverdir", "", "专用服务器根目录（含 bin/ 的 \"Don't Starve Together Dedicated Server\"）。留空则自动探测 Steam 库；也可用环境变量 DST_SERVER_DIR，或直接在 Web 面板里配置")
 		arch        = flag.String("arch", "", "服务器架构：auto（优先 64 位，默认）/ 64 / 32。留空则用面板里配置的值")
+		dataDir     = flag.String("data-dir", "", "运行数据根目录（存档/日志/模组/面板配置）。留空则用可执行文件同级目录；也可用环境变量 DST_DATA_DIR，容器里指向持久化挂载卷")
 	)
 	flag.Parse()
 
@@ -91,15 +92,31 @@ func main() {
 		return
 	}
 
-	// 所有运行数据放在可执行文件同级，便于整体迁移与备份。
+	// 所有运行数据默认放在可执行文件同级，便于整体迁移与备份。
 	// 基于可执行文件自身路径而非进程工作目录（os.Getwd）：
 	// 右键管理员运行、快捷方式、在其他目录启动 exe 时 CWD 会漂移
 	// （如管理员运行时 CWD 是 C:\Windows\System32），数据会建到错误位置。
-	exePath, err := os.Executable()
-	if err != nil {
-		log.Fatalf("获取程序路径失败: %v", err)
+	//
+	// workDir 是所有运行数据的基准（存档/日志/模组/panel.json/SteamCMD）。
+	// 容器里用 -data-dir / DST_DATA_DIR 把它指到挂载卷，避免数据写进镜像层。
+	// 优先级：命令行 > 环境变量 > 可执行文件同级目录（Windows 原有行为不变）。
+	workDir := strings.TrimSpace(*dataDir)
+	if workDir == "" {
+		workDir = strings.TrimSpace(os.Getenv("DST_DATA_DIR"))
 	}
-	workDir := filepath.Dir(exePath)
+	if workDir == "" {
+		exePath, err := os.Executable()
+		if err != nil {
+			log.Fatalf("获取程序路径失败: %v", err)
+		}
+		workDir = filepath.Dir(exePath)
+	} else {
+		abs, err := filepath.Abs(workDir)
+		if err != nil {
+			log.Fatalf("解析数据目录失败 %s: %v", workDir, err)
+		}
+		workDir = abs
+	}
 
 	rootDir := filepath.Join(workDir, defaultRootName)
 	logDir := filepath.Join(workDir, "logs")
@@ -124,7 +141,7 @@ func main() {
 	steam := steamcmd.NewManager(workDir, archPref)
 
 	// 优先复用已有安装（Steam 工具里装的那份就是同一套文件，
-	// 重新下一遍 2GB 没有意义），找不到才回退到面板自带 SteamCMD 安装。
+	// 重新下一遍 4.5GB 没有意义），找不到才回退到面板自带 SteamCMD 安装。
 	if dir, src := pickServerOverride(workDir, *serverDir, cfg, cfgExists); dir != "" {
 		got, err := steam.Configure(dir, archPref, src)
 		if err != nil {
@@ -145,7 +162,7 @@ func main() {
 			fmt.Println("路径：", steam.Root())
 			return
 		}
-		fmt.Println("开始安装 DST 专用服务器，约需下载 2GB…")
+		fmt.Println("开始安装 DST 专用服务器，约需下载 4.5GB…")
 		steam.Install()
 		for steam.IsInstalling() {
 			p, e, _ := steam.Progress()
@@ -154,6 +171,16 @@ func main() {
 			}
 			fmt.Printf("  %s\n", p)
 			time.Sleep(3 * time.Second)
+		}
+		// 循环退出后必须复查最终结果：安装可能在两次轮询之间失败，
+		// 若直接打印「安装完成」会把 SteamCMD 的失败（如缺 32 位运行库）伪装成成功。
+		if _, e, _ := steam.Progress(); e != "" {
+			log.Fatalf("安装失败: %s", e)
+		}
+		if !steam.IsInstalled() {
+			log.Fatalf("安装未成功：未找到服务器可执行文件（%s）。"+
+				"SteamCMD 是 32 位程序，Linux 宿主需安装 i386 运行库（如 Debian/Ubuntu: apt-get install libc6-i386 lib32gcc-s1 lib32stdc++6）",
+				steam.Executable())
 		}
 		fmt.Println("安装完成，服务器路径:", steam.ServerDir())
 		return
@@ -250,12 +277,18 @@ func main() {
 	fmt.Println("  按 Ctrl+C 停止面板并安全关闭所有服务器")
 	fmt.Printf("  请打开浏览器，访问 http://%s:%d 进入开服面板\n", *bind, *port)
 
-	// 优雅退出：先关面板，再优雅停服（会先 c_save 再 shutdown）
+	// 优雅退出：收到信号后先停止接受新启动/自动重启，再关面板、优雅停服（c_save → c_shutdown）。
+	// done 用于修复退出竞态：ListenAndServe 返回后 main 必须等分片真正停完才能退出，
+	// 否则 Docker 发 SIGTERM 时面板进程可能在存档落盘前就结束。
+	done := make(chan struct{})
 	go func() {
+		defer close(done)
 		sig := make(chan os.Signal, 1)
 		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
 		<-sig
 		fmt.Println("\n正在安全关闭…")
+		// 先阻断新启动与崩溃重启，避免停服途中进程被重新拉起
+		mgr.BeginShutdown()
 		_ = srv.Close()
 		for _, c := range mgr.Clusters() {
 			if err := mgr.Stop(c.Key(), 30*time.Second); err != nil {
@@ -263,13 +296,13 @@ func main() {
 			}
 		}
 		fmt.Println("已安全退出")
-		os.Exit(0)
 	}()
 
-	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		hintBindError(err, *port)
 		log.Fatalf("服务启动失败: %v", err)
 	}
+	<-done
 }
 
 // hintBindError 对 Windows 下端口绑定失败给出针对性提示。

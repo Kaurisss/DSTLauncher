@@ -13,6 +13,10 @@ import (
 func TestQueryProcessSelf(t *testing.T) {
 	pid := os.Getpid()
 
+	// 先真实消耗一点 CPU：刚启动的测试进程可能还没累计到可测量的
+	// CPU 时间，不预热会让「累计 CPU > 0」断言偶发失败。
+	burnCPU(30 * time.Millisecond)
+
 	cpu1, mem1, err := queryProcess(pid)
 	if err != nil {
 		t.Fatalf("采样失败: %v", err)
@@ -36,6 +40,17 @@ func TestQueryProcessSelf(t *testing.T) {
 	}
 	if cpu2 < cpu1 {
 		t.Errorf("累计 CPU 时间倒退了: %v -> %v", cpu1, cpu2)
+	}
+}
+
+func burnCPU(duration time.Duration) {
+	deadline := time.Now().Add(duration)
+	var value uint64
+	for time.Now().Before(deadline) {
+		value++
+	}
+	if value == 0 {
+		panic("CPU loop did not run")
 	}
 }
 

@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"dst-windows/internal/backup"
@@ -55,6 +56,11 @@ type Server struct {
 	workDir  string
 	ugcDir   string
 	version  string
+
+	// taskMu 串行化「开服 / 安装更新服务端 / 模组下载」这四类会改动共享状态
+	// （游戏安装目录、共享 ugc 目录）的操作，让「检查是否忙 → 启动」成为原子动作，
+	// 关闭并发请求同时穿过检查的窗口。长任务本身是异步的，这里只锁决策与启动瞬间。
+	taskMu sync.Mutex
 }
 
 // NewServer 创建 HTTP 服务。
@@ -90,6 +96,10 @@ func respond(w http.ResponseWriter, code int, data interface{}, err error) {
 // Handler 构建路由。
 func (s *Server) Handler() http.Handler {
 	mux := http.NewServeMux()
+
+	// 健康检查：供容器编排/反向代理探活。只要面板进程在跑、路由能响应就算健康，
+	// 不以「游戏是否已安装/是否有分片在跑」为失败条件——那会让未安装时容器被误判为不健康。
+	mux.HandleFunc("/healthz", s.handleHealth)
 
 	// 房间（配置的唯一事实来源）
 	mux.HandleFunc("/api/rooms", s.handleRooms)
@@ -391,6 +401,15 @@ func (s *Server) handleAdmins(w http.ResponseWriter, r *http.Request) {
 
 // ---- 进程控制 ----
 
+// handleHealth 返回固定的健康状态，供容器编排探活。
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	respond(w, 200, map[string]interface{}{
+		"status":  "ok",
+		"version": s.version,
+	}, nil)
+}
+
+// handleStatus 返回分片状态。
 func (s *Server) handleStatus(w http.ResponseWriter, r *http.Request) {
 	rm, err := s.roomByID(r)
 	if err != nil {
@@ -412,8 +431,15 @@ func (s *Server) withRoom(w http.ResponseWriter, r *http.Request, fn func(rm *ro
 }
 
 func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
 	rm, err := s.roomByID(r)
 	if err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
+	// 安装/更新服务端或下载模组时不能开服：三者都会改动游戏安装目录与共享 ugc 目录
+	if err := s.busyTaskError(""); err != nil {
 		respond(w, 200, nil, err)
 		return
 	}
@@ -460,9 +486,15 @@ func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
 	rm, err := s.roomByID(r)
 	if err != nil {
 		respond(w, 200, nil, err)
+		return
+	}
+	if err := s.busyTaskError(""); err != nil {
+		respond(w, 200, s.mgr.Status(rm.Key()), err)
 		return
 	}
 	// 重启前必须优雅关闭，否则会丢存档
@@ -1060,8 +1092,15 @@ func (s *Server) handleModsUpdate(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, s.mgr.ModsUpdateStatus(), nil)
 
 	case http.MethodPost:
+		s.taskMu.Lock()
+		defer s.taskMu.Unlock()
 		rm, err := s.roomByID(r)
 		if err != nil {
+			respond(w, 200, nil, err)
+			return
+		}
+		// 服务端安装/更新途中不能下载模组：两者都写游戏安装目录
+		if err := s.busyTaskError("mods"); err != nil {
 			respond(w, 200, nil, err)
 			return
 		}
@@ -1447,6 +1486,8 @@ func buildImportSummary(p *saveimport.Parsed, saved *room.Room, notes []string, 
 func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
 	// 显式触发安装
 	if r.URL.Query().Get("action") == "start" {
+		s.taskMu.Lock()
+		defer s.taskMu.Unlock()
 		if s.steam.IsExternal() {
 			respond(w, 200, nil, fmt.Errorf(
 				"当前已复用安装好的专用服务器（%s），无需在此安装；如需更新请在 Steam 中更新该工具",
@@ -1455,6 +1496,10 @@ func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
 		}
 		if s.steam.IsInstalling() {
 			respond(w, 200, nil, fmt.Errorf("安装正在进行中"))
+			return
+		}
+		if err := s.busyTaskError("install"); err != nil {
+			respond(w, 200, nil, err)
 			return
 		}
 		if err := s.requireNoRunningShards(); err != nil {
@@ -1488,6 +1533,8 @@ func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
 	if s.steam.IsExternal() {
 		respond(w, 200, nil, fmt.Errorf(
 			"服务器复用自 %s，请在 Steam 中更新「Don't Starve Together Dedicated Server」工具",
@@ -1498,6 +1545,10 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, nil, fmt.Errorf("服务器尚未安装"))
 		return
 	}
+	if err := s.busyTaskError("install"); err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
 	if err := s.requireNoRunningShards(); err != nil {
 		respond(w, 200, nil, err)
 		return
@@ -1506,9 +1557,22 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]interface{}{"started": err == nil}, err)
 }
 
+// busyTaskError 实现「开服 / 安装更新服务端 / 模组下载」之间的全局互斥。
+// 这三类操作都会改动游戏安装目录或共享 ugc 目录，必须互斥。
+// skip 指明调用方自己属于哪类任务（"install" / "mods"），避免自己挡自己。
+func (s *Server) busyTaskError(skip string) error {
+	if skip != "install" && s.steam.IsInstalling() {
+		return fmt.Errorf("服务器文件正在安装或更新，请等待完成后再操作")
+	}
+	if skip != "mods" && s.mgr.ModsUpdating() {
+		return fmt.Errorf("模组正在下载，请等待完成后再操作")
+	}
+	return nil
+}
+
 // requireNoRunningShards 在安装 / 更新服务器文件前确认没有分片在运行。
 //
-// Windows 下正在运行的 exe 与 dll 是被锁定的，SteamCMD 替换这些文件会失败，
+// 正在运行的服务器进程会持有游戏文件，SteamCMD 替换这些文件可能失败，
 // 最坏情况是留下一个「更新了一半」的安装——那种状态很容易在下次启动时崩溃。
 func (s *Server) requireNoRunningShards() error {
 	busy := s.mgr.RunningShards()
@@ -1517,7 +1581,7 @@ func (s *Server) requireNoRunningShards() error {
 	}
 	return fmt.Errorf(
 		"有分片正在运行（%s），请先全部停止再安装或更新："+
-			"Windows 下正在使用的服务器文件被锁定，更新会失败或只更新一半",
+			"运行中的服务器会占用游戏文件，更新可能失败或只更新一半",
 		strings.Join(busy, "、"))
 }
 

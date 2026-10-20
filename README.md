@@ -1,8 +1,8 @@
-# DSTWin · 饥荒联机版 Windows 开服面板
+# DSTWin · 饥荒联机版开服面板（Windows / Linux）
 
-Windows 原生《饥荒联机版》(Don't Starve Together) 专用服务器管理系统。用 Go 原生进程管理（`exec.Command` + stdin 管道）替代 Linux 下的 `screen`/`bash`/`ps`/`tail`，在 Windows 上直接运行，无需 WSL。
+《饥荒联机版》(Don't Starve Together) 专用服务器管理系统。用 Go 原生进程管理（`exec.Command` + stdin 管道）替代 Linux 下的 `screen`/`bash`/`ps`/`tail`：在 Windows 上直接运行，无需 WSL；也提供 Linux 原生进程层与 Docker Compose 部署。
 
-> 本项目的实现思路参考了 [dst-management-platform-api (DMP)](https://github.com/miracleEverywhere/dst-management-platform-api)，感谢 Miracle 的优秀开源作品（MIT License）。DSTWin 并非 DMP 的分支，而是面向 Windows 平台的独立实现。
+> 本项目的实现思路参考了 [dst-management-platform-api (DMP)](https://github.com/miracleEverywhere/dst-management-platform-api)，感谢 Miracle 的优秀开源作品（MIT License）。DSTWin 并非 DMP 的分支，而是面向 Windows / Linux 平台的独立实现。
 
 ## 功能
 
@@ -15,13 +15,13 @@ Windows 原生《饥荒联机版》(Don't Starve Together) 专用服务器管理
 - **进程守护 + 崩溃重启**：`cmd.Wait()` 监听退出自动拉起；停止前自动发送 `c_save()` + `c_shutdown()`，避免丢档
 - **房间创建**：世界设置（worldgenoverride 可视化编辑）、管理员名单（adminlist.txt）
 - **存档上传**：导入外部存档整包，自动解析新旧两版 ini 结构、转换 leveldataoverride
-- **服务器文件安装/更新**：自动探测 Steam 库 + SteamCMD 安装 DST 专用服务器（appid 343050）
+- **服务器文件安装/更新**：自动探测 Steam 库 + SteamCMD 安装 DST 专用服务器（appid 343050，约 4.5GB）
 
 ## 环境
 
-- Windows 10/11
-- Go 1.25+
-- Steam / SteamCMD（服务器文件安装用，已有安装则自动探测）
+**Windows**：Windows 10/11，Go 1.25+，Steam / SteamCMD（服务器文件安装用，已有安装则自动探测）。
+
+**Linux / Docker**：任意支持 Docker 的 Linux x86_64 主机（推荐直接用下文的 Docker Compose）；裸机运行需 Go 1.25+ 与 i386 运行库（`libc6-i386`、`lib32gcc-s1`、`lib32stdc++6`，SteamCMD 是 32 位程序）。详见下文「Linux / Docker 部署」。
 
 ## 构建与运行
 
@@ -54,8 +54,55 @@ go build -o dst-windows.exe .
 | `-install` | `false` | 仅安装服务器文件后退出 |
 | `-serverdir` | 自动探测 | 专用服务器根目录（含 `bin/` 的 "Don't Starve Together Dedicated Server"） |
 | `-arch` | `auto` | 服务器架构：auto / 64 / 32 |
+| `-data-dir` | 可执行文件同级 | 运行数据根目录（存档/日志/模组/panel.json/SteamCMD）。也可用环境变量 `DST_DATA_DIR`，容器里指向挂载卷 |
 
 服务器目录也可以通过环境变量 `DST_SERVER_DIR` 或 Web 面板里的配置页指定（写入 `panel.json`）。
+
+## Linux / Docker 部署
+
+面板已支持 Linux：进程管理层按平台拆分（`internal/server/process_{windows,linux}.go`、`portstat_linux.go`、`procstat_linux.go`），SteamCMD 同样分平台（`internal/steamcmd/platform_{windows,linux}.go`）。Linux 下每个 DST 分片是独立进程组，超时强停会整组回收，避免残留子进程。
+
+用 Docker Compose 单容器部署（一个面板进程管理全部房间/分片）：
+
+```bash
+cp .env.example .env            # 按需修改 PANEL_UID/GID、DST_SERVER_DIR
+mkdir -p ./data && sudo chown -R 1000:1000 ./data   # 与 PANEL_UID/GID 一致
+docker compose up -d --build
+docker compose logs -f
+```
+
+- **网络**：用 bridge + 显式端口映射（**不用** `network_mode: host`）。
+  - Docker Desktop（Windows/macOS）的 host 网络指向 WSL2/虚拟机自己的 loopback，宿主机浏览器访问不到；
+  - 面板端口只映射到宿主 `127.0.0.1:16800`，默认不对外暴露；
+  - 游戏/协调/Steam 四类端口按范围映射（各 100 个），房间端口由面板动态分配；
+  - 超出映射范围的分片玩家会连不上，多开时按同样步长追加范围。
+- **访问面板**：浏览器打开 `http://127.0.0.1:16800`。远程服务器用 SSH 隧道 `ssh -L 16800:127.0.0.1:16800 user@host`。当前 API 无鉴权，勿改成对外绑定；需要公网时前置带 TLS+认证的反向代理。
+- **持久化**：全部可变数据在 `./data`（容器内 `/data`），含存档、模组、日志、`panel.json`、SteamCMD 与面板自带安装的游戏服务端。备份/迁移直接归档 `data/`。
+- **优雅关服**：`init: true` 转发 SIGTERM，`stop_grace_period: 2m` 给各分片执行 `c_save()` → `c_shutdown()` 的时间，超时才强制结束进程组。
+- **健康检查**：`GET /healthz` 只反映面板进程是否存活，不以「游戏未安装/未开服」为失败。
+
+### 资源要求（实测数据）
+
+DST 专用服务器是内存密集型进程，内存不够会先卡在加载阶段、最终被内核 OOM killer 杀掉。
+实测（游戏版本 `756039`，地表 `forest` 世界）：
+
+| 场景 | 实测内存 |
+|---|---|
+| 单个分片（Master） | 约 0.9～1GB |
+| 双分片（Master + Caves） | 需 ≥ 2.5GB |
+| 安装后磁盘占用 | 约 4.3GB（首次下载 4.5GB） |
+
+因此：
+
+- **每开一个分片至少预留 1～1.5GB 内存**，另加面板与系统开销。
+- 只开地表（关闭洞穴）时 2GB 可跑；地表 + 洞穴建议 **≥ 3GB**；多房间再按分片数递增。
+- Docker Desktop / WSL 默认内存上限偏低时，必须先调大（Windows: `%UserProfile%\\.wslconfig` 的 `memory=`），
+  否则会在世界加载阶段卡住，最终整个容器被 OOM killer 杀掉（`docker inspect` 可见 `ExitCode 137` / `OOMKilled=true`）。
+- 首次生成世界（`WorldSim` 生成地图）比加载已有存档耗时更久、内存峰值更高，宜留出余量。
+
+服务端文件首次由面板用 SteamCMD 匿名安装（`appid 343050`，约 4.5GB）到 `/data/steamapps/common/...`；也可在 `.env` 里用 `DST_SERVER_DIR` 指向已挂载的现有安装。
+
+> 安装中途失败（如 `exit 8` / `App state 0x402`）通常是到 Steam 内容服务器的连接中断。已下载的分块会保留，重新点击安装/更新即可续传。
 
 ## 目录结构
 
@@ -82,8 +129,8 @@ logs/                   运行日志、mod 更新日志
 
 ## 关键实现说明
 
-- **进程管理**：`exec.Command` 启动分片进程（地面/洞穴各一个），`CREATE_NEW_PROCESS_GROUP` 脱离终端控制；长期持有 stdin 管道写入控制台命令；`cmd.Wait()` 监听退出实现崩溃检测与自动重启
-- **存档路径**：用 `-persistent_storage_root` 指向程序目录下的 `dst_save/`，规避 Windows 默认 `文档\Klei` 路径受 OneDrive 重定向的影响
+- **进程管理**：`exec.Command` 启动分片进程（地表/洞穴各一个），按平台隔离进程组（Windows `CREATE_NEW_PROCESS_GROUP`；Linux `Setpgid`）脱离面板生命周期；长期持有 stdin 管道写入控制台命令；`cmd.Wait()` 监听退出实现崩溃检测与自动重启；超时强停时 Windows 杀进程、Linux 杀整个进程组
+- **存档路径**：用 `-persistent_storage_root` 指向数据目录下的 `dst_save/`，规避 Windows 默认 `文档\Klei` 路径受 OneDrive 重定向的影响
 - **mod 预下载**：启动分片前以 `-only_update_server_mods` 跑一次预更新（引擎约 30 秒无回调即退出、一轮只下 1 个，面板自动多轮循环直至下载完整），分片启动时带 `-skip_update_server_mods` 避免多分片抢写共享目录
 - **mods 并集同步**：`dedicated_server_mods_setup.lua` 是安装级文件，面板在 mod/房间增删改时自动重算为所有房间启用 mod 的并集
 

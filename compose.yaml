@@ -1,0 +1,61 @@
+# DST 开服面板 —— 单容器编排
+#
+# 一个面板进程管理全部房间/分片（地表+洞穴+自定义），DST 子进程由面板直接
+# fork 并持有 stdin，因此不拆成多容器，也不挂载 docker.sock。
+#
+# 网络：用 bridge + 显式端口映射，而不是 network_mode: host。
+# 原因：Docker Desktop（Windows/macOS）的 host 网络指向 WSL2/虚拟机自己的
+# loopback，宿主机浏览器访问不到；即使在 Linux 上 host 网络也会把无鉴权的
+# 面板直接暴露到所有网卡。显式映射到宿主 127.0.0.1 既跨平台可用，也默认安全。
+#
+# 房间端口由 internal/room/store.go 动态分配，四个区间：
+#   游戏 11000+ / 分片协调 21000+ / Steam master 31000+ / Steam auth 41000+
+# 下面的映射覆盖 100 个分片的余量（够开几十个房间）。若需更多，按同样的
+# 步长追加范围即可；超出映射范围的分片玩家会连不上。
+#
+# 首次使用前，确保 ./data 目录属主与 PANEL_UID/PANEL_GID 一致：
+#   mkdir -p ./data && sudo chown -R 1000:1000 ./data
+
+services:
+  dst-panel:
+    build:
+      context: .
+      args:
+        PANEL_UID: ${PANEL_UID:-1000}
+        PANEL_GID: ${PANEL_GID:-1000}
+    image: dst-panel:local
+    container_name: dst-panel
+    # init 转发 SIGTERM 并回收僵尸子进程；面板优雅关服依赖 SIGTERM
+    init: true
+    restart: unless-stopped
+    # 给 DST 执行 c_save → c_shutdown 留出时间，超时才 SIGKILL
+    stop_grace_period: 2m
+    environment:
+      DST_DATA_DIR: /data
+      # 可选：指定已安装的 DST 专用服务器目录（含 bin64/ 的那一层，留空则由面板用 SteamCMD 安装到 /data/steamapps/common/...）
+      DST_SERVER_DIR: ${DST_SERVER_DIR:-}
+    ports:
+      # 面板只绑宿主回环：当前 API 无鉴权，不要改成 0.0.0.0。
+      # 远程访问用 SSH 隧道：ssh -L 16800:127.0.0.1:16800 user@host
+      - "127.0.0.1:16800:16800"
+      # 游戏端口（UDP）：玩家直连这些端口
+      - "11000-11099:11000-11099/udp"
+      # 分片协调端口（TCP，cluster.ini master_port）
+      - "21000-21099:21000-21099/tcp"
+      # Steam master / auth 端口（UDP）
+      - "31000-31099:31000-31099/udp"
+      - "41000-41099:41000-41099/udp"
+    volumes:
+      # 单一持久化卷：存档、模组、日志、panel.json、SteamCMD、游戏服务端全在 /data
+      - ./data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:16800/healthz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -9,7 +9,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
-	"syscall"
 	"time"
 )
 
@@ -475,9 +474,7 @@ func (m *Manager) runUpdaterOnce(
 		"-only_update_server_mods",
 	)...)
 	cmd.Dir = workDir
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP,
-	}
+	configureChildProcess(cmd)
 
 	// 持有标准输入而不是让它立刻读到 EOF：进程环境要尽量贴近
 	// 能正常工作的分片启动，避免引擎因读 stdin 行为不一致而提前退出
@@ -501,7 +498,7 @@ func (m *Manager) runUpdaterOnce(
 	m.modMu.Unlock()
 
 	kill := time.AfterFunc(time.Until(deadline), func() {
-		_ = cmd.Process.Kill()
+		_ = forceStopChild(cmd)
 	})
 
 	downloadDone := false
@@ -548,7 +545,7 @@ func (m *Manager) StopModsUpdate() error {
 	m.modCancel = true
 	m.modQueue = nil
 	if m.modCmd != nil && m.modCmd.Process != nil {
-		_ = m.modCmd.Process.Kill()
+		_ = forceStopChild(m.modCmd)
 	}
 	return nil
 }

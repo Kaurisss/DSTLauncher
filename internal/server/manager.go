@@ -1,7 +1,7 @@
 // Package server 实现 DST 专用服务器的进程管理层。
 //
 // 这是整个系统最核心的一层：
-//   - 启动：exec.Command + CREATE_NEW_PROCESS_GROUP，让进程脱离控制台独立存活
+//   - 启动：exec.Command + 平台进程组隔离，让服务器独立于面板生命周期运行
 //   - 命令注入：长期持有 cmd.StdinPipe()，直接往进程标准输入写控制台命令
 //   - 崩溃检测：cmd.Wait() 监听退出，返回非零退出码即判定为崩溃
 //   - 优雅关闭：必须先发 c_save() 再 c_shutdown()，严禁直接 Kill
@@ -10,6 +10,7 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -19,7 +20,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"syscall"
+	"sync/atomic"
 	"time"
 
 	"dst-windows/internal/config"
@@ -171,8 +172,8 @@ type procSample struct {
 // 也可能装完才发现官方还提供了 64 位可执行文件，这些都要在启动分片时才能确定。
 type ExeResolver func() (exePath, workDir string)
 
-// 默认可执行文件名（面板自带安装的 32 位版本）。
-const defaultExeName = "dontstarve_dedicated_server_nullrenderer.exe"
+// errShuttingDown 表示面板正在退出，拒绝再拉起任何分片。
+var errShuttingDown = errors.New("面板正在关闭，已拒绝启动请求")
 
 // Manager 管理所有集群的所有分片进程。
 type Manager struct {
@@ -195,6 +196,12 @@ type Manager struct {
 	subMu  sync.Mutex
 	subs   map[int]chan Event // 每个 SSE 客户端一个通道，避免互相抢事件
 	nextID int
+
+	// ops 是启动分片的独占令牌（容量 1）。检查「是否已在运行」与真正拉起进程
+	// 之间必须原子：并发点击启动会让同一分片起两个进程抢同一个端口。
+	ops chan struct{}
+	// closing 置位后拒绝一切新的启动，包括崩溃自动重启。
+	closing atomic.Bool
 
 	// 模组预更新的状态。单独一把锁：更新可能持续几十分钟，
 	// 不能让它的读写挤在管理分片进程的 mu 上。
@@ -255,6 +262,7 @@ func NewManager(baseDir, binDir, logDir string) *Manager {
 		maxRestarts:  5,
 		restartDelay: 3 * time.Second,
 		subs:         make(map[int]chan Event),
+		ops:          make(chan struct{}, 1),
 	}
 }
 
@@ -353,6 +361,13 @@ func (m *Manager) shardPath(c *Cluster, shard string) string {
 	return config.ShardDir(m.baseDir, c.ConfDir, c.ID, shard)
 }
 
+// BeginShutdown 进入关闭流程：拒绝新的启动与崩溃自动重启，并中止进行中的模组更新。
+// 必须在停止分片之前调用，否则关闭途中崩溃重启会把进程再拉起来。
+func (m *Manager) BeginShutdown() {
+	m.closing.Store(true)
+	_ = m.StopModsUpdate()
+}
+
 // Start 启动指定集群的所有分片。
 func (m *Manager) Start(clusterKey string) error {
 	m.mu.RLock()
@@ -383,6 +398,13 @@ func (m *Manager) StartShard(clusterKey, shard string) error {
 }
 
 func (m *Manager) startShard(c *Cluster, shard string) error {
+	if m.closing.Load() {
+		return errShuttingDown
+	}
+	// 持有令牌直到进程登记完成，杜绝并发启动造成的双开
+	m.ops <- struct{}{}
+	defer func() { <-m.ops }()
+
 	k := procKey(c.Key(), shard)
 
 	m.mu.Lock()
@@ -429,11 +451,7 @@ func (m *Manager) startShard(c *Cluster, shard string) error {
 	// 传相对名会退化为在 %PATH% 中查找，导致 "executable file not found"
 	cmd := exec.Command(exePath, args...)
 	cmd.Dir = workDir
-	// CREATE_NEW_PROCESS_GROUP 让子进程成为独立进程组，
-	// 避免控制台关闭时连带杀掉服务器，也便于整组管理
-	cmd.SysProcAttr = &syscall.SysProcAttr{
-		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP,
-	}
+	configureChildProcess(cmd)
 
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
@@ -596,7 +614,7 @@ func (m *Manager) watch(p *process) {
 	}
 	m.emit(p.cluster.Key(), p.shard, typ, msg)
 
-	if !crashed || !m.autoRestart {
+	if !crashed || !m.autoRestart || m.closing.Load() {
 		p.close()
 		return
 	}
@@ -737,7 +755,7 @@ func (m *Manager) StopShard(clusterKey, shard string, timeout time.Duration) err
 	if p.isAlive() {
 		// 超时才强杀
 		m.emit(clusterKey, shard, "warn", "优雅关闭超时，强制结束进程")
-		_ = p.cmd.Process.Kill()
+		_ = forceStopChild(p.cmd)
 	}
 
 	m.emit(clusterKey, shard, "stop", "已停止")
