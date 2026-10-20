@@ -15,7 +15,7 @@ logs/
 # 本机专用的面板配置（服务器安装路径、架构偏好，由 Web 面板写入）
 serverdir.txt
 panel.json
-steamcmd/
+/steamcmd/
 
 # 本地私密文件（Klei 服务器令牌等），绝不能提交
 个人测试信息.txt
@@ -24,3 +24,10 @@ steamcmd/
 # 共享工坊模组目录（-ugc_directory，所有房间共用同一份 mod）
 ugc_mods/
 extract-worldsettings.exe
+
+# Docker 运行数据挂载点（compose 里 ./data:/data）与本机临时环境变量
+/data/
+/.env
+
+# pi agent 本地工作目录（任务输出等），不提交
+/.pi/
