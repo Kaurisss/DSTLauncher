@@ -13,6 +13,10 @@ import UiField from '@/components/ui/UiField.vue';
 import UiPill from '@/components/ui/UiPill.vue';
 import UiProgress from '@/components/ui/UiProgress.vue';
 import Icon from '@/components/ui/Icon.vue';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { saveApi } from '@/lib/api.js';
 import { toast } from '@/lib/toast.js';
 import { fmtSize } from '@/lib/format.js';
@@ -33,6 +37,10 @@ const mode = ref(props.rooms.length ? MODE_OVERWRITE : MODE_NEW);
 const roomId = ref(
   props.presetRoomId || props.currentRoomId || (props.rooms[0] && props.rooms[0].id) || null,
 );
+const targetRoomLabel = computed(() => {
+  const r = props.rooms.find(x => x.id === roomId.value);
+  return r ? `${r.name}（${r.key}）` : '选择房间';
+});
 
 const file = ref(null);
 const dragging = ref(false);
@@ -155,24 +163,35 @@ async function submit() {
     <section class="form-section">
       <h3>导入到</h3>
 
-      <div class="switches" style="margin-bottom: 14px">
-        <label class="switch">
-          <input v-model="mode" type="radio" :value="MODE_OVERWRITE" :disabled="!rooms.length || busy">
-          覆盖已有房间
+      <RadioGroup v-model="mode" class="flex flex-wrap items-center gap-6 mb-3.5">
+        <label class="flex items-center gap-2 cursor-pointer text-sm">
+          <RadioGroupItem :value="MODE_OVERWRITE" :disabled="!rooms.length || busy" />
+          <span>覆盖已有房间</span>
         </label>
-        <label class="switch">
-          <input v-model="mode" type="radio" :value="MODE_NEW" :disabled="busy">
-          新建房间
+        <label class="flex items-center gap-2 cursor-pointer text-sm">
+          <RadioGroupItem :value="MODE_NEW" :disabled="busy" />
+          <span>新建房间</span>
         </label>
-      </div>
+      </RadioGroup>
 
       <div v-if="mode === MODE_OVERWRITE" class="form-grid">
         <UiField label="目标房间" for-id="s_target">
-          <select id="s_target" v-model.number="roomId" class="select" :disabled="busy">
-            <option v-for="r in rooms" :key="r.id" :value="r.id">
-              {{ r.name }}（{{ r.key }}）
-            </option>
-          </select>
+          <Select
+            :model-value="roomId ? String(roomId) : ''"
+            :disabled="busy || !rooms.length"
+            @update:model-value="(v) => roomId = Number(v)"
+          >
+            <SelectTrigger id="s_target">
+              <SelectValue :placeholder="targetRoomLabel" />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem v-for="r in rooms" :key="r.id" :value="String(r.id)">
+                  {{ r.name }}（{{ r.key }}）
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </UiField>
       </div>
 

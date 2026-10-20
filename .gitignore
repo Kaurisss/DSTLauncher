@@ -34,3 +34,6 @@ extract-worldsettings.exe
 !/.pi/agents/
 /.pi/agents/*
 !/.pi/agents/*.md
+
+# 本地 MCP 运行痕迹
+/.serena/

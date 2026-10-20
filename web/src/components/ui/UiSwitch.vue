@@ -1,6 +1,6 @@
 <script setup>
-// 带文字的开关（复选框包成胶囊样式）。
-// 用 v-model 双向绑定：<UiSwitch v-model="form.pvp" label="PVP" />
+import { Switch } from '@/components/ui/switch';
+
 defineProps({
   modelValue: { type: Boolean, default: false },
   label: { type: String, default: '' },
@@ -11,13 +11,12 @@ const emit = defineEmits(['update:modelValue']);
 </script>
 
 <template>
-  <label class="switch">
-    <input
-      type="checkbox"
+  <label class="inline-flex items-center gap-2 cursor-pointer select-none text-sm text-foreground">
+    <Switch
       :checked="modelValue"
       :disabled="disabled"
-      @change="emit('update:modelValue', $event.target.checked)"
-    >
-    <span>{{ label }}</span>
+      @update:checked="emit('update:modelValue', $event)"
+    />
+    <span v-if="label">{{ label }}</span>
   </label>
 </template>

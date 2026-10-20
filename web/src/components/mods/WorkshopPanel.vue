@@ -13,6 +13,7 @@ import { computed, ref } from 'vue';
 
 import Icon from '@/components/ui/Icon.vue';
 import UiPill from '@/components/ui/UiPill.vue';
+import { Input } from '@/components/ui/input';
 import { workshopApi } from '@/lib/api.js';
 import { guard, toast } from '@/lib/toast.js';
 
@@ -101,12 +102,11 @@ function download(item) {
 <template>
   <div class="workshop">
     <div class="workshop-input">
-      <input
+      <Input
         v-model="keyword"
-        class="input"
         placeholder="搜索关键词，或粘贴模组 ID / 创意工坊链接"
         @keyup.enter="query"
-      >
+      />
       <button class="btn btn-sm btn-primary" :disabled="searching || !keyword.trim()" @click="query">
         <Icon name="globe" size="14" />{{ searching ? '查询中…' : (looksLikeId ? '查询' : '搜索') }}
       </button>
@@ -119,8 +119,11 @@ function download(item) {
     </p>
 
     <div v-if="showKeyForm" class="workshop-key">
-      <input v-model="apiKeyInput" class="input" type="text"
-             placeholder="Steam Web API Key（32 位十六进制，可留空清除）">
+      <Input
+        v-model="apiKeyInput"
+        type="text"
+        placeholder="Steam Web API Key（32 位十六进制，可留空清除）"
+      />
       <button class="btn btn-sm" :disabled="savingKey" @click="saveKey">
         {{ savingKey ? '保存中…' : '保存' }}
       </button>

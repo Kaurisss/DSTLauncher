@@ -6,6 +6,8 @@
 
 import { computed, onMounted, ref, watch } from 'vue';
 
+import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
 import { useLogs } from '@/composables/useLogs.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard } from '@/lib/toast.js';
@@ -95,8 +97,8 @@ async function submit() {
       <span class="pill" :class="connected ? 'pill-ok' : 'pill-warn'">
         {{ connected ? '已连接' : '重连中' }}
       </span>
-      <label class="switch" title="关闭后可以安静地往上翻历史，滚回底部会自动重新打开">
-        <input v-model="autoscroll" type="checkbox">
+      <label class="inline-flex items-center gap-2 cursor-pointer select-none text-xs text-muted-foreground" title="关闭后可以安静地往上翻历史，滚回底部会自动重新打开">
+        <Switch v-model="autoscroll" />
         <span>自动滚动</span>
       </label>
       <button class="btn btn-sm" @click="clear(shard)">清屏</button>
@@ -112,13 +114,12 @@ async function submit() {
     </div>
 
     <form class="console-form" @submit.prevent="submit">
-      <input
+      <Input
         v-model="input"
-        class="input"
         autocomplete="off"
         :disabled="!running"
         :placeholder="running ? '控制台命令，如 c_save() / c_listallplayers()' : shard + ' 未运行'"
-      >
+      />
       <button class="btn btn-primary" type="submit" :disabled="!running">执行</button>
     </form>
   </section>

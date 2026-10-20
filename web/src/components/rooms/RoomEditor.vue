@@ -12,6 +12,11 @@ import UiField from '@/components/ui/UiField.vue';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
 import Icon from '@/components/ui/Icon.vue';
 import ShardEditor from '@/components/rooms/ShardEditor.vue';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard, toast } from '@/lib/toast.js';
 import { GAME_MODE_LABEL, TICK_RATE_LABEL, LANGUAGE_LABEL } from '@/lib/format.js';
@@ -161,45 +166,61 @@ async function save() {
       <h3>基本信息</h3>
       <div class="form-grid">
         <UiField label="房间名" for-id="f_name">
-          <input id="f_name" v-model="form.name" class="input" type="text"
-                 placeholder="显示在服务器列表里的名字">
+          <Input id="f_name" v-model="form.name" type="text" placeholder="显示在服务器列表里的名字" />
         </UiField>
         <UiField label="描述" for-id="f_description">
-          <input id="f_description" v-model="form.description" class="input" type="text"
-                 placeholder="一句话介绍">
+          <Input id="f_description" v-model="form.description" type="text" placeholder="一句话介绍" />
         </UiField>
         <UiField label="游戏模式" for-id="f_gameMode">
-          <select id="f_gameMode" v-model="form.gameMode" class="select">
-            <option v-for="m in gameModes" :key="m" :value="m">
-              {{ GAME_MODE_LABEL[m] || m }}
-            </option>
-          </select>
+          <Select v-model="form.gameMode">
+            <SelectTrigger id="f_gameMode">
+              <SelectValue :placeholder="GAME_MODE_LABEL[form.gameMode] || form.gameMode" />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem v-for="m in gameModes" :key="m" :value="m">
+                  {{ GAME_MODE_LABEL[m] || m }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </UiField>
         <UiField label="最大人数" for-id="f_maxPlayers">
-          <input id="f_maxPlayers" v-model.number="form.maxPlayers" class="input"
-                 type="number" min="1" max="64">
+          <Input id="f_maxPlayers" v-model.number="form.maxPlayers" type="number" min="1" max="64" />
         </UiField>
         <UiField label="tick 频率" for-id="f_tickRate">
-          <select id="f_tickRate" v-model.number="form.tickRate" class="select">
-            <option v-for="t in tickRates" :key="t" :value="t">
-              {{ TICK_RATE_LABEL[t] || t }}
-            </option>
-          </select>
+          <Select :model-value="String(form.tickRate)" @update:model-value="(v) => form.tickRate = Number(v)">
+            <SelectTrigger id="f_tickRate">
+              <SelectValue :placeholder="TICK_RATE_LABEL[form.tickRate] || String(form.tickRate)" />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem v-for="t in tickRates" :key="t" :value="String(t)">
+                  {{ TICK_RATE_LABEL[t] || t }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </UiField>
         <UiField label="语言" for-id="f_language">
-          <select id="f_language" v-model="form.language" class="select">
-            <option v-for="l in languages" :key="l" :value="l">
-              {{ LANGUAGE_LABEL[l] || l }}
-            </option>
-          </select>
+          <Select v-model="form.language">
+            <SelectTrigger id="f_language">
+              <SelectValue :placeholder="LANGUAGE_LABEL[form.language] || form.language" />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem v-for="l in languages" :key="l" :value="l">
+                  {{ LANGUAGE_LABEL[l] || l }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </UiField>
         <UiField label="房间密码" for-id="f_password">
-          <input id="f_password" v-model="form.password" class="input" type="text"
-                 placeholder="留空表示无密码">
+          <Input id="f_password" v-model="form.password" type="text" placeholder="留空表示无密码" />
         </UiField>
         <UiField label="回档点数" for-id="f_maxSnapshots">
-          <input id="f_maxSnapshots" v-model.number="form.maxSnapshots" class="input"
-                 type="number" min="1" max="100">
+          <Input id="f_maxSnapshots" v-model.number="form.maxSnapshots" type="number" min="1" max="100" />
         </UiField>
       </div>
     </section>
@@ -211,10 +232,9 @@ async function save() {
         block
         tip="在线开服必需，会写入存档目录下的 cluster_token.txt；勾选「仅局域网」或「离线模式」后可以留空。"
       >
-        <textarea
+        <Textarea
           id="f_token"
           v-model="form.token"
-          class="textarea"
           rows="2"
           spellcheck="false"
           placeholder="pds-g^... 从 Klei 账号页复制"
@@ -253,11 +273,10 @@ async function save() {
       <summary>高级设置</summary>
       <div class="form-grid form-grid-top">
         <UiField label="主分片 IP" for-id="f_masterIp">
-          <input id="f_masterIp" v-model="form.masterIp" class="input" type="text">
+          <Input id="f_masterIp" v-model="form.masterIp" type="text" />
         </UiField>
         <UiField label="分片协调端口" for-id="f_masterPort">
-          <input id="f_masterPort" v-model.number="form.masterPort" class="input"
-                 type="number" min="1024" max="65535">
+          <Input id="f_masterPort" v-model.number="form.masterPort" type="number" min="1024" max="65535" />
         </UiField>
         <UiField
           label="通信密钥"
@@ -265,7 +284,7 @@ async function save() {
           wide
           tip="地表与洞穴之间的认证密钥，两边必须一致；改动后需重启全部已启用的分片。"
         >
-          <input id="f_clusterKey" v-model="form.clusterKey" class="input" type="text">
+          <Input id="f_clusterKey" v-model="form.clusterKey" type="text" />
         </UiField>
       </div>
     </details>

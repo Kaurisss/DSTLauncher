@@ -7,6 +7,10 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import UiSkeleton from '@/components/ui/UiSkeleton.vue';
+import { Input } from '@/components/ui/input';
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { modApi } from '@/lib/api.js';
 import { toast } from '@/lib/toast.js';
 
@@ -106,46 +110,58 @@ async function save() {
     <div v-for="o in schema" :key="o.name" class="opt">
       <label :for="`opt_${mod.id}_${o.name}`">{{ o.label || o.name }}</label>
 
-      <select
+      <Select
         v-if="fieldType(o) === 'select'"
-        :id="`opt_${mod.id}_${o.name}`"
-        v-model="values[o.name]"
-        class="select"
+        :model-value="values[o.name] !== undefined ? String(values[o.name]) : ''"
         :disabled="disabled"
+        @update:model-value="(v) => values[o.name] = v"
       >
-        <option v-for="op in o.options" :key="op" :value="op">{{ op }}</option>
-      </select>
+        <SelectTrigger :id="`opt_${mod.id}_${o.name}`" class="min-w-36">
+          <SelectValue :placeholder="String(values[o.name] ?? '请选择')" />
+        </SelectTrigger>
+        <SelectContent position="popper">
+          <SelectGroup>
+            <SelectItem v-for="op in o.options" :key="op" :value="String(op)">
+              {{ op }}
+            </SelectItem>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
 
-      <select
+      <Select
         v-else-if="fieldType(o) === 'boolean'"
-        :id="`opt_${mod.id}_${o.name}`"
-        v-model="values[o.name]"
-        class="select"
+        :model-value="values[o.name] === true ? 'true' : (values[o.name] === false ? 'false' : '')"
         :disabled="disabled"
+        @update:model-value="(v) => values[o.name] = (v === 'true')"
       >
-        <option :value="true">true</option>
-        <option :value="false">false</option>
-      </select>
+        <SelectTrigger :id="`opt_${mod.id}_${o.name}`" class="min-w-36">
+          <SelectValue :placeholder="String(values[o.name] ?? '请选择')" />
+        </SelectTrigger>
+        <SelectContent position="popper">
+          <SelectGroup>
+            <SelectItem value="true">true</SelectItem>
+            <SelectItem value="false">false</SelectItem>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
 
-      <input
+      <Input
         v-else-if="fieldType(o) === 'number'"
         :id="`opt_${mod.id}_${o.name}`"
         v-model="values[o.name]"
-        class="input"
         type="number"
         :disabled="disabled"
         :min="o.min !== undefined && o.min !== '' ? o.min : undefined"
         :max="o.max !== undefined && o.max !== '' ? o.max : undefined"
-      >
+      />
 
-      <input
+      <Input
         v-else
         :id="`opt_${mod.id}_${o.name}`"
         v-model="values[o.name]"
-        class="input"
         type="text"
         :disabled="disabled"
-      >
+      />
 
       <div v-if="o.description" class="opt-desc">{{ o.description }}</div>
     </div>

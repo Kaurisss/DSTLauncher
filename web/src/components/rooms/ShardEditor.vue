@@ -11,6 +11,10 @@ import { defineModel } from 'vue';
 
 import Icon from '@/components/ui/Icon.vue';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
+import { Input } from '@/components/ui/input';
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import { WORLD_TYPE_LABEL } from '@/lib/format.js';
 import { confirmAction } from '@/lib/confirm.js';
 
@@ -81,21 +85,28 @@ async function removeShard(index) {
       :class="{ 'is-off': s.disabled }"
     >
       <div class="shard-card-head">
-        <input
+        <Input
           v-model.trim="s.name"
-          class="input shard-name-input"
+          class="shard-name-input"
           :disabled="!canRename(s)"
           :title="canRename(s) ? '英文名，不含空格；保存后不可修改' : '存档目录名，保存后不可修改'"
           placeholder="世界名"
-        >
-        <select
+        />
+        <Select
           v-model="s.worldType"
-          class="select shard-type-select"
           :disabled="!canRename(s)"
-          title="决定世界生成预设与可用设置项"
         >
-          <option v-for="t in WORLD_TYPES" :key="t.value" :value="t.value">{{ t.label }}</option>
-        </select>
+          <SelectTrigger class="shard-type-select w-32" :title="canRename(s) ? '决定世界生成预设与可用设置项' : '存档类型'">
+            <SelectValue :placeholder="typeLabel(s.worldType)" />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectGroup>
+              <SelectItem v-for="t in WORLD_TYPES" :key="t.value" :value="t.value">
+                {{ t.label }}
+              </SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
         <span v-if="s.isMaster" class="pill pill-info">主世界</span>
         <UiSwitch
           :model-value="!s.disabled"
@@ -116,14 +127,13 @@ async function removeShard(index) {
       <div class="shard-ports">
         <label v-for="p in PORTS" :key="p.key" class="shard-port">
           <span>{{ p.label }}</span>
-          <input
+          <Input
             v-model.number="s[p.key]"
-            class="input"
             type="number"
             min="1024"
             max="65535"
             :placeholder="s[p.key] ? '' : '自动分配'"
-          >
+          />
         </label>
       </div>
 

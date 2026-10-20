@@ -19,6 +19,11 @@ import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiField from '@/components/ui/UiField.vue';
 import UiSkeleton from '@/components/ui/UiSkeleton.vue';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 import OptionGroupPanel from '@/components/world/OptionGroupPanel.vue';
 import { worldApi } from '@/lib/api.js';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -280,19 +285,33 @@ onMounted(() => selectShard(rooms.shards[0]));
 
         <div class="form-grid">
           <UiField label="世界生成预设" for-id="w-worldgen" tip="决定地图长什么样">
-            <select id="w-worldgen" v-model="worldgenPreset" class="select" :disabled="worldgenFrozen">
-              <option v-for="p in worldgenPresets" :key="p.data" :value="p.data">
-                {{ p.label ? p.label + '（' + p.data + '）' : p.data }}
-              </option>
-            </select>
+            <Select v-model="worldgenPreset" :disabled="worldgenFrozen">
+              <SelectTrigger id="w-worldgen">
+                <SelectValue :placeholder="worldgenPreset || '选择预设'" />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  <SelectItem v-for="p in worldgenPresets" :key="p.data" :value="p.data">
+                    {{ p.label ? p.label + '（' + p.data + '）' : p.data }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </UiField>
 
           <UiField label="世界规则预设" for-id="w-settings" tip="决定游戏规则">
-            <select id="w-settings" v-model="settingsPreset" class="select" :disabled="frozen">
-              <option v-for="p in settingsPresets" :key="p.data" :value="p.data">
-                {{ p.label ? p.label + '（' + p.data + '）' : p.data }}
-              </option>
-            </select>
+            <Select v-model="settingsPreset" :disabled="frozen">
+              <SelectTrigger id="w-settings">
+                <SelectValue :placeholder="settingsPreset || '选择预设'" />
+              </SelectTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  <SelectItem v-for="p in settingsPresets" :key="p.data" :value="p.data">
+                    {{ p.label ? p.label + '（' + p.data + '）' : p.data }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
           </UiField>
         </div>
 
@@ -356,9 +375,9 @@ onMounted(() => selectShard(rooms.shards[0]));
       </div>
 
       <div class="world-toolbar world-toolbar-sub">
-        <input v-model="keyword" class="input" placeholder="搜索选项（中英文均可）">
-        <label class="switch">
-          <input v-model="onlyChanged" type="checkbox">
+        <Input v-model="keyword" placeholder="搜索选项（中英文均可）" class="max-w-xs" />
+        <label class="inline-flex items-center gap-2 cursor-pointer select-none text-sm text-foreground">
+          <Switch v-model="onlyChanged" />
           <span>只看已改动</span>
         </label>
         <span class="world-count">

@@ -9,6 +9,7 @@ import { onMounted, ref, watch } from 'vue';
 import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
+import { Input } from '@/components/ui/input';
 import { adminApi } from '@/lib/api.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard, toast } from '@/lib/toast.js';
@@ -92,14 +93,14 @@ async function remove(id) {
 
     <template v-else>
       <div class="inline-row" style="max-width: 560px">
-        <input
+        <Input
           v-model="input"
-          class="input mono"
+          class="mono"
           placeholder="输入 Klei ID（KU_ 开头）"
           autocomplete="off"
           spellcheck="false"
           @keydown.enter="add"
-        >
+        />
         <button class="btn btn-primary" :disabled="busy || !input.trim()" @click="add">
           <Icon name="plus" size="14" />添加
         </button>

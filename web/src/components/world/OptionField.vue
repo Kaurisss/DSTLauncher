@@ -11,6 +11,10 @@
 import { computed, ref } from 'vue';
 
 import { iconOf } from '@/lib/worldIcons.js';
+import { Input } from '@/components/ui/input';
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 
 const props = defineProps({
   option: { type: Object, required: true },
@@ -33,10 +37,10 @@ const unknownValue = computed(() => {
   return !vals.some(v => v.data === props.value);
 });
 
-function onChange(e) {
-  if (props.disabled) return;
-  emit('change', e.target.value);
-}
+const currentLabel = computed(() => {
+  const v = props.option.values?.find(x => x.data === props.value);
+  return v ? (v.label || v.data) : props.value;
+});
 </script>
 
 <template>
@@ -58,30 +62,37 @@ function onChange(e) {
         <span v-if="changed" class="opt-row-dot" title="已修改" />
       </label>
 
-      <select
+      <Select
         v-if="option.values && option.values.length"
-        :id="inputId"
-        class="select"
-        :value="value"
+        :model-value="value"
         :disabled="disabled"
-        @change="onChange"
+        @update:model-value="(val) => emit('change', val)"
       >
-        <option v-if="unknownValue" :value="value">{{ value }}（游戏未提供此项）</option>
-        <option v-for="v in option.values" :key="v.data" :value="v.data">
-          {{ v.label || v.data }}
-        </option>
-      </select>
+        <SelectTrigger :id="inputId">
+          <SelectValue :placeholder="currentLabel" />
+        </SelectTrigger>
+        <SelectContent position="popper">
+          <SelectGroup>
+            <SelectItem v-if="unknownValue" :value="value">
+              {{ value }}（游戏未提供此项）
+            </SelectItem>
+            <SelectItem v-for="v in option.values" :key="v.data" :value="v.data">
+              {{ v.label || v.data }}
+            </SelectItem>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
 
-      <input
+      <Input
         v-else
         :id="inputId"
-        class="input mono"
-        :value="value"
+        class="mono"
+        :model-value="value"
         :disabled="disabled"
         autocomplete="off"
         placeholder="按游戏内的名称填写"
-        @change="onChange"
-      >
+        @update:model-value="(val) => emit('change', val)"
+      />
 
       <p v-if="option.dynamic" class="opt-row-tip">取值由游戏运行时决定，需自行填写</p>
     </div>

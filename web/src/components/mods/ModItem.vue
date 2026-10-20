@@ -5,6 +5,7 @@ import { computed, ref, watch } from 'vue';
 
 import UiPill from '@/components/ui/UiPill.vue';
 import Icon from '@/components/ui/Icon.vue';
+import { Switch } from '@/components/ui/switch';
 import ModConfigForm from '@/components/mods/ModConfigForm.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { modApi } from '@/lib/api.js';
@@ -95,13 +96,12 @@ async function updateOne() {
 <template>
   <div class="mod">
     <div class="mod-head">
-      <label class="switch" :class="{ 'is-locked': frozen }">
-        <input
-          type="checkbox"
+      <label class="inline-flex items-center gap-2 cursor-pointer select-none text-sm font-medium" :class="{ 'opacity-50 cursor-not-allowed': frozen }">
+        <Switch
           :checked="enabled"
           :disabled="frozen"
-          @change="onToggle($event.target.checked)"
-        >
+          @update:checked="onToggle($event)"
+        />
         <span>启用</span>
       </label>
 
