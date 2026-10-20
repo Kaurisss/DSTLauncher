@@ -12,6 +12,7 @@ import UiEmpty from '@/components/ui/UiEmpty.vue';
 import { adminApi } from '@/lib/api.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard, toast } from '@/lib/toast.js';
+import { confirmAction } from '@/lib/confirm.js';
 
 const rooms = useRoomsStore();
 
@@ -69,7 +70,7 @@ async function add() {
 async function remove(id) {
   const room = rooms.current;
   if (!room) return;
-  if (!confirm(`移除管理员 ${id}？`)) return;
+  if (!await confirmAction(`移除管理员 ${id}？`)) return;
 
   const { ok, data } = await guard(() => adminApi.remove(room.id, id));
   if (!ok) return;

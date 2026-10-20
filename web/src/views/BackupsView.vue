@@ -10,6 +10,7 @@ import BackupTable from '@/components/backups/BackupTable.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { backupApi } from '@/lib/api.js';
 import { guard, toast } from '@/lib/toast.js';
+import { confirmAction } from '@/lib/confirm.js';
 
 const rooms = useRoomsStore();
 
@@ -55,7 +56,7 @@ async function create() {
 async function restore(name) {
   const room = rooms.current;
   if (!room) return;
-  if (!confirm(`回滚到 ${name}？\n\n当前存档将被覆盖，需先停止服务器。`)) return;
+  if (!await confirmAction(`回滚到 ${name}？\n\n当前存档将被覆盖，需先停止服务器。`)) return;
 
   const { ok } = await guard(
     () => backupApi.restore(room.id, name),
@@ -67,7 +68,7 @@ async function restore(name) {
 async function remove(name) {
   const room = rooms.current;
   if (!room) return;
-  if (!confirm(`删除备份 ${name}？`)) return;
+  if (!await confirmAction(`删除备份 ${name}？`)) return;
 
   const { ok } = await guard(() => backupApi.remove(room.id, name), { success: '已删除' });
   if (ok) load();

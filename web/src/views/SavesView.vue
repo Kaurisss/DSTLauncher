@@ -12,6 +12,7 @@ import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiSkeleton from '@/components/ui/UiSkeleton.vue';
 import { savesApi } from '@/lib/api.js';
 import { guard, toast } from '@/lib/toast.js';
+import { confirmAction } from '@/lib/confirm.js';
 import { fmtSize, fmtTime } from '@/lib/format.js';
 
 const items = ref([]);
@@ -54,7 +55,7 @@ async function remove(item) {
     return;
   }
 
-  const ok = confirm(
+  const ok = await confirmAction(
     `永久删除 ${item.cluster}？\n\n`
     + `分片：${shardNames(item)}\n`
     + `占用：${fmtSize(item.size)}\n`

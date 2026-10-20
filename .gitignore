@@ -29,5 +29,8 @@ extract-worldsettings.exe
 /data/
 /.env
 
-# pi agent 本地工作目录（任务输出等），不提交
-/.pi/
+# pi 本地任务/截图等不提交，仅允许项目级代理定义进入版本控制
+/.pi/*
+!/.pi/agents/
+/.pi/agents/*
+!/.pi/agents/*.md

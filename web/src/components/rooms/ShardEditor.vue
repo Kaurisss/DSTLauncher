@@ -12,6 +12,7 @@ import { defineModel } from 'vue';
 import Icon from '@/components/ui/Icon.vue';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { WORLD_TYPE_LABEL } from '@/lib/format.js';
+import { confirmAction } from '@/lib/confirm.js';
 
 const props = defineProps({
   /** 新建房间时还没落盘，所有分片都可以改名 */
@@ -58,10 +59,10 @@ function addShard() {
   ];
 }
 
-function removeShard(index) {
+async function removeShard(index) {
   const s = shards.value[index];
   if (!s || s.isMaster) return;
-  const ok = confirm(
+  const ok = await confirmAction(
     `从面板移除世界「${s.name}」？\n\n`
     + '存档目录会保留在磁盘上，但面板不再管理它。\n'
     + '以后用同名的分片重新添加，就能继续使用这份存档。',

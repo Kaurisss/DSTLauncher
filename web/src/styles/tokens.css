@@ -1,3 +1,4 @@
+
 @layer theme, base, legacy, components, utilities;
 @import "./legacy.css" layer(legacy);
 @import "./components.css" layer(legacy);
@@ -136,6 +137,11 @@
     --legacy-primary-text: var(--primary-foreground);
     --legacy-primary-glow: color-mix(in srgb, var(--primary) 20%, transparent);
     --legacy-focus-ring: 0 0 0 3px color-mix(in srgb, var(--ring) 50%, transparent);
+    --ok: var(--primary);
+    --ok-soft: color-mix(in srgb, var(--primary) 14%, transparent);
+    --danger: var(--destructive);
+    --danger-hover: color-mix(in srgb, var(--destructive) 85%, var(--foreground));
+    --danger-soft: color-mix(in srgb, var(--destructive) 14%, transparent);
   }
 }
 

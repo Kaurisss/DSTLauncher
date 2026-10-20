@@ -3,12 +3,12 @@ import { computed } from 'vue';
 import { HugeiconsIcon } from '@hugeicons/vue';
 import {
   Archive02Icon, CodeFolderIcon, DashboardSquare01Icon, EarthIcon,
-  Folder01Icon, GameController03Icon, PackageIcon, ServerStack01Icon,
+  Folder01Icon, PackageIcon, ServerStack01Icon,
 } from '@hugeicons/core-free-icons';
 import { Badge } from '@/components/ui/badge';
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
-  SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
+  SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   SidebarSeparator, useSidebar,
 } from '@/components/ui/sidebar';
 import { useUiStore } from '@/stores/ui.js';
@@ -38,22 +38,10 @@ function navigate(key) {
 </script>
 
 <template>
-  <Sidebar collapsible="icon">
-    <SidebarHeader>
-      <div class="flex items-center gap-3 p-2 group-data-[collapsible=icon]:p-0">
-        <span class="flex size-8 shrink-0 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-          <HugeiconsIcon :icon="GameController03Icon" class="size-5" aria-hidden="true" />
-        </span>
-        <div class="min-w-0 group-data-[collapsible=icon]:hidden">
-          <p class="truncate text-sm font-semibold">DST 开服控制台</p>
-          <p class="text-xs text-muted-foreground">专用服务器管理</p>
-        </div>
-      </div>
-    </SidebarHeader>
-
+  <Sidebar collapsible="icon" class="top-14 h-[calc(100svh-3.5rem)]">
     <SidebarContent>
       <SidebarGroup>
-        <SidebarGroupLabel>管理</SidebarGroupLabel>
+        <SidebarGroupLabel class="group-data-[collapsible=icon]:hidden">管理</SidebarGroupLabel>
         <SidebarGroupContent>
           <nav id="app-navigation" aria-label="主导航">
             <SidebarMenu>

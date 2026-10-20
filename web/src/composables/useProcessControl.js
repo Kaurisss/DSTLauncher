@@ -6,6 +6,7 @@
 
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard } from '@/lib/toast.js';
+import { confirmAction } from '@/lib/confirm.js';
 
 export function useProcessControl() {
   const rooms = useRoomsStore();
@@ -27,13 +28,25 @@ export function useProcessControl() {
     },
 
     async stop(shard) {
-      if (!confirm(`停止${label(shard)}分片？将先自动保存存档。`)) return false;
+      const ok = await confirmAction({
+        title: `停止${label(shard)}分片？`,
+        description: '将先自动保存存档。',
+        confirmText: '停止分片',
+        destructive: true,
+      });
+      if (!ok) return false;
       // 停服要等 c_save + c_shutdown，全部分片要给足够长的等待
       return run(() => rooms.stop(shard, shard ? 40 : 60), `${label(shard)}分片已停止`);
     },
 
     async restart(shard) {
-      if (!confirm(`重启 ${shard}？将先自动保存存档。`)) return false;
+      const ok = await confirmAction({
+        title: `重启 ${shard}？`,
+        description: '将先自动保存存档。',
+        confirmText: '重启分片',
+        destructive: true,
+      });
+      if (!ok) return false;
       return run(() => rooms.restart(shard), `${shard} 已重启`);
     },
   };

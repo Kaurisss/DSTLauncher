@@ -41,6 +41,8 @@ const { useUiStore } = await vite.ssrLoadModule('/src/stores/ui.js');
 const { procApi, roomApi } = await vite.ssrLoadModule('/src/lib/api.js');
 const { useLogs } = await vite.ssrLoadModule('/src/composables/useLogs.js');
 const themeModule = await vite.ssrLoadModule('/src/composables/useTheme.js');
+const { confirmAction, confirmState, handleCancel, handleConfirm } = await vite.ssrLoadModule('/src/lib/confirm.js');
+const { useProcessControl } = await vite.ssrLoadModule('/src/composables/useProcessControl.js');
 const { default: Banner } = await vite.ssrLoadModule('/src/components/CurrentRoomBanner.vue');
 const logs = useLogs();
 let pinia;
@@ -257,4 +259,34 @@ test('清屏和切房清理同时丢弃待落账日志', async () => {
   sources.at(-1).emit('new room');
   await wait(150);
   assert.deepEqual(logs.channels.Master.lines.map(l => l.text), ['new room']);
+});
+
+test('通用确认弹窗支持异步取消与确认，危险动作为红，分片启停先走统一弹窗', async () => {
+  const cancelPromise = confirmAction('删除「测试房间」？\n\n磁盘存档会保留。');
+  assert.equal(confirmState.open, true);
+  assert.equal(confirmState.title, '删除「测试房间」？');
+  assert.equal(confirmState.description, '磁盘存档会保留。');
+  assert.equal(confirmState.destructive, true);
+  handleCancel();
+  assert.equal(await cancelPromise, false);
+  assert.equal(confirmState.open, false);
+
+  const confirmPromise = confirmAction({ title: '确认更新', description: '拉取最新补丁' });
+  assert.equal(confirmState.open, true);
+  assert.equal(confirmState.destructive, false);
+  handleConfirm();
+  assert.equal(await confirmPromise, true);
+  assert.equal(confirmState.open, false);
+
+  const proc = useProcessControl();
+  let stopCalled = false;
+  mock.method(procApi, 'stop', async () => { stopCalled = true; return { ok: true }; });
+
+  const stopPromise = proc.stop('Master');
+  assert.equal(confirmState.open, true);
+  assert.match(confirmState.title, /停止Master分片/);
+  handleCancel();
+  const stopOk = await stopPromise;
+  assert.equal(stopOk, false);
+  assert.equal(stopCalled, false);
 });

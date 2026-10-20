@@ -8,9 +8,9 @@ import { computed, onMounted, onUnmounted, watch } from 'vue';
 
 import AppSidebar from '@/components/AppSidebar.vue';
 import TopBar from '@/components/TopBar.vue';
-import CurrentRoomBanner from '@/components/CurrentRoomBanner.vue';
 import ToastHost from '@/components/ToastHost.vue';
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
+import ConfirmHost from '@/components/ConfirmHost.vue';
+import { SidebarProvider } from '@/components/ui/sidebar';
 
 import OverviewView from '@/views/OverviewView.vue';
 import RoomsView from '@/views/RoomsView.vue';
@@ -87,21 +87,26 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <SidebarProvider>
+  <SidebarProvider class="flex h-svh max-h-svh flex-col overflow-hidden bg-sidebar">
     <a href="#page-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:p-3 focus:text-foreground focus:shadow-md">跳到内容</a>
-    <AppSidebar />
+    <TopBar />
 
-    <SidebarInset class="min-w-0">
-      <TopBar />
-      <!-- 全局当前房间标识：每个页面都能看到正在操作的是哪个房间 -->
-      <CurrentRoomBanner />
+    <div class="flex flex-1 min-h-0 w-full overflow-hidden">
+      <AppSidebar />
 
-      <div id="page-content" tabindex="-1" class="w-full max-w-[2400px] min-w-0 p-4 md:p-6">
-        <!-- 不延迟旧视图卸载，快速导航和换房始终只保留一个业务实例。 -->
-        <component :is="currentView" :key="viewKey" />
-      </div>
-    </SidebarInset>
+      <main
+        id="page-content"
+        tabindex="-1"
+        class="flex-1 min-w-0 md:rounded-tl-3xl bg-background md:border-t md:border-l border-border shadow-xs flex flex-col overflow-y-auto"
+      >
+        <div class="w-full max-w-[2400px] min-w-0 p-4 md:p-6">
+          <!-- 不延迟旧视图卸载，快速导航和换房始终只保留一个业务实例。 -->
+          <component :is="currentView" :key="viewKey" />
+        </div>
+      </main>
+    </div>
   </SidebarProvider>
 
   <ToastHost />
+  <ConfirmHost />
 </template>

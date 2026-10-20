@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button';
 import { useSidebar } from "./utils";
 
 const props = defineProps({
+  size: {
+    type: String,
+    required: false,
+    default: "icon",
+  },
   class: {
     type: [Boolean, null, String, Object, Array],
     required: false,
@@ -21,7 +26,7 @@ const { toggleSidebar, isMobile, openMobile, open } = useSidebar();
     data-sidebar="trigger"
     data-slot="sidebar-trigger"
     variant="ghost"
-    size="icon-sm"
+    :size="props.size"
     :class="cn('', props.class)"
     :aria-expanded="isMobile ? openMobile : open"
     @click="toggleSidebar"

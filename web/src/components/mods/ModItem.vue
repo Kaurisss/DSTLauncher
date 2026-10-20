@@ -9,6 +9,7 @@ import ModConfigForm from '@/components/mods/ModConfigForm.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { modApi } from '@/lib/api.js';
 import { guard, toast } from '@/lib/toast.js';
+import { confirmAction } from '@/lib/confirm.js';
 import { fmtUnix } from '@/lib/format.js';
 
 const props = defineProps({
@@ -55,7 +56,7 @@ async function remove() {
   const room = rooms.current;
   if (!room) return;
   const name = props.mod.name || props.mod.id;
-  if (!confirm(
+  if (!await confirmAction(
     `删除模组「${name}」？\n\n` +
     `模组实体是所有房间共享的，删除本地文件后其它房间也无法使用；` +
     `只会从当前房间的 modoverrides 中移除启用记录。`,
@@ -74,14 +75,14 @@ async function remove() {
  * 有会话在跑时后端会排队串行下载，这里不需要因「更新中」而禁用。
  * 启动交给父组件（轮询归它管），这里只做确认。
  */
-function updateOne() {
+async function updateOne() {
   if (frozen.value) return;
   if (!props.mod.id.startsWith('workshop-')) {
     toast('本地模组不支持在线更新', 'warn');
     return;
   }
   const name = props.mod.name || props.mod.id;
-  if (props.mod.installed && !confirm(
+  if (props.mod.installed && !await confirmAction(
     `重新下载模组「${name}」？\n\n` +
     `将删除本地文件并从创意工坊重新获取，用于修复损坏或拉取更新；\n` +
     `模组实体所有房间共享，重下期间其它房间也暂时不可用。`,

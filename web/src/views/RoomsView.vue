@@ -11,6 +11,7 @@ import RoomAdmins from '@/components/rooms/RoomAdmins.vue';
 import SaveUploadPanel from '@/components/rooms/SaveUploadPanel.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard, toast } from '@/lib/toast.js';
+import { confirmAction } from '@/lib/confirm.js';
 
 const rooms = useRoomsStore();
 
@@ -73,7 +74,7 @@ async function onUploaded() {
 async function onRemove(id) {
   const room = rooms.list.find(r => r.id === Number(id));
   const name = room ? room.name : '房间';
-  if (!confirm(`删除「${name}」？\n\n只会从面板移除，磁盘上的存档目录会保留。`)) return;
+  if (!await confirmAction(`删除「${name}」？\n\n只会从面板移除，磁盘上的存档目录会保留。`)) return;
 
   const { ok, data } = await guard(() => rooms.remove(id));
   if (!ok) return;
