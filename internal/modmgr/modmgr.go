@@ -543,11 +543,9 @@ func (m *Manager) InstalledMods() (map[string]bool, error) {
 	return out, nil
 }
 
-// findModDir 定位某个模组的实体目录，找不到返回空串。
-// 依次尝试已知布局，最后做限深搜索兜底（兼容手工安装的目录结构）。
-func (m *Manager) findModDir(id string) string {
+func (m *Manager) modDirCandidates(id string) []string {
 	num := strings.TrimPrefix(id, "workshop-")
-	cands := []string{
+	return []string{
 		// 共享 UGC 布局（服务器 -ugc_directory 指向的目录）
 		filepath.Join(m.ugcDir, "content", "322330", num),
 		filepath.Join(m.ugcDir, "steamapps", "workshop", "content", "322330", num),
@@ -558,7 +556,13 @@ func (m *Manager) findModDir(id string) string {
 		filepath.Join(m.modsDir, id),
 		filepath.Join(m.modsDir, num),
 	}
-	for _, c := range cands {
+}
+
+// findModDir 定位某个模组的实体目录，找不到返回空串。
+// 依次尝试已知布局，最后做限深搜索兜底（兼容手工安装的目录结构）。
+func (m *Manager) findModDir(id string) string {
+	num := strings.TrimPrefix(id, "workshop-")
+	for _, c := range m.modDirCandidates(id) {
 		if fileExists(filepath.Join(c, "modinfo.lua")) {
 			return c
 		}
@@ -1036,8 +1040,31 @@ func (m *Manager) SetConfig(id, key string, value interface{}) error {
 // 注意：模组实体是跨房间共享的，删除会同时影响其它房间——
 // 调用方（Web 层 / 前端确认框）必须把这一点明确告知用户。
 func (m *Manager) DeleteMod(id string) error {
-	// 模组已不在本地时也允许清理 overrides 中的残留记录
+	if !filepath.IsLocal(id) || id != strings.TrimRight(id, ". ") || strings.ContainsAny(id, `/\:`) {
+		return fmt.Errorf("无效的模组 ID")
+	}
+	dirs := []string{filepath.Join(m.modsDir, id)}
+	if num, workshop := strings.CutPrefix(id, "workshop-"); workshop {
+		if num == "" || strings.Trim(num, "0123456789") != "" {
+			return fmt.Errorf("无效的创意工坊模组 ID")
+		}
+		dirs = m.modDirCandidates(id)
+	}
 	if dir := m.findModDir(id); dir != "" {
+		dirs = append(dirs, dir)
+	}
+	// 清理全部已知副本，包括没有 modinfo.lua 的残缺下载目录。
+	for _, dir := range dirs {
+		info, err := os.Stat(dir)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return fmt.Errorf("读取模组目录失败: %w", err)
+		}
+		if !info.IsDir() {
+			continue
+		}
 		if err := os.RemoveAll(dir); err != nil {
 			return fmt.Errorf("删除模组目录失败: %w", err)
 		}

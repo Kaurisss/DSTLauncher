@@ -23,6 +23,11 @@ const emit = defineEmits(['changed', 'update']);
 
 const rooms = useRoomsStore();
 const expanded = ref(false);
+const coverFailed = ref(false);
+watch(() => props.mod.previewUrl, () => { coverFailed.value = false; });
+const workshopUrl = computed(() => /^workshop-\d+$/.test(props.mod.id)
+  ? `https://steamcommunity.com/sharedfiles/filedetails/?id=${props.mod.id.slice('workshop-'.length)}`
+  : '');
 
 /** 服务器运行中冻结：模组开关与配置重启后才生效，改了也不生效 */
 const frozen = computed(() => rooms.running);
@@ -95,34 +100,58 @@ async function updateOne() {
 
 <template>
   <div class="mod">
-    <div class="mod-head">
-      <label class="inline-flex items-center gap-2 cursor-pointer select-none text-sm font-medium" :class="{ 'opacity-50 cursor-not-allowed': frozen }">
-        <Switch
-          :checked="enabled"
-          :disabled="frozen"
-          @update:checked="onToggle($event)"
-        />
-        <span>启用</span>
-      </label>
+    <div class="mod-entry-head">
+      <div class="mod-summary">
+        <div class="mod-cover" aria-hidden="true">
+          <img
+            v-if="mod.previewUrl && !coverFailed"
+            :src="mod.previewUrl"
+            alt=""
+            loading="lazy"
+            decoding="async"
+            @error="coverFailed = true"
+          >
+          <Icon v-else name="package" size="28" />
+        </div>
+        <div class="mod-info">
+          <a
+            v-if="workshopUrl"
+            class="mod-name mod-workshop-link"
+            :href="workshopUrl"
+            target="_blank"
+            rel="noopener noreferrer"
+            title="在 Steam 创意工坊查看（新标签页）"
+          >{{ mod.name || mod.id }}<Icon name="globe" size="14" /></a>
+          <span v-else class="mod-name">{{ mod.name || mod.id }}</span>
+          <div class="mod-status">
+            <UiPill :tone="enabled ? 'ok' : 'muted'">
+              {{ enabled ? '已启用' : '已禁用' }}
+            </UiPill>
+            <UiPill :tone="mod.installed ? 'muted' : 'warn'">
+              {{ mod.installed ? '已下载' : '未下载' }}
+            </UiPill>
+            <UiPill
+              v-if="updateInfo"
+              tone="warn"
+              :title="`本地 ${fmtUnix(updateInfo.localTime)}，工坊 ${fmtUnix(updateInfo.remoteTime)}`"
+            >
+              有新版本
+            </UiPill>
+          </div>
+          <div class="mod-id">{{ mod.id }}</div>
+        </div>
+      </div>
 
-      <span class="mod-name">{{ mod.name || mod.id }}</span>
-
-      <UiPill :tone="enabled ? 'ok' : 'muted'">
-        {{ enabled ? '已启用' : '已禁用' }}
-      </UiPill>
-      <UiPill :tone="mod.installed ? 'muted' : 'warn'">
-        {{ mod.installed ? '已下载' : '未下载' }}
-      </UiPill>
-      <UiPill
-        v-if="updateInfo"
-        tone="warn"
-        :title="`本地 ${fmtUnix(updateInfo.localTime)}，工坊 ${fmtUnix(updateInfo.remoteTime)}`"
-      >
-        有新版本
-      </UiPill>
-
-      <span class="mod-actions">
-        <span class="mod-id">{{ mod.id }}</span>
+      <div class="mod-entry-actions">
+        <label class="mod-toggle" :class="{ 'opacity-50 cursor-not-allowed': frozen }">
+          <Switch
+            :model-value="enabled"
+            :disabled="frozen"
+            :aria-label="`启用 ${mod.name || mod.id}`"
+            @update:model-value="onToggle($event)"
+          />
+          <span>启用</span>
+        </label>
         <button
           v-if="mod.id.startsWith('workshop-')"
           class="btn btn-sm"
@@ -142,7 +171,7 @@ async function updateOne() {
           {{ expanded ? '收起' : '配置' }}
         </button>
         <button class="btn btn-sm btn-danger" :disabled="frozen" @click="remove">删除</button>
-      </span>
+      </div>
     </div>
 
     <div v-if="expanded" class="mod-body">
@@ -150,3 +179,44 @@ async function updateOne() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.mod-entry-head { display: flex; align-items: center; flex-wrap: wrap; gap: 16px; }
+.mod-summary { display: flex; align-items: center; gap: 14px; flex: 1 1 280px; min-width: 0; }
+.mod-cover {
+  display: grid;
+  place-items: center;
+  width: 72px;
+  height: 72px;
+  flex-shrink: 0;
+  overflow: hidden;
+  border-radius: 8px;
+  background: var(--surface-3);
+  color: var(--text-muted);
+}
+.mod-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  outline: 1px solid oklch(0 0 0 / 0.1);
+  outline-offset: -1px;
+}
+:global(.dark) .mod-cover img { outline-color: oklch(1 0 0 / 0.1); }
+.mod-info { min-width: 0; }
+.mod-name { font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }
+.mod-workshop-link { color: var(--text); text-decoration: none; }
+.mod-workshop-link svg { display: inline; margin-left: 6px; vertical-align: -2px; color: var(--text-muted); }
+.mod-workshop-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 3px; border-radius: 2px; }
+@media (hover: hover) {
+  .mod-workshop-link:hover { color: var(--legacy-primary); text-decoration: underline; text-underline-offset: 3px; }
+}
+.mod-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin: 5px 0; }
+.mod-id { overflow-wrap: anywhere; }
+.mod-entry-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.mod-toggle { display: inline-flex; align-items: center; gap: 8px; margin-right: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }
+@media (max-width: 640px) {
+  .mod-summary { flex-basis: 100%; }
+  .mod-entry-actions { width: 100%; justify-content: flex-end; }
+  .mod-toggle { margin-right: auto; }
+}
+</style>

@@ -25,9 +25,10 @@ import { confirmState, handleCancel, handleConfirm } from '@/lib/confirm.js';
         <AlertDialogCancel @click="handleCancel">
           {{ confirmState.cancelText }}
         </AlertDialogCancel>
+        <!-- 先解析确认结果，再由组件内部关闭事件处理弹窗，避免被误判为取消。 -->
         <AlertDialogAction
           :class="confirmState.destructive ? 'bg-destructive text-destructive-foreground hover:bg-destructive/90' : ''"
-          @click="handleConfirm"
+          @click.capture="handleConfirm"
         >
           {{ confirmState.confirmText }}
         </AlertDialogAction>

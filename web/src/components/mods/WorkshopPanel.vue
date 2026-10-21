@@ -143,7 +143,13 @@ function download(item) {
         >
         <div class="workshop-info">
           <div class="workshop-title">
-            {{ item.title || item.id }}
+            <a
+              :href="`https://steamcommunity.com/sharedfiles/filedetails/?id=${item.id}`"
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring"
+              title="在 Steam 创意工坊查看（新标签页）"
+            >{{ item.title || item.id }}</a>
             <UiPill v-if="item.id === downloadingId" tone="info">
               下载中{{ progress ? ' ' + progress : '…' }}
             </UiPill>
