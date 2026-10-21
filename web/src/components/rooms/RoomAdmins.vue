@@ -9,6 +9,7 @@ import { onMounted, ref, watch } from 'vue';
 import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { adminApi } from '@/lib/api.js';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -24,8 +25,10 @@ const loading = ref(false);
 const loadError = ref('');
 const input = ref('');
 const busy = ref(false);
+let reqId = 0;
 
 async function load() {
+  const req = ++reqId;
   const room = rooms.current;
   if (!room) {
     admins.value = [];
@@ -36,13 +39,15 @@ async function load() {
   loadError.value = '';
   try {
     const data = await adminApi.list(room.id);
+    if (req !== reqId || room.id !== rooms.currentId) return;
     admins.value = data.admins || [];
     file.value = data.file || '';
     needRestart.value = !!data.needRestart;
   } catch (err) {
+    if (req !== reqId || room.id !== rooms.currentId) return;
     loadError.value = err.message;
   } finally {
-    loading.value = false;
+    if (req === reqId) loading.value = false;
   }
 }
 
@@ -52,32 +57,46 @@ watch(() => rooms.currentId, load);
 async function add() {
   const room = rooms.current;
   const id = input.value.trim();
-  if (!room || !id) return;
+  if (!room || !id || busy.value) return;
   if (!/^KU_[A-Za-z0-9]{1,32}$/i.test(id)) {
     toast('Klei ID 不合法：应为 KU_ 开头、后接字母数字', 'err');
     return;
   }
 
+  const targetRoomId = room.id;
   busy.value = true;
-  const { ok, data } = await guard(() => adminApi.add(room.id, id));
-  busy.value = false;
-  if (!ok) return;
-  admins.value = data.admins;
-  needRestart.value = !!data.needRestart;
-  input.value = '';
-  toast(`已添加管理员 ${id.toUpperCase().slice(0, 8)}…（重启后生效）`);
+  try {
+    const { ok, data } = await guard(() => adminApi.add(targetRoomId, id));
+    if (!ok) return;
+    if (rooms.currentId === targetRoomId) {
+      admins.value = data.admins;
+      needRestart.value = !!data.needRestart;
+      input.value = '';
+    }
+    toast(`已添加管理员 ${id.toUpperCase().slice(0, 8)}…（重启后生效）`);
+  } finally {
+    busy.value = false;
+  }
 }
 
 async function remove(id) {
   const room = rooms.current;
-  if (!room) return;
-  if (!await confirmAction(`移除管理员 ${id}？`)) return;
+  if (!room || busy.value) return;
+  const targetRoomId = room.id;
+  busy.value = true;
+  try {
+    if (!await confirmAction(`移除管理员 ${id}？`)) return;
 
-  const { ok, data } = await guard(() => adminApi.remove(room.id, id));
-  if (!ok) return;
-  admins.value = data.admins;
-  needRestart.value = !!data.needRestart;
-  toast('已移除（重启后生效）');
+    const { ok, data } = await guard(() => adminApi.remove(targetRoomId, id));
+    if (!ok) return;
+    if (rooms.currentId === targetRoomId) {
+      admins.value = data.admins;
+      needRestart.value = !!data.needRestart;
+    }
+    toast('已移除（重启后生效）');
+  } finally {
+    busy.value = false;
+  }
 }
 </script>
 
@@ -101,9 +120,9 @@ async function remove(id) {
           spellcheck="false"
           @keydown.enter="add"
         />
-        <button class="btn btn-primary" :disabled="busy || !input.trim()" @click="add">
+        <Button :disabled="busy || !input.trim()" @click="add">
           <Icon name="plus" size="14" />添加
-        </button>
+        </Button>
       </div>
       <p class="field-tip" style="margin-top: 6px">
         游戏内按 ` 反引号打开控制台，输入 TheNet:GetUserID() 可查看自己的 Klei ID。
@@ -118,7 +137,9 @@ async function remove(id) {
         <div v-for="id in admins" :key="id" class="admin-row">
           <Icon class="admin-row-icon" name="users" size="14" />
           <span class="mono">{{ id }}</span>
-          <button class="btn btn-sm btn-danger" @click="remove(id)">移除</button>
+          <Button variant="destructive" size="sm" class="h-6 rounded-full px-2 text-xs" :disabled="busy" @click="remove(id)">
+            移除
+          </Button>
         </div>
       </div>
       <UiEmpty v-else icon="users" text="暂无管理员。房主（服务器持有者）默认就是管理员" />

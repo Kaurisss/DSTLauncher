@@ -5,13 +5,15 @@
 // 的所有可配置项。表单状态是本地副本，只有点保存才写回后端。
 // 切换编辑对象时由父组件用 :key 重建本组件，因此不需要 watch 同步。
 
-import { computed, reactive } from 'vue';
+import { computed, reactive, ref } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
 import UiField from '@/components/ui/UiField.vue';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
 import Icon from '@/components/ui/Icon.vue';
 import ShardEditor from '@/components/rooms/ShardEditor.vue';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -91,6 +93,8 @@ function buildForm() {
 }
 
 const form = reactive(buildForm());
+const saving = ref(false);
+const saveError = ref('');
 
 const gameModes = computed(() => (props.meta && props.meta.gameModes) || Object.keys(GAME_MODE_LABEL));
 const tickRates = computed(() => (props.meta && props.meta.tickRates) || [15, 30, 60]);
@@ -103,50 +107,61 @@ function toNum(value, fallback) {
 }
 
 async function save() {
-  const payload = {
-    id: form.id,
-    name: form.name.trim(),
-    description: form.description.trim(),
-    gameMode: form.gameMode,
-    maxPlayers: toNum(form.maxPlayers, 12),
-    tickRate: toNum(form.tickRate, 30),
-    language: form.language,
-    password: form.password,
-    token: form.token.trim(),
-    maxSnapshots: toNum(form.maxSnapshots, 10),
-    masterIp: form.masterIp.trim(),
-    masterPort: toNum(form.masterPort, 0),
-    clusterKey: form.clusterKey.trim(),
-    pvp: form.pvp,
-    pauseEmpty: form.pauseEmpty,
-    voteEnabled: form.voteEnabled,
-    voteKick: form.voteKick,
-    lanOnly: form.lanOnly,
-    offline: form.offline,
+  if (saving.value) return;
+  saveError.value = '';
+  saving.value = true;
 
-    // 分片：名字/类型/启停/世界 id 由用户决定，端口留 0 表示交给后端统一分配
-    shards: form.shards.map(s => ({
-      name: s.name.trim(),
-      worldType: s.worldType,
-      isMaster: s.isMaster,
-      disabled: s.disabled,
-      gameId: s.gameId || 0,
-      serverPort: toNum(s.serverPort, 0),
-      masterServerPort: toNum(s.masterServerPort, 0),
-      authenticationPort: toNum(s.authenticationPort, 0),
-    })),
-  };
+  try {
+    const payload = {
+      id: form.id,
+      name: form.name.trim(),
+      description: form.description.trim(),
+      gameMode: form.gameMode,
+      maxPlayers: toNum(form.maxPlayers, 12),
+      tickRate: toNum(form.tickRate, 30),
+      language: form.language,
+      password: form.password,
+      token: form.token.trim(),
+      maxSnapshots: toNum(form.maxSnapshots, 10),
+      masterIp: form.masterIp.trim(),
+      masterPort: toNum(form.masterPort, 0),
+      clusterKey: form.clusterKey.trim(),
+      pvp: !!form.pvp,
+      pauseEmpty: !!form.pauseEmpty,
+      voteEnabled: !!form.voteEnabled,
+      voteKick: !!form.voteKick,
+      lanOnly: !!form.lanOnly,
+      offline: !!form.offline,
 
-  const { ok, data } = await guard(() =>
-    isNew.value ? rooms.create(payload) : rooms.update(payload));
-  if (!ok) return;
+      // 分片：名字/类型/启停/世界 id 由用户决定，端口留 0 表示交给后端统一分配
+      shards: form.shards.map(s => ({
+        name: s.name.trim(),
+        worldType: s.worldType,
+        isMaster: !!s.isMaster,
+        disabled: !!s.disabled,
+        gameId: toNum(s.gameId, 0),
+        serverPort: toNum(s.serverPort, 0),
+        masterServerPort: toNum(s.masterServerPort, 0),
+        authenticationPort: toNum(s.authenticationPort, 0),
+      })),
+    };
 
-  // 房间运行中改配置不会立即生效，后端会带一条提示
-  const hint = data && data.hint;
-  if (hint) toast(hint, 'warn');
-  else toast(isNew.value ? '房间已创建' : '房间已保存');
+    const { ok, data, error } = await guard(() =>
+      isNew.value ? rooms.create(payload) : rooms.update(payload));
+    if (!ok) {
+      saveError.value = (error && error.message) || '保存失败';
+      return;
+    }
 
-  emit('saved');
+    // 房间运行中改配置不会立即生效，后端会带一条提示
+    const hint = data && data.hint;
+    if (hint) toast(hint, 'warn');
+    else toast(isNew.value ? '房间已创建' : '房间已保存');
+
+    emit('saved');
+  } finally {
+    saving.value = false;
+  }
 }
 </script>
 
@@ -154,6 +169,11 @@ async function save() {
   <UiCard>
     <template #title>{{ isNew ? '新建房间' : '编辑房间 · ' + form.name }}</template>
     <template v-if="!isNew" #hint>Cluster_{{ form.id }}</template>
+
+    <Alert v-if="saveError" variant="destructive" class="mb-4">
+      <AlertTitle>保存失败</AlertTitle>
+      <AlertDescription>{{ saveError }}</AlertDescription>
+    </Alert>
 
     <div v-if="isNew" class="notice" style="margin-bottom: 18px">
       <Icon name="info" size="16" />
@@ -290,10 +310,10 @@ async function save() {
     </details>
 
     <div class="form-actions">
-      <button class="btn btn-primary" @click="save">
-        <Icon name="check" size="14" />保存
-      </button>
-      <button class="btn" @click="emit('close')">取消</button>
+      <Button :disabled="saving" @click="save">
+        <Icon name="check" size="14" />{{ saving ? '保存中…' : '保存' }}
+      </Button>
+      <Button variant="outline" :disabled="saving" @click="emit('close')">取消</Button>
     </div>
   </UiCard>
 </template>

@@ -5,6 +5,7 @@ import { computed, onMounted, ref } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
 import Icon from '@/components/ui/Icon.vue';
+import { Button } from '@/components/ui/button';
 import RoomGrid from '@/components/rooms/RoomGrid.vue';
 import RoomEditor from '@/components/rooms/RoomEditor.vue';
 import RoomAdmins from '@/components/rooms/RoomAdmins.vue';
@@ -71,15 +72,25 @@ async function onUploaded() {
   await guard(() => rooms.load());
 }
 
+const deleting = ref(false);
+
 async function onRemove(id) {
+  if (deleting.value) return;
   const room = rooms.list.find(r => r.id === Number(id));
   const name = room ? room.name : '房间';
-  if (!await confirmAction(`删除「${name}」？\n\n只会从面板移除，磁盘上的存档目录会保留。`)) return;
+  deleting.value = true;
+  try {
+    if (!await confirmAction(`删除「${name}」？\n\n只会从面板移除，磁盘上的存档目录会保留。`)) return;
 
-  const { ok, data } = await guard(() => rooms.remove(id));
-  if (!ok) return;
-  close();
-  toast((data && data.message) || '房间已删除');
+    const { ok, data } = await guard(() => rooms.remove(id));
+    if (!ok) return;
+    if (editor.value.roomId === Number(id)) {
+      close();
+    }
+    toast((data && data.message) || '房间已删除');
+  } finally {
+    deleting.value = false;
+  }
 }
 </script>
 
@@ -89,15 +100,15 @@ async function onRemove(id) {
       <template #title>房间列表</template>
       <template #hint>一个房间 = 一套存档（Cluster_N），可各自启停与备份</template>
       <template #actions>
-        <button class="btn btn-sm btn-primary" @click="openNew">
+        <Button size="sm" @click="openNew">
           <Icon name="plus" size="14" />新建房间
-        </button>
-        <button class="btn btn-sm" @click="openUpload()">
+        </Button>
+        <Button variant="outline" size="sm" @click="openUpload()">
           <Icon name="upload" size="14" />上传存档
-        </button>
-        <button class="btn btn-sm" @click="reload">
+        </Button>
+        <Button variant="outline" size="sm" @click="reload">
           <Icon name="refresh" size="14" />刷新
-        </button>
+        </Button>
       </template>
 
       <RoomGrid

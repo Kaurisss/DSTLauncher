@@ -7,10 +7,11 @@
 //
 // 主分片固定存在、不可停用也不可删除：房间至少要有一个世界。
 
-import { defineModel } from 'vue';
+import { ref } from 'vue';
 
 import Icon from '@/components/ui/Icon.vue';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
@@ -63,16 +64,23 @@ function addShard() {
   ];
 }
 
+const removing = ref(false);
+
 async function removeShard(index) {
   const s = shards.value[index];
-  if (!s || s.isMaster) return;
-  const ok = await confirmAction(
-    `从面板移除世界「${s.name}」？\n\n`
-    + '存档目录会保留在磁盘上，但面板不再管理它。\n'
-    + '以后用同名的分片重新添加，就能继续使用这份存档。',
-  );
-  if (!ok) return;
-  shards.value = shards.value.filter((_, i) => i !== index);
+  if (!s || s.isMaster || removing.value) return;
+  removing.value = true;
+  try {
+    const ok = await confirmAction(
+      `从面板移除世界「${s.name}」？\n\n`
+      + '存档目录会保留在磁盘上，但面板不再管理它。\n'
+      + '以后用同名的分片重新添加，就能继续使用这份存档。',
+    );
+    if (!ok) return;
+    shards.value = shards.value.filter(shard => shard !== s);
+  } finally {
+    removing.value = false;
+  }
 }
 </script>
 
@@ -114,14 +122,17 @@ async function removeShard(index) {
           label="启用"
           @update:model-value="v => (s.disabled = !v)"
         />
-        <button
+        <Button
           v-if="!s.isMaster"
-          class="btn btn-sm shard-del"
+          variant="destructive"
+          size="sm"
+          class="shard-del"
           title="从面板移除（存档目录保留）"
+          :disabled="removing"
           @click="removeShard(i)"
         >
           <Icon name="trash" size="14" />
-        </button>
+        </Button>
       </div>
 
       <div class="shard-ports">
@@ -145,8 +156,8 @@ async function removeShard(index) {
       </p>
     </div>
 
-    <button class="btn btn-sm shard-add" type="button" @click="addShard">
+    <Button variant="outline" size="sm" class="shard-add" type="button" @click="addShard">
       <Icon name="plus" size="14" />添加世界
-    </button>
+    </Button>
   </div>
 </template>
