@@ -1,12 +1,6 @@
 <script setup>
-// 世界配置：按分片逐个编辑 worldgenoverride.lua（分片数量不限）。
-//
-// 只写 worldgenoverride.lua —— 同目录下的 leveldataoverride.lua 优先级更高，
-// 且按 Klei 在服务器源码里的注释会「完全覆盖已保存的世界数据」，
-// 那是游戏内部文件，面板不碰。
-//
-// 保存时只提交与默认值不同的项：官方文档说等于默认值的项可以直接省略，
-// 省略还能避免游戏以后新增选项时被这里保存的旧默认值覆盖。
+// 世界配置：普通文件整表保存并保留未知项，leveldata 仅更新点名的规则。
+// 恢复默认也属于修改，必须显式提交；已有存档的生成项始终只读。
 //
 // 世界规则（settings）与世界生成（worldgen）分开成两个标签页展示；
 // 服务器运行中整个页面冻结——游戏只在启动时读这份文件，改了也不生效。
@@ -27,7 +21,7 @@ import OptionGroupPanel from '@/components/world/OptionGroupPanel.vue';
 import { worldApi } from '@/lib/api.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard, toast } from '@/lib/toast.js';
-import { SHARD_NAME_LABEL, WORLD_TYPE_LABEL } from '@/lib/format.js';
+import { WORLD_TYPE_LABEL, MOD_LABEL, shardLabel } from '@/lib/format.js';
 
 const rooms = useRoomsStore();
 
@@ -41,10 +35,11 @@ const enabled = ref(true);
 const worldgenPreset = ref('');
 const settingsPreset = ref('');
 
-/** 编辑中的改动：只放与默认值不同的项 */
+/** 待保存增量：相对载入值记录，包含显式恢复的默认值 */
 const draft = reactive({});
 /** 载入时的原始值，用于判断有没有未保存的改动 */
 const original = reactive({ enabled: true, worldgenPreset: '', settingsPreset: '' });
+const originalOverrides = ref({});
 
 const keyword = ref('');
 const onlyChanged = ref(false);
@@ -53,29 +48,57 @@ const onlyChanged = ref(false);
 const category = ref('settings');
 const categorySwitching = ref(false);
 
-watch(category, (_category, _previous, onCleanup) => {
+/** 用户手动选过类别后，不再自动跳转 */
+const categoryPinned = ref(false);
+
+/** 手动切换类别：记住用户的选择，不再自动回落。 */
+function pickCategory(key) {
+  categoryPinned.value = true;
+  category.value = key;
+}
+
+watch(category, () => {
   categorySwitching.value = true;
-  // 留出一次浏览器绘制，让骨架屏先出现，再挂载大量选项控件。
-  let frame = requestAnimationFrame(() => {
-    frame = requestAnimationFrame(() => { categorySwitching.value = false; });
+  // 留出两帧，让骨架屏先绘制一次，再挂载大量选项控件。
+  // 必须自己把状态复位：onCleanup 只在 watcher 重跑或卸载时调用，
+  // 正常一次切换不会触发它，骨架屏会永远盖住选项。
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { categorySwitching.value = false; });
   });
-  onCleanup(() => window.cancelAnimationFrame(frame));
 });
 
 /* ---------- 派生状态 ---------- */
 
-/** tab 标签：常见分片给中文短名（地表 / 洞穴），自定义世界显示配置里的名字 */
-const shardLabel = name => SHARD_NAME_LABEL[name] || name;
+/**
+ * 分片标签。取存档里读到的 location；还没读到（切分片的请求未回）时
+ * 用房间列表里那一份，避免先闪一下目录名。
+ */
+const labelOf = name => {
+  const locs = (rooms.current && rooms.current.locations) || {};
+  return shardLabel(name, locs[name]);
+};
 
-/** 当前分片的世界类型，决定预设与可用选项；来自房间配置，不靠名字猜 */
+/**
+ * 当前分片的世界类型。
+ * 优先用后端从存档 leveldataoverride.lua 读到的 location：房间配置里的
+ * WorldType 可能是旧数据（例如海难分片还写着 forest），按它过滤会掉走整批模组选项。
+ */
 const shardType = computed(() => {
+  if (view.value && view.value.location) return view.value.location;
   const list = (rooms.current && rooms.current.shards) || [];
   const found = list.find(x => x.name === shard.value);
   return (found && found.worldType) || 'forest';
 });
 
+const typeLabel = computed(() => WORLD_TYPE_LABEL[shardType.value] || shardType.value);
+const modLabel = computed(() => (view.value && view.value.mod ? MOD_LABEL[view.value.mod] : ''));
+
 const shardHint = computed(() =>
-  `${shardLabel(shard.value)} · ${WORLD_TYPE_LABEL[shardType.value] || shardType.value}`);
+  `${labelOf(shard.value)} · ${modLabel.value || typeLabel.value}`);
+
+/** 提示文案用的世界描述：“岛屿冒险 · 海难”比只写模组名更清楚。 */
+const worldLabel = computed(() =>
+  modLabel.value ? `${modLabel.value} · ${typeLabel.value}` : typeLabel.value);
 
 /** 服务器运行中冻结全部修改：游戏只在启动时读配置，改了也不生效 */
 const frozen = computed(() => rooms.running);
@@ -83,22 +106,40 @@ const frozen = computed(() => rooms.running);
 /**
  * 世界已生成的房间冻结「世界生成」类配置：
  * 这些选项只在生成世界时被读取，已有地图不会重建，改了纯属误导。
- * 世界规则类不受此限制。
+ *
+ * 使用 leveldataoverride.lua 的存档（客户端生成过世界）天然就是这种状态：
+ * 游戏只认它里面的完整世界定义，面板也只能改世界规则。
  */
-const worldGenerated = computed(() => !!view.value?.hasSave);
+const worldGenerated = computed(() => !!(view.value?.hasSave || view.value?.levelDataInUse));
 const worldgenFrozen = computed(() => frozen.value || worldGenerated.value);
 
-const totalOptions = computed(() =>
-  (view.value?.groups || []).reduce((n, g) => n + g.options.length, 0));
+/** 存档用的是游戏自己的 leveldataoverride.lua：预设与“启用本文件”由游戏固定，不展示开关。 */
+const levelDataInUse = computed(() => !!view.value?.levelDataInUse);
 
-const changedCount = computed(() => Object.keys(draft).length);
+/** 候选定义不丢弃，显隐仅影响展示；缺省开关取源码默认值。 */
+const displayGroups = computed(() => {
+  const groups = view.value?.groups || [];
+  const island = groups.flatMap(g => g.options).find(o => o.name === 'volcanoisland');
+  if (island && valueOf(island) !== 'none') return groups;
+  const hidden = new Set(view.value?.volcanoIslandOnly || []);
+  return groups.map(g => ({ ...g, options: g.options.filter(o => !hidden.has(o.name)) }))
+    .filter(g => g.options.length > 0);
+});
+
+const totalOptions = computed(() =>
+  displayGroups.value.reduce((n, g) => n + g.options.length, 0));
+
+const changedCount = computed(() =>
+  displayGroups.value.reduce((n, g) => n + g.options.filter(isChanged).length, 0));
 
 const settingsChanged = computed(() =>
   enabled.value !== original.enabled
   || worldgenPreset.value !== original.worldgenPreset
   || settingsPreset.value !== original.settingsPreset);
 
-const dirty = computed(() => changedCount.value > 0 || settingsChanged.value);
+const dirty = computed(() => Object.keys(draft).length > 0 || settingsChanged.value);
+const canReset = computed(() => settingsChanged.value || displayGroups.value.some(g =>
+  !(worldgenFrozen.value && g.category === 'worldgen') && g.options.some(isChanged)));
 
 const worldgenPresets = computed(() => view.value?.presets?.worldgen || []);
 const settingsPresets = computed(() => view.value?.presets?.settings || []);
@@ -109,8 +150,11 @@ const settingsPresets = computed(() => view.value?.presets?.settings || []);
  * 引擎只按预设生成世界，既不看分片叫什么，也不看面板里的类型：
  * 洞穴分片配成 SURVIVAL_TOGETHER 就会长出第二张地表图。
  * 世界生成不可逆，所以这里必须显式提醒，而不是等玩家下去才发现。
+ *
+ * 模组世界不套这个规则：海难与火山的预设本来就不同名，也不带 CAVE 字样。
  */
 const presetMismatch = computed(() => {
+  if (view.value?.mod) return false;
   const p = worldgenPreset.value || '';
   if (!p) return false;
   const isCavePreset = p.toUpperCase().includes('CAVE');
@@ -119,9 +163,9 @@ const presetMismatch = computed(() => {
 
 /** 按类别拆分分组 */
 const settingsGroups = computed(() =>
-  (view.value?.groups || []).filter(g => g.category !== 'worldgen'));
+  displayGroups.value.filter(g => g.category !== 'worldgen'));
 const worldgenGroups = computed(() =>
-  (view.value?.groups || []).filter(g => g.category === 'worldgen'));
+  displayGroups.value.filter(g => g.category === 'worldgen'));
 
 const activeGroups = computed(() =>
   category.value === 'worldgen' ? worldgenGroups.value : settingsGroups.value);
@@ -130,6 +174,23 @@ const categoryCounts = computed(() => ({
   settings: settingsGroups.value.reduce((n, g) => n + g.options.length, 0),
   worldgen: worldgenGroups.value.reduce((n, g) => n + g.options.length, 0),
 }));
+
+/**
+ * 默认停在有内容的标签。
+ * 存档使用 leveldataoverride.lua 时世界生成全是只读的，若当前标签一篇空白，
+ * 用户会以为配置丢了。仅在用户未手动切换时调整。
+ */
+watch(
+  categoryCounts,
+  counts => {
+    if (categoryPinned.value || !view.value) return;
+    if (counts[category.value] === 0) {
+      const other = category.value === 'settings' ? 'worldgen' : 'settings';
+      if (counts[other] > 0) category.value = other;
+    }
+  },
+  { immediate: true },
+);
 
 const visibleGroups = computed(() => {
   const kw = keyword.value.trim().toLowerCase();
@@ -152,20 +213,19 @@ const visibleGroups = computed(() => {
 /* ---------- 取值读写 ---------- */
 
 function isChanged(o) {
-  // 用 in 追踪键的增删；原生 hasOwnProperty.call 不会建立 Vue 依赖。
-  return o.name in draft && Object.prototype.hasOwnProperty.call(draft, o.name);
+  return valueOf(o) !== o.default;
 }
 
 function valueOf(o) {
-  return isChanged(o) ? draft[o.name] : o.default;
+  return o.name in draft ? draft[o.name] : (originalOverrides.value[o.name] ?? o.default);
 }
 
 function onOptionChange(o, value) {
   if (frozen.value) return;
   // 世界已生成时，世界生成类选项锁死（与控件 disabled 双保险）
-  if (worldgenFrozen.value && o.category === 'worldgen') return;
-  // 改回默认值等于没改，从草稿里删掉——避免写出一份全是默认值的文件
-  if (value === o.default) delete draft[o.name];
+  if (worldgenFrozen.value && worldsettingsCategory.value[o.name] === 'worldgen') return;
+  // 回到载入值才算撤销；恢复默认仍需点名写回。
+  if (value === (originalOverrides.value[o.name] ?? o.default)) delete draft[o.name];
   else draft[o.name] = value;
 }
 
@@ -173,15 +233,19 @@ function onOptionChange(o, value) {
 
 function applyView(data) {
   view.value = data;
-  enabled.value = data.config.overrideEnabled;
-  worldgenPreset.value = data.config.worldgenPreset;
-  settingsPreset.value = data.config.settingsPreset;
-  original.enabled = data.config.overrideEnabled;
-  original.worldgenPreset = data.config.worldgenPreset;
-  original.settingsPreset = data.config.settingsPreset;
+  originalOverrides.value = { ...data.config.overrides };
+  // leveldataoverride.lua 里没有 override_enabled / 预设字段：它本身就是完整定义，
+  // 游戏恒定按它生效，所以开关与预设固定为启用、无预设。
+  const levelData = !!data.levelDataInUse;
+  enabled.value = levelData ? true : data.config.overrideEnabled;
+  worldgenPreset.value = data.config.worldgenPreset || '';
+  settingsPreset.value = data.config.settingsPreset || '';
+  original.enabled = enabled.value;
+  original.worldgenPreset = worldgenPreset.value;
+  original.settingsPreset = settingsPreset.value;
 
   Object.keys(draft).forEach(k => delete draft[k]);
-  Object.assign(draft, data.config.overrides || {});
+  // 原配置另存快照：未知键与隐藏项不计为待保存改动，也不会丢失。
 }
 
 async function load() {
@@ -226,7 +290,9 @@ async function save() {
       overrideEnabled: enabled.value,
       worldgenPreset: worldgenPreset.value,
       settingsPreset: settingsPreset.value,
-      overrides: { ...draft },
+      overrides: onlySettings(levelDataInUse.value
+        ? { ...draft }
+        : { ...originalOverrides.value, ...draft }),
     }),
     { success: '世界配置已保存' },
   );
@@ -238,12 +304,33 @@ async function save() {
 }
 
 function resetAll() {
-  Object.keys(draft).forEach(k => delete draft[k]);
+  for (const g of displayGroups.value) {
+    if (worldgenFrozen.value && g.category === 'worldgen') continue;
+    for (const o of g.options) onOptionChange(o, o.default);
+  }
   enabled.value = original.enabled;
   worldgenPreset.value = original.worldgenPreset;
   settingsPreset.value = original.settingsPreset;
 }
 
+/** leveldata 只提交规则增量；普通文件整表保存，必须保留只读生成原值。 */
+function onlySettings(overrides) {
+  if (!levelDataInUse.value) return overrides;
+  const categoryOf = worldsettingsCategory.value;
+  const out = {};
+  for (const [k, v] of Object.entries(overrides)) {
+    if (categoryOf[k] !== 'worldgen') out[k] = v;
+  }
+  return out;
+}
+
+const worldsettingsCategory = computed(() => {
+  const out = {};
+  for (const g of view.value?.groups || []) {
+    for (const o of g.options) out[o.name] = g.category;
+  }
+  return out;
+});
 /* ---------- 生命周期 ---------- */
 
 watch(() => rooms.currentId, () => {
@@ -270,12 +357,12 @@ onMounted(() => selectShard(rooms.shards[0]));
         <button
           v-for="s in rooms.shards"
           :key="s"
-          class="btn btn-sm transition-none"
+          class="btn btn-sm shard-tab transition-none"
           :class="{ 'btn-primary': s === shard }"
           :aria-pressed="s === shard"
           @click="selectShard(s)"
         >
-          {{ shardLabel(s) }}
+          {{ labelOf(s) }}
         </button>
       </template>
 
@@ -294,7 +381,7 @@ onMounted(() => selectShard(rooms.shards[0]));
           </span>
         </div>
 
-        <div class="world-presets">
+        <div v-if="!levelDataInUse" class="world-presets">
           <UiField block label="世界生成预设" for-id="w-worldgen" tip="决定地图长什么样">
             <Select v-model="worldgenPreset" :disabled="worldgenFrozen">
               <SelectTrigger id="w-worldgen" class="w-full">
@@ -326,17 +413,23 @@ onMounted(() => selectShard(rooms.shards[0]));
           </UiField>
         </div>
 
-        <label class="world-enabled">
+        <label v-if="!levelDataInUse" class="world-enabled">
           <Switch v-model="enabled" aria-label="启用本文件" :disabled="frozen" />
           <span>启用本文件</span>
         </label>
 
-        <div v-if="!enabled" class="notice">
+        <div v-if="!enabled && !levelDataInUse" class="notice">
           <span>已关闭 <code>override_enabled</code>：游戏仍会读取本文件，但不会应用里面的设置。</span>
         </div>
         <div v-if="worldGenerated" class="notice">
           <Icon name="info" size="16" />
-          <span>
+          <span v-if="levelDataInUse">
+            该存档的配置由游戏自己的 <code>leveldataoverride.lua</code> 保存，
+            当前分片是 <strong>{{ worldLabel }}</strong>。
+            <strong>世界规则</strong>可直接在这里改；<strong>世界生成</strong>只在建图时生效，
+            地图已生成后不可修改，只做展示。
+          </span>
+          <span v-else>
             该房间<strong>已生成过世界</strong>：世界生成类配置已冻结——
             这些选项只在生成世界时读取，改了也不会重建已有地图。
             如需调整地形、资源分布等，请新建房间重新生成，或另行导入存档。
@@ -372,7 +465,7 @@ onMounted(() => selectShard(rooms.shards[0]));
             :class="{ 'is-active': category === 'settings' }"
             :aria-pressed="category === 'settings'"
             type="button"
-            @click="category = 'settings'"
+            @click="pickCategory('settings')"
           >
             世界规则 <span class="seg-count">{{ categoryCounts.settings }}</span>
           </button>
@@ -381,7 +474,7 @@ onMounted(() => selectShard(rooms.shards[0]));
             :class="{ 'is-active': category === 'worldgen' }"
             :aria-pressed="category === 'worldgen'"
             type="button"
-            @click="category = 'worldgen'"
+            @click="pickCategory('worldgen')"
           >
             世界生成 <span class="seg-count">{{ categoryCounts.worldgen }}</span>
           </button>
@@ -398,7 +491,7 @@ onMounted(() => selectShard(rooms.shards[0]));
           <span class="world-count">
             {{ changedCount ? '已改 ' + changedCount + ' 项' : '未做改动' }}
           </span>
-          <button class="btn btn-sm" :disabled="!dirty || frozen" @click="resetAll">重置</button>
+          <button class="btn btn-sm" :disabled="!canReset || frozen" @click="resetAll">重置</button>
           <button class="btn btn-sm btn-primary" :disabled="!dirty || frozen || saving" @click="save">
             {{ saving ? '保存中…' : '保存' }}
           </button>

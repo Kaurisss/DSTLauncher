@@ -1,0 +1,4839 @@
+{
+  "version": 1,
+  "gameVersion": "756039",
+  "source": "IslandAdventures scripts/map/levels + modservercreationmain.lua",
+  "dynamicValues": {
+    "task_set": [
+      {
+        "data": "quagmire_taskset",
+        "label": "暴食",
+        "location": "quagmire"
+      },
+      {
+        "data": "default",
+        "label": "联机版",
+        "location": "forest"
+      },
+      {
+        "data": "classic",
+        "label": "经典",
+        "location": "forest"
+      },
+      {
+        "data": "lavaarena_taskset",
+        "label": "熔炉",
+        "location": "lavaarena"
+      },
+      {
+        "data": "cave_default",
+        "label": "地下",
+        "location": "cave"
+      },
+      {
+        "data": "shipwrecked",
+        "label": "海难",
+        "location": "shipwrecked"
+      },
+      {
+        "data": "volcano",
+        "label": "火山",
+        "location": "volcanoworld"
+      }
+    ],
+    "start_location": [
+      {
+        "data": "default",
+        "label": "默认",
+        "location": "forest"
+      },
+      {
+        "data": "plus",
+        "label": "额外资源",
+        "location": "forest"
+      },
+      {
+        "data": "darkness",
+        "label": "黑暗",
+        "location": "forest"
+      },
+      {
+        "data": "caves",
+        "label": "洞穴",
+        "location": "cave"
+      },
+      {
+        "data": "lavaarena",
+        "label": "默认",
+        "location": "lavaarena"
+      },
+      {
+        "data": "quagmire_startlocation",
+        "label": "默认",
+        "location": "quagmire"
+      },
+      {
+        "data": "shipwrecked_default",
+        "label": "默认",
+        "location": "shipwrecked"
+      },
+      {
+        "data": "shipwrecked_plus",
+        "label": "额外资源",
+        "location": "shipwrecked"
+      },
+      {
+        "data": "shipwrecked_darkness",
+        "label": "黑暗",
+        "location": "shipwrecked"
+      },
+      {
+        "data": "volcano_default",
+        "label": "火山",
+        "location": "volcanoworld"
+      }
+    ]
+  },
+  "masterControlled": [
+    "autumn",
+    "basicresource_regrowth",
+    "beefaloheat",
+    "brightmarecreatures",
+    "crow_carnival",
+    "darkness",
+    "day",
+    "dropeverythingondespawn",
+    "dry",
+    "extrastartingitems",
+    "ghostenabled",
+    "ghostsanitydrain",
+    "hallowed_nights",
+    "healthpenalty",
+    "hunger",
+    "hurricane",
+    "krampus",
+    "lessdamagetaken",
+    "mild",
+    "monsoon",
+    "poison",
+    "portalresurection",
+    "resettime",
+    "season_start",
+    "seasonalstartingitems",
+    "shadowcreatures",
+    "shipwrecked_season_start",
+    "spawnmode",
+    "spawnprotection",
+    "specialevent",
+    "spring",
+    "summer",
+    "temperaturedamage",
+    "winter",
+    "winters_feast",
+    "year_of_the_beefalo",
+    "year_of_the_bunnyman",
+    "year_of_the_carrat",
+    "year_of_the_catcoon",
+    "year_of_the_dragonfly",
+    "year_of_the_gobbler",
+    "year_of_the_knight",
+    "year_of_the_pig",
+    "year_of_the_snake",
+    "year_of_the_varg"
+  ],
+  "locations": {
+    "shipwrecked": {
+      "label": "海难",
+      "vanilla": [
+        "task_set",
+        "start_location",
+        "world_size",
+        "grass",
+        "sapling",
+        "flowers",
+        "touchstone",
+        "boons",
+        "balatro",
+        "terrariumchest",
+        "junkyard",
+        "marshbush",
+        "reeds",
+        "flint",
+        "rock",
+        "berrybush",
+        "mushroom",
+        "bees",
+        "spiders",
+        "merm",
+        "angrybees",
+        "tallbirds",
+        "liefs",
+        "beequeen",
+        "fruitfly",
+        "klaus",
+        "spiderqueen",
+        "daywalker2",
+        "eyeofterror",
+        "lureplants",
+        "wasps",
+        "merms",
+        "spiders_setting",
+        "spider_warriors",
+        "daywalker",
+        "butterfly",
+        "birds",
+        "bees_setting",
+        "pigs_setting",
+        "bunnymen_setting",
+        "grassgekkos",
+        "regrowth",
+        "flowers_regrowth",
+        "reeds_regrowth",
+        "lightning",
+        "weather",
+        "moles_setting",
+        "prefabswaps_start",
+        "twiggytrees_regrowth",
+        "fishschools",
+        "season_start",
+        "basicresource_regrowth",
+        "extrastartingitems",
+        "seasonalstartingitems",
+        "spawnprotection",
+        "dropeverythingondespawn",
+        "healthpenalty",
+        "lessdamagetaken",
+        "temperaturedamage",
+        "hunger",
+        "darkness",
+        "shadowcreatures",
+        "brightmarecreatures",
+        "crow_carnival",
+        "hallowed_nights",
+        "winters_feast",
+        "year_of_the_gobbler",
+        "year_of_the_varg",
+        "year_of_the_pig",
+        "year_of_the_carrat",
+        "year_of_the_beefalo",
+        "year_of_the_catcoon",
+        "year_of_the_bunnyman",
+        "year_of_the_dragonfly",
+        "year_of_the_snake",
+        "year_of_the_knight",
+        "specialevent",
+        "autumn",
+        "winter",
+        "spring",
+        "summer",
+        "day",
+        "spawnmode",
+        "ghostenabled",
+        "portalresurection",
+        "ghostsanitydrain",
+        "resettime",
+        "beefaloheat",
+        "krampus"
+      ],
+      "defaults": {
+        "start_location": "shipwrecked_default",
+        "season_start": "default",
+        "world_size": "default",
+        "task_set": "shipwrecked",
+        "layout_mode": "LinkNodesByKeys",
+        "keep_disconnected_tiles": "true",
+        "has_ocean": "true",
+        "clocktype": "tropical",
+        "poi": "never",
+        "dst_boats": "none",
+        "ia_boats": "always",
+        "ia_drowning": "always"
+      },
+      "presets": {
+        "settings": [
+          {
+            "data": "SHIPWRECKED_ENDLESS",
+            "label": "无尽"
+          },
+          {
+            "data": "SHIPWRECKED_LIGHTS_OUT",
+            "label": "暗无天日"
+          },
+          {
+            "data": "SHIPWRECKED_RELAXED",
+            "label": "轻松"
+          },
+          {
+            "data": "SHIPWRECKED_SURVIVAL_DEFAULT_PLUS",
+            "label": "海难加强"
+          },
+          {
+            "data": "SHIPWRECKED_TERRARIA",
+            "label": "泰拉瑞亚之味"
+          },
+          {
+            "data": "SHIPWRECKED_WILDERNESS",
+            "label": "荒野"
+          },
+          {
+            "data": "SURVIVAL_SHIPWRECKED_CLASSIC",
+            "label": "海难"
+          }
+        ],
+        "worldgen": [
+          {
+            "data": "SHIPWRECKED_ENDLESS",
+            "label": "无尽"
+          },
+          {
+            "data": "SHIPWRECKED_LIGHTS_OUT",
+            "label": "暗无天日"
+          },
+          {
+            "data": "SHIPWRECKED_RELAXED",
+            "label": "轻松"
+          },
+          {
+            "data": "SHIPWRECKED_SURVIVAL_DEFAULT_PLUS",
+            "label": "海难加强"
+          },
+          {
+            "data": "SHIPWRECKED_TERRARIA",
+            "label": "泰拉瑞亚之味"
+          },
+          {
+            "data": "SHIPWRECKED_WILDERNESS",
+            "label": "荒野"
+          },
+          {
+            "data": "SURVIVAL_SHIPWRECKED_CLASSIC",
+            "label": "海难"
+          }
+        ]
+      },
+      "items": [
+        {
+          "name": "alternatewhalehunt",
+          "label": "追鲸惊喜",
+          "default": "default",
+          "category": "settings",
+          "group": "misc",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "ballphin_setting",
+          "label": "海豚",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "bioluminescence_regrowth",
+          "label": "荧光生物",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "chessnavy_setting",
+          "label": "浮船骑士",
+          "default": "default",
+          "category": "settings",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "coral_brain_rock_regrowth",
+          "label": "智慧树",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "crab_setting",
+          "label": "兔蟹",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "dragoon_setting",
+          "label": "呆龙",
+          "default": "default",
+          "category": "settings",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "dragoonegg",
+          "label": "火山爆发",
+          "default": "default",
+          "category": "settings",
+          "group": "misc",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "fishermerm_setting",
+          "label": "渔人",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "floods",
+          "label": "洪水",
+          "default": "default",
+          "category": "settings",
+          "group": "misc",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "jellyfish_setting",
+          "label": "水母",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "jungletree_regrowth",
+          "label": "丛林树",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "kraken",
+          "label": "海妖",
+          "default": "default",
+          "category": "settings",
+          "group": "giants",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "lobster_setting",
+          "label": "龙虾",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "magmarock_regrowth",
+          "label": "熔岩矿堆",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "mangrovetree_regrowth",
+          "label": "红树林",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "mosquito",
+          "label": "毒蚊子",
+          "default": "default",
+          "category": "settings",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "oceanwaves",
+          "label": "海浪",
+          "default": "default",
+          "category": "settings",
+          "group": "misc",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "palmtree_regrowth",
+          "label": "椰树",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "primeape_setting",
+          "label": "猿猴",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "rainbowjellyfish_setting",
+          "label": "彩虹水母",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "rock_charcoal_regrowth",
+          "label": "木炭矿",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "rock_obsidian_regrowth",
+          "label": "黑曜石矿",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "sandhill_regrowth",
+          "label": "沙堆",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "seashell_regrowth",
+          "label": "贝壳",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "sharkitten_setting",
+          "label": "猫鲨",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "snake_setting",
+          "label": "蛇",
+          "default": "default",
+          "category": "settings",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "solofish_setting",
+          "label": "狗鱼",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "stungray_setting",
+          "label": "恶臭蝠鲼",
+          "default": "default",
+          "category": "settings",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "sweet_potato_regrowth",
+          "label": "甘薯",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "swordfish_setting",
+          "label": "剑鱼",
+          "default": "default",
+          "category": "settings",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "tides",
+          "label": "潮汐",
+          "default": "default",
+          "category": "settings",
+          "group": "misc",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "tigershark",
+          "label": "虎鲨",
+          "default": "default",
+          "category": "settings",
+          "group": "giants",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "twister",
+          "label": "豹卷风",
+          "default": "default",
+          "category": "settings",
+          "group": "giants",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "volcano_shrub_regrowth",
+          "label": "灰烬树",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "waterencounters",
+          "label": "随机海洋奇遇",
+          "default": "default",
+          "category": "settings",
+          "group": "misc",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "whalehunt",
+          "label": "捕鲸",
+          "default": "default",
+          "category": "settings",
+          "group": "misc",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "wildbores_setting",
+          "label": "野猪",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "crocodog",
+          "label": "鳄狗袭击",
+          "default": "default",
+          "category": "settings",
+          "group": "misc",
+          "order": 1,
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "yellowcrocodog",
+          "label": "黄色鳄狗袭击",
+          "default": "default",
+          "category": "settings",
+          "group": "misc",
+          "order": 2,
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            }
+          ]
+        },
+        {
+          "name": "bluecrocodog",
+          "label": "蓝色鳄狗袭击",
+          "default": "default",
+          "category": "settings",
+          "group": "misc",
+          "order": 3,
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            }
+          ]
+        },
+        {
+          "name": "dst_boats",
+          "label": "DST船",
+          "default": "none",
+          "category": "settings",
+          "group": "misc",
+          "order": 4,
+          "values": [
+            {
+              "data": "none",
+              "label": "禁用"
+            },
+            {
+              "data": "always",
+              "label": "启用"
+            }
+          ]
+        },
+        {
+          "name": "ia_boats",
+          "label": "IA船",
+          "default": "always",
+          "category": "settings",
+          "group": "misc",
+          "order": 5,
+          "values": [
+            {
+              "data": "none",
+              "label": "禁用"
+            },
+            {
+              "data": "always",
+              "label": "启用"
+            }
+          ]
+        },
+        {
+          "name": "ia_drowning",
+          "label": "溺死",
+          "default": "always",
+          "category": "settings",
+          "group": "misc",
+          "order": 6,
+          "values": [
+            {
+              "data": "none",
+              "label": "禁用"
+            },
+            {
+              "data": "always",
+              "label": "启用"
+            }
+          ]
+        },
+        {
+          "name": "mild",
+          "label": "温和季",
+          "default": "default",
+          "category": "settings",
+          "group": "global",
+          "order": 20,
+          "values": [
+            {
+              "data": "noseason",
+              "label": "无"
+            },
+            {
+              "data": "veryshortseason",
+              "label": "极短"
+            },
+            {
+              "data": "shortseason",
+              "label": "短"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "longseason",
+              "label": "长"
+            },
+            {
+              "data": "verylongseason",
+              "label": "极长"
+            },
+            {
+              "data": "random",
+              "label": "随机"
+            }
+          ]
+        },
+        {
+          "name": "hurricane",
+          "label": "飓风季",
+          "default": "default",
+          "category": "settings",
+          "group": "global",
+          "order": 21,
+          "values": [
+            {
+              "data": "noseason",
+              "label": "无"
+            },
+            {
+              "data": "veryshortseason",
+              "label": "极短"
+            },
+            {
+              "data": "shortseason",
+              "label": "短"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "longseason",
+              "label": "长"
+            },
+            {
+              "data": "verylongseason",
+              "label": "极长"
+            },
+            {
+              "data": "random",
+              "label": "随机"
+            }
+          ]
+        },
+        {
+          "name": "monsoon",
+          "label": "雨季",
+          "default": "default",
+          "category": "settings",
+          "group": "global",
+          "order": 23,
+          "values": [
+            {
+              "data": "noseason",
+              "label": "无"
+            },
+            {
+              "data": "veryshortseason",
+              "label": "极短"
+            },
+            {
+              "data": "shortseason",
+              "label": "短"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "longseason",
+              "label": "长"
+            },
+            {
+              "data": "verylongseason",
+              "label": "极长"
+            },
+            {
+              "data": "random",
+              "label": "随机"
+            }
+          ]
+        },
+        {
+          "name": "dry",
+          "label": "旱季",
+          "default": "default",
+          "category": "settings",
+          "group": "global",
+          "order": 24,
+          "values": [
+            {
+              "data": "noseason",
+              "label": "无"
+            },
+            {
+              "data": "veryshortseason",
+              "label": "极短"
+            },
+            {
+              "data": "shortseason",
+              "label": "短"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "longseason",
+              "label": "长"
+            },
+            {
+              "data": "verylongseason",
+              "label": "极长"
+            },
+            {
+              "data": "random",
+              "label": "随机"
+            }
+          ]
+        },
+        {
+          "name": "poison",
+          "label": "中毒",
+          "default": "always",
+          "category": "settings",
+          "group": "global",
+          "order": 25,
+          "values": [
+            {
+              "data": "none",
+              "label": "禁用"
+            },
+            {
+              "data": "always",
+              "label": "启用"
+            }
+          ]
+        },
+        {
+          "name": "ballphin",
+          "label": "海豚宫殿",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "bamboo",
+          "label": "竹子",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "bermudatriangle",
+          "label": "电光三角",
+          "default": "default",
+          "category": "worldgen",
+          "group": "misc",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "bioluminescence",
+          "label": "荧光生物",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "bush_vine",
+          "label": "藤蔓根",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "coffeebush",
+          "label": "咖啡丛",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "coral",
+          "label": "珊瑚",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "coral_brain_rock",
+          "label": "智慧树",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "crabhole",
+          "label": "兔蟹洞",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "crate",
+          "label": "板条箱",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "doydoy",
+          "label": "渡渡鸟",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            }
+          ]
+        },
+        {
+          "name": "dragoon",
+          "label": "呆龙窝",
+          "default": "default",
+          "category": "worldgen",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "elephantcactus",
+          "label": "象仙人掌",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "fishermerm",
+          "label": "渔人小屋",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "fishinhole",
+          "label": "鱼群",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "flup",
+          "label": "独眼弹涂鱼",
+          "default": "default",
+          "category": "worldgen",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "jellyfish",
+          "label": "水母",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "limpets",
+          "label": "帽贝岩",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "lobster",
+          "label": "龙虾",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "magma_rocks",
+          "label": "熔岩矿堆",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "mussel_farm",
+          "label": "贻贝",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "ox",
+          "label": "水牛",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "poisonhole",
+          "label": "毒穴",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "primeape",
+          "label": "猿猴小窝",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "rainbowjellyfish",
+          "label": "彩虹水母",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "rock_charcoal",
+          "label": "木炭矿",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "rock_obsidian",
+          "label": "黑曜石矿",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "sandhill",
+          "label": "沙堆",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "seagull",
+          "label": "海鸥",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "seashell",
+          "label": "贝壳",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "seaweed",
+          "label": "海带",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "shipwreck",
+          "label": "沉船",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "shipwrecked_trees",
+          "label": "岛屿树木（所有）",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "snake",
+          "label": "蛇窝",
+          "default": "default",
+          "category": "worldgen",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "solofish",
+          "label": "狗鱼",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "stungray",
+          "label": "恶臭蝠鲼",
+          "default": "default",
+          "category": "worldgen",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "sweet_potato",
+          "label": "甘薯",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "swordfish",
+          "label": "剑鱼",
+          "default": "default",
+          "category": "worldgen",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "tar_pool",
+          "label": "焦油",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "tidalpool",
+          "label": "潮汐池",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "volcano",
+          "label": "火山",
+          "default": "default",
+          "category": "worldgen",
+          "group": "misc",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            }
+          ]
+        },
+        {
+          "name": "volcano_shrub",
+          "label": "灰烬树",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "volcanoisland",
+          "label": "火山岛",
+          "default": "none",
+          "category": "worldgen",
+          "group": "misc",
+          "values": [
+            {
+              "data": "none",
+              "label": "禁用"
+            },
+            {
+              "data": "always",
+              "label": "启用"
+            }
+          ]
+        },
+        {
+          "name": "waterygrave",
+          "label": "水墓",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "wildbores",
+          "label": "野猪舍",
+          "default": "default",
+          "category": "worldgen",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "shipwrecked_season_start",
+          "label": "海难开局季节",
+          "default": "default",
+          "category": "worldgen",
+          "group": "global",
+          "order": 2,
+          "values": [
+            {
+              "data": "default",
+              "label": "温和季"
+            },
+            {
+              "data": "wet",
+              "label": "飓风季"
+            },
+            {
+              "data": "green",
+              "label": "雨季"
+            },
+            {
+              "data": "dry",
+              "label": "旱季"
+            },
+            {
+              "data": "mild|green",
+              "label": "温和季或雨季"
+            },
+            {
+              "data": "wet|dry",
+              "label": "飓风季或旱季"
+            }
+          ]
+        }
+      ],
+      "settingsGroupOrder": [
+        "global",
+        "events",
+        "survivors",
+        "misc",
+        "resources",
+        "animals",
+        "monsters",
+        "giants"
+      ],
+      "settingsOrder": {
+        "global": [
+          "specialevent",
+          "autumn",
+          "winter",
+          "spring",
+          "summer",
+          "day",
+          "spawnmode",
+          "ghostenabled",
+          "portalresurection",
+          "ghostsanitydrain",
+          "resettime",
+          "beefaloheat",
+          "krampus",
+          "mild",
+          "hurricane",
+          "monsoon",
+          "dry",
+          "poison"
+        ],
+        "events": [
+          "crow_carnival",
+          "hallowed_nights",
+          "winters_feast",
+          "year_of_the_gobbler",
+          "year_of_the_varg",
+          "year_of_the_pig",
+          "year_of_the_carrat",
+          "year_of_the_beefalo",
+          "year_of_the_catcoon",
+          "year_of_the_bunnyman",
+          "year_of_the_dragonfly",
+          "year_of_the_snake",
+          "year_of_the_knight"
+        ],
+        "survivors": [
+          "extrastartingitems",
+          "seasonalstartingitems",
+          "spawnprotection",
+          "dropeverythingondespawn",
+          "healthpenalty",
+          "lessdamagetaken",
+          "temperaturedamage",
+          "hunger",
+          "darkness",
+          "shadowcreatures",
+          "brightmarecreatures"
+        ],
+        "misc": [
+          "crocodog",
+          "yellowcrocodog",
+          "bluecrocodog",
+          "dst_boats",
+          "ia_boats",
+          "ia_drowning",
+          "whalehunt",
+          "floods",
+          "oceanwaves",
+          "tides",
+          "dragoonegg",
+          "alternatewhalehunt",
+          "lightning",
+          "waterencounters",
+          "weather"
+        ],
+        "resources": [
+          "regrowth",
+          "jungletree_regrowth",
+          "basicresource_regrowth",
+          "twiggytrees_regrowth",
+          "coral_brain_rock_regrowth",
+          "palmtree_regrowth",
+          "sandhill_regrowth",
+          "sweet_potato_regrowth",
+          "mangrovetree_regrowth",
+          "reeds_regrowth",
+          "flowers_regrowth",
+          "bioluminescence_regrowth",
+          "seashell_regrowth"
+        ],
+        "animals": [
+          "bunnymen_setting",
+          "crab_setting",
+          "rainbowjellyfish_setting",
+          "jellyfish_setting",
+          "ballphin_setting",
+          "fishermerm_setting",
+          "solofish_setting",
+          "pigs_setting",
+          "sharkitten_setting",
+          "primeape_setting",
+          "grassgekkos",
+          "bees_setting",
+          "butterfly",
+          "wildbores_setting",
+          "fishschools",
+          "birds",
+          "moles_setting",
+          "lobster_setting"
+        ],
+        "monsters": [
+          "swordfish_setting",
+          "dragoon_setting",
+          "stungray_setting",
+          "wasps",
+          "mosquito",
+          "chessnavy_setting",
+          "snake_setting",
+          "spiders_setting",
+          "spider_warriors",
+          "lureplants",
+          "merms"
+        ],
+        "giants": [
+          "klaus",
+          "eyeofterror",
+          "daywalker2",
+          "fruitfly",
+          "liefs",
+          "kraken",
+          "tigershark",
+          "beequeen",
+          "spiderqueen",
+          "twister"
+        ]
+      },
+      "worldgenGroupOrder": [
+        "misc",
+        "resources",
+        "animals",
+        "monsters"
+      ],
+      "worldgenOrder": {
+        "misc": [
+          "task_set",
+          "start_location",
+          "world_size",
+          "touchstone",
+          "boons",
+          "prefabswaps_start",
+          "junkyard",
+          "balatro",
+          "volcano",
+          "volcanoisland",
+          "bermudatriangle",
+          "terrariumchest"
+        ],
+        "resources": [
+          "marshbush",
+          "shipwrecked_trees",
+          "rock",
+          "limpets",
+          "coral_brain_rock",
+          "crate",
+          "sapling",
+          "poisonhole",
+          "waterygrave",
+          "shipwreck",
+          "sandhill",
+          "berrybush",
+          "seaweed",
+          "tidalpool",
+          "tar_pool",
+          "magma_rocks",
+          "flint",
+          "coral",
+          "sweet_potato",
+          "bamboo",
+          "reeds",
+          "flowers",
+          "grass",
+          "bioluminescence",
+          "bush_vine",
+          "mushroom",
+          "seashell",
+          "mussel_farm"
+        ],
+        "animals": [
+          "crabhole",
+          "rainbowjellyfish",
+          "jellyfish",
+          "ox",
+          "ballphin",
+          "seagull",
+          "fishermerm",
+          "doydoy",
+          "solofish",
+          "primeape",
+          "bees",
+          "wildbores",
+          "fishinhole",
+          "lobster"
+        ],
+        "monsters": [
+          "swordfish",
+          "stungray",
+          "angrybees",
+          "merm",
+          "flup",
+          "snake",
+          "spiders",
+          "tallbirds"
+        ]
+      },
+      "volcanoIslandOnly": [
+        "coffeebush",
+        "elephantcactus",
+        "rock_obsidian",
+        "rock_charcoal",
+        "volcano_shrub",
+        "dragoon",
+        "daywalker",
+        "rock_obsidian_regrowth",
+        "rock_charcoal_regrowth",
+        "volcano_shrub_regrowth",
+        "magmarock_regrowth"
+      ],
+      "dynamicValues": {
+        "task_set": [
+          {
+            "data": "shipwrecked",
+            "label": "海难"
+          }
+        ],
+        "start_location": [
+          {
+            "data": "shipwrecked_default",
+            "label": "默认"
+          },
+          {
+            "data": "shipwrecked_plus",
+            "label": "额外资源"
+          },
+          {
+            "data": "shipwrecked_darkness",
+            "label": "黑暗"
+          }
+        ]
+      }
+    },
+    "volcanoworld": {
+      "label": "火山",
+      "vanilla": [
+        "task_set",
+        "start_location",
+        "fruitfly",
+        "spiderqueen",
+        "daywalker",
+        "liefs",
+        "merms",
+        "spiders_setting",
+        "spider_warriors",
+        "bees_setting",
+        "pigs_setting",
+        "bunnymen_setting",
+        "lightning",
+        "weather",
+        "regrowth",
+        "moles_setting",
+        "season_start",
+        "basicresource_regrowth",
+        "extrastartingitems",
+        "seasonalstartingitems",
+        "spawnprotection",
+        "dropeverythingondespawn",
+        "healthpenalty",
+        "lessdamagetaken",
+        "temperaturedamage",
+        "hunger",
+        "darkness",
+        "shadowcreatures",
+        "brightmarecreatures",
+        "crow_carnival",
+        "hallowed_nights",
+        "winters_feast",
+        "year_of_the_gobbler",
+        "year_of_the_varg",
+        "year_of_the_pig",
+        "year_of_the_carrat",
+        "year_of_the_beefalo",
+        "year_of_the_catcoon",
+        "year_of_the_bunnyman",
+        "year_of_the_dragonfly",
+        "year_of_the_snake",
+        "year_of_the_knight",
+        "specialevent",
+        "autumn",
+        "winter",
+        "spring",
+        "summer",
+        "day",
+        "spawnmode",
+        "ghostenabled",
+        "portalresurection",
+        "ghostsanitydrain",
+        "resettime",
+        "beefaloheat",
+        "krampus"
+      ],
+      "defaults": {
+        "start_location": "volcano_default",
+        "season_start": "default",
+        "world_size": "small",
+        "task_set": "volcano",
+        "layout_mode": "LinkNodesByKeys",
+        "keep_disconnected_tiles": "true",
+        "has_ocean": "false",
+        "clocktype": "tropical",
+        "boons": "never",
+        "poi": "never",
+        "traps": "never",
+        "prefabswaps_start": "classic",
+        "grassgekkos": "never",
+        "dst_boats": "none",
+        "ia_boats": "always",
+        "ia_drowning": "always"
+      },
+      "presets": {
+        "settings": [
+          {
+            "data": "SURVIVAL_VOLCANO_CLASSIC",
+            "label": "火山"
+          },
+          {
+            "data": "VOLCANO_PLUS",
+            "label": "火山加强"
+          },
+          {
+            "data": "VOLCANO_TERRARIA",
+            "label": "泰拉瑞亚的火山"
+          }
+        ],
+        "worldgen": [
+          {
+            "data": "SURVIVAL_VOLCANO_CLASSIC",
+            "label": "火山"
+          },
+          {
+            "data": "VOLCANO_PLUS",
+            "label": "火山加强"
+          },
+          {
+            "data": "VOLCANO_TERRARIA",
+            "label": "泰拉瑞亚的火山"
+          }
+        ]
+      },
+      "items": [
+        {
+          "name": "dragoon_setting",
+          "label": "呆龙",
+          "default": "default",
+          "category": "settings",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "dragoonegg",
+          "label": "火山爆发",
+          "default": "default",
+          "category": "settings",
+          "group": "misc",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "fishermerm_setting",
+          "label": "渔人",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "magmarock_regrowth",
+          "label": "熔岩矿堆",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "primeape_setting",
+          "label": "猿猴",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "rock_charcoal_regrowth",
+          "label": "木炭矿",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "rock_obsidian_regrowth",
+          "label": "黑曜石矿",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "snake_setting",
+          "label": "蛇",
+          "default": "default",
+          "category": "settings",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "volcano_shrub_regrowth",
+          "label": "灰烬树",
+          "default": "default",
+          "category": "settings",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "veryslow",
+              "label": "极慢"
+            },
+            {
+              "data": "slow",
+              "label": "慢"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "fast",
+              "label": "快"
+            },
+            {
+              "data": "veryfast",
+              "label": "极快"
+            }
+          ]
+        },
+        {
+          "name": "wildbores_setting",
+          "label": "野猪",
+          "default": "default",
+          "category": "settings",
+          "group": "animals",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            }
+          ]
+        },
+        {
+          "name": "dst_boats",
+          "label": "DST船",
+          "default": "none",
+          "category": "settings",
+          "group": "misc",
+          "order": 4,
+          "values": [
+            {
+              "data": "none",
+              "label": "禁用"
+            },
+            {
+              "data": "always",
+              "label": "启用"
+            }
+          ]
+        },
+        {
+          "name": "ia_boats",
+          "label": "IA船",
+          "default": "always",
+          "category": "settings",
+          "group": "misc",
+          "order": 5,
+          "values": [
+            {
+              "data": "none",
+              "label": "禁用"
+            },
+            {
+              "data": "always",
+              "label": "启用"
+            }
+          ]
+        },
+        {
+          "name": "mild",
+          "label": "温和季",
+          "default": "default",
+          "category": "settings",
+          "group": "global",
+          "order": 20,
+          "values": [
+            {
+              "data": "noseason",
+              "label": "无"
+            },
+            {
+              "data": "veryshortseason",
+              "label": "极短"
+            },
+            {
+              "data": "shortseason",
+              "label": "短"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "longseason",
+              "label": "长"
+            },
+            {
+              "data": "verylongseason",
+              "label": "极长"
+            },
+            {
+              "data": "random",
+              "label": "随机"
+            }
+          ]
+        },
+        {
+          "name": "hurricane",
+          "label": "飓风季",
+          "default": "default",
+          "category": "settings",
+          "group": "global",
+          "order": 21,
+          "values": [
+            {
+              "data": "noseason",
+              "label": "无"
+            },
+            {
+              "data": "veryshortseason",
+              "label": "极短"
+            },
+            {
+              "data": "shortseason",
+              "label": "短"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "longseason",
+              "label": "长"
+            },
+            {
+              "data": "verylongseason",
+              "label": "极长"
+            },
+            {
+              "data": "random",
+              "label": "随机"
+            }
+          ]
+        },
+        {
+          "name": "monsoon",
+          "label": "雨季",
+          "default": "default",
+          "category": "settings",
+          "group": "global",
+          "order": 23,
+          "values": [
+            {
+              "data": "noseason",
+              "label": "无"
+            },
+            {
+              "data": "veryshortseason",
+              "label": "极短"
+            },
+            {
+              "data": "shortseason",
+              "label": "短"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "longseason",
+              "label": "长"
+            },
+            {
+              "data": "verylongseason",
+              "label": "极长"
+            },
+            {
+              "data": "random",
+              "label": "随机"
+            }
+          ]
+        },
+        {
+          "name": "dry",
+          "label": "旱季",
+          "default": "default",
+          "category": "settings",
+          "group": "global",
+          "order": 24,
+          "values": [
+            {
+              "data": "noseason",
+              "label": "无"
+            },
+            {
+              "data": "veryshortseason",
+              "label": "极短"
+            },
+            {
+              "data": "shortseason",
+              "label": "短"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "longseason",
+              "label": "长"
+            },
+            {
+              "data": "verylongseason",
+              "label": "极长"
+            },
+            {
+              "data": "random",
+              "label": "随机"
+            }
+          ]
+        },
+        {
+          "name": "poison",
+          "label": "中毒",
+          "default": "always",
+          "category": "settings",
+          "group": "global",
+          "order": 25,
+          "values": [
+            {
+              "data": "none",
+              "label": "禁用"
+            },
+            {
+              "data": "always",
+              "label": "启用"
+            }
+          ]
+        },
+        {
+          "name": "coffeebush",
+          "label": "咖啡丛",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "dragoon",
+          "label": "呆龙窝",
+          "default": "default",
+          "category": "worldgen",
+          "group": "monsters",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "elephantcactus",
+          "label": "象仙人掌",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "magma_rocks",
+          "label": "熔岩矿堆",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "rock_charcoal",
+          "label": "木炭矿",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "rock_obsidian",
+          "label": "黑曜石矿",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "volcano_shrub",
+          "label": "灰烬树",
+          "default": "default",
+          "category": "worldgen",
+          "group": "resources",
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "rare",
+              "label": "很少"
+            },
+            {
+              "data": "uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "default",
+              "label": "默认"
+            },
+            {
+              "data": "often",
+              "label": "较多"
+            },
+            {
+              "data": "mostly",
+              "label": "很多"
+            },
+            {
+              "data": "always",
+              "label": "大量"
+            },
+            {
+              "data": "insane",
+              "label": "疯狂"
+            }
+          ]
+        },
+        {
+          "name": "shipwrecked_season_start",
+          "label": "海难开局季节",
+          "default": "default",
+          "category": "worldgen",
+          "group": "global",
+          "order": 2,
+          "values": [
+            {
+              "data": "default",
+              "label": "温和季"
+            },
+            {
+              "data": "wet",
+              "label": "飓风季"
+            },
+            {
+              "data": "green",
+              "label": "雨季"
+            },
+            {
+              "data": "dry",
+              "label": "旱季"
+            },
+            {
+              "data": "mild|green",
+              "label": "温和季或雨季"
+            },
+            {
+              "data": "wet|dry",
+              "label": "飓风季或旱季"
+            }
+          ]
+        }
+      ],
+      "settingsGroupOrder": [
+        "misc",
+        "resources",
+        "animals",
+        "monsters",
+        "giants"
+      ],
+      "settingsOrder": {
+        "misc": [
+          "dst_boats",
+          "ia_boats",
+          "dragoonegg",
+          "lightning",
+          "weather"
+        ],
+        "resources": [
+          "regrowth",
+          "rock_charcoal_regrowth",
+          "volcano_shrub_regrowth",
+          "magmarock_regrowth",
+          "rock_obsidian_regrowth"
+        ],
+        "animals": [
+          "bunnymen_setting",
+          "fishermerm_setting",
+          "pigs_setting",
+          "primeape_setting",
+          "bees_setting",
+          "wildbores_setting",
+          "moles_setting"
+        ],
+        "monsters": [
+          "dragoon_setting",
+          "snake_setting",
+          "spiders_setting",
+          "spider_warriors",
+          "merms"
+        ],
+        "giants": [
+          "fruitfly",
+          "liefs",
+          "daywalker",
+          "spiderqueen"
+        ]
+      },
+      "worldgenGroupOrder": [
+        "misc",
+        "resources",
+        "monsters"
+      ],
+      "worldgenOrder": {
+        "misc": [
+          "task_set",
+          "start_location"
+        ],
+        "resources": [
+          "coffeebush",
+          "rock_charcoal",
+          "volcano_shrub",
+          "magma_rocks",
+          "elephantcactus",
+          "rock_obsidian"
+        ],
+        "monsters": [
+          "dragoon"
+        ]
+      },
+      "volcanoIslandOnly": [],
+      "dynamicValues": {
+        "task_set": [
+          {
+            "data": "volcano",
+            "label": "火山"
+          }
+        ],
+        "start_location": [
+          {
+            "data": "volcano_default",
+            "label": "火山"
+          }
+        ]
+      }
+    }
+  }
+}

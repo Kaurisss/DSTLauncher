@@ -193,7 +193,11 @@ var (
 	fieldWorldRe  = regexp.MustCompile(`\bworld\s*=\s*\{([^}]*)\}`)
 	textFieldRe   = regexp.MustCompile(`\btext\s*=\s*([\w_.]+)`)
 	descEntryRe   = regexp.MustCompile(`\{\s*text\s*=\s*([\w_.]+)\s*,\s*data\s*=\s*"([^"]*)"\s*\}`)
-	descTableRe   = regexp.MustCompile(`(?m)^\s*(?:local\s+)?(\w+_descriptions)\s*=\s*\{`)
+	// 表名不一定以 _descriptions 结尾：出生保护用的就是 `local autodetect = {...}`。
+	// 只认 _descriptions 会把这张表漏掉，导致该项被当成“取值由运行时决定”而只能手填。
+	descTableRe   = regexp.MustCompile(`(?m)^\s*(?:local\s+)?(\w*(?:descriptions|autodetect))\s*=\s*\{`)
+	// ocean_ 派生表：`t = {}` + `for ... do t[i] = {text=d.text, data="ocean_"..d.data} end`
+	derivedDescRe = regexp.MustCompile(`(?s)(\w+)\s*=\s*\{\}\s*\nfor\s+\w+,\s*\w+\s+in\s+ipairs\((\w+)\)\s+do\s*\n\s*\w+\[\w+\]\s*=\s*\{text\s*=\s*\w+\.text,?\s*data\s*=\s*"([^"]*)"\s*\.\.\s*\w+\.data\}`)
 	presetDataRe  = regexp.MustCompile(`LEVELCATEGORY\.(WORLDGEN|SETTINGS),\s*LEVELTYPE\.(\w+)\)`)
 	quotedStringR = regexp.MustCompile(`"(?:[^"\\]|\\.)*"`)
 )
@@ -261,6 +265,28 @@ func parseDescriptionTables(src string) map[string][]optionValue {
 	out := make(map[string][]optionValue, len(best))
 	for k, v := range best {
 		out[k] = v.values
+	}
+
+	// ocean_ 派生表：游戏里写成
+	//   local ocean_worldgen_frequency_descriptions = {}
+	//   for i, data in ipairs(worldgen_frequency_descriptions) do
+	//       ocean_worldgen_frequency_descriptions[i] = {text = data.text, data = "ocean_"..data.data}
+	// 它不是字面量表，上面那轮扫不到；不补的话，森林的海洋岩堆 / 海洋植物
+	// 这类只属于森林世界的选项会没有可选值，只能手填。
+	for _, m := range derivedDescRe.FindAllStringSubmatch(src, -1) {
+		derived, base, prefix := m[1], m[2], m[3]
+		if _, done := out[derived]; done {
+			continue
+		}
+		baseVals, ok := best[base]
+		if !ok {
+			continue
+		}
+		vals := make([]optionValue, len(baseVals.values))
+		for i, v := range baseVals.values {
+			vals[i] = optionValue{Data: prefix + v.Data, Label: v.Label}
+		}
+		out[derived] = vals
 	}
 	return out
 }

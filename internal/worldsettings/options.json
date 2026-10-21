@@ -1,7 +1,7 @@
 {
   "version": 1,
   "gameVersion": "756039",
-  "generatedAt": "2026-10-05T00:01:41+08:00",
+  "generatedAt": "2026-10-21T12:11:08+08:00",
   "source": "scripts/map/customize.lua",
   "presets": {
     "cave_settings": [
@@ -836,7 +836,20 @@
             "forest",
             "cave"
           ],
-          "dynamic": true,
+          "values": [
+            {
+              "data": "never",
+              "label": "无"
+            },
+            {
+              "data": "default",
+              "label": "自动检测"
+            },
+            {
+              "data": "always",
+              "label": "总是"
+            }
+          ],
           "category": "settings"
         },
         {
@@ -6066,7 +6079,40 @@
           "worlds": [
             "forest"
           ],
-          "dynamic": true,
+          "values": [
+            {
+              "data": "ocean_never",
+              "label": "无"
+            },
+            {
+              "data": "ocean_rare",
+              "label": "很少"
+            },
+            {
+              "data": "ocean_uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "ocean_default",
+              "label": "默认"
+            },
+            {
+              "data": "ocean_often",
+              "label": "较多"
+            },
+            {
+              "data": "ocean_mostly",
+              "label": "很多"
+            },
+            {
+              "data": "ocean_always",
+              "label": "大量"
+            },
+            {
+              "data": "ocean_insane",
+              "label": "疯狂"
+            }
+          ],
           "category": "worldgen"
         },
         {
@@ -7645,7 +7691,40 @@
           "worlds": [
             "forest"
           ],
-          "dynamic": true,
+          "values": [
+            {
+              "data": "ocean_never",
+              "label": "无"
+            },
+            {
+              "data": "ocean_rare",
+              "label": "很少"
+            },
+            {
+              "data": "ocean_uncommon",
+              "label": "较少"
+            },
+            {
+              "data": "ocean_default",
+              "label": "默认"
+            },
+            {
+              "data": "ocean_often",
+              "label": "较多"
+            },
+            {
+              "data": "ocean_mostly",
+              "label": "很多"
+            },
+            {
+              "data": "ocean_always",
+              "label": "大量"
+            },
+            {
+              "data": "ocean_insane",
+              "label": "疯狂"
+            }
+          ],
           "category": "worldgen"
         },
         {

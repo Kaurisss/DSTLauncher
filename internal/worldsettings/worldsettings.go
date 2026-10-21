@@ -95,7 +95,14 @@ var (
 	loadErr  error
 	dataset  Dataset
 	byName   map[string]*Option
+	byGroup  map[string]groupRef
 )
+
+// groupRef 记录选项在原版清单里所属的分组，供岛屿冒险视图按原版分组归位。
+type groupRef struct {
+	ID       string
+	Category string
+}
 
 // Load 解析内嵌的选项清单（只做一次）。
 func Load() error {
@@ -105,10 +112,12 @@ func Load() error {
 			return
 		}
 		byName = make(map[string]*Option, len(dataset.Groups)*8)
+		byGroup = make(map[string]groupRef, len(dataset.Groups)*8)
 		for gi := range dataset.Groups {
 			for oi := range dataset.Groups[gi].Options {
 				o := &dataset.Groups[gi].Options[oi]
 				byName[o.Name] = o
+				byGroup[o.Name] = groupRef{ID: dataset.Groups[gi].ID, Category: dataset.Groups[gi].Category}
 			}
 		}
 	})
@@ -236,6 +245,27 @@ func Presets(location, category string) []Preset {
 	out := make([]Preset, len(list))
 	copy(out, list)
 	return out
+}
+
+// GroupOf 返回选项在原版清单里所属的分组（ID 与类别）。
+// 岛屿冒险把原版选项并到自己的视图里时必须按原分组归位，否则海难页会多出一个“未归类”分组。
+func GroupOf(name string) (id, category string) {
+	if err := Load(); err != nil {
+		return "", ""
+	}
+	g, ok := byGroup[name]
+	if !ok {
+		return "", ""
+	}
+	return g.ID, g.Category
+}
+
+// CategoryOf 返回选项的分类（worldgen / settings）；未知选项返回空串。
+func CategoryOf(name string) string {
+	if o, ok := Lookup(name); ok {
+		return o.Category
+	}
+	return ""
 }
 
 // Lookup 按名字取选项定义。

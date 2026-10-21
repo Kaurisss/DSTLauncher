@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -23,6 +22,13 @@ type Override struct {
 	WorldGenPreset string            `json:"worldgenPreset"`
 	SettingsPreset string            `json:"settingsPreset"`
 	Overrides      map[string]string `json:"overrides"`
+	// 导入后重新生成文件时，未知静态字面量也必须保留原类型。
+	literals map[string]overrideLiteral
+}
+
+type overrideLiteral struct {
+	value string
+	raw   string
 }
 
 // DefaultPreset 返回某世界类型的默认预设。
@@ -63,68 +69,11 @@ func NewShardDefault(location string) *Override {
 	return o
 }
 
-var (
-	enabledRe        = regexp.MustCompile(`\boverride_enabled\s*=\s*(true|false)`)
-	worldgenPresetRe = regexp.MustCompile(`\bworldgen_preset\s*=\s*"([^"]*)"`)
-	settingsPresetRe = regexp.MustCompile(`\bsettings_preset\s*=\s*"([^"]*)"`)
-	legacyPresetRe   = regexp.MustCompile(`\bpreset\s*=\s*"([^"]*)"`)
-	overridesBlockRe = regexp.MustCompile(`\boverrides\s*=\s*\{`)
-	overrideItemRe   = regexp.MustCompile(`^(?:\["([^"]+)"\]|([A-Za-z_]\w*))\s*=\s*"([^"]*)"`)
-)
-
-// ParseOverride 解析 worldgenoverride.lua。
-//
-// 宽松解析：认不出的行一律跳过而不是报错。这个文件是给用户手工编辑的，
-// 可能带注释、Mod 字段，甚至来自游戏客户端的导出。
+// ParseOverride 保留导入调用方的旧签名；文件编辑使用 ReadFile 的严格错误返回。
 func ParseOverride(content string) *Override {
-	o := &Override{Overrides: map[string]string{}}
-
-	// 去掉 BOM 与 Klei 导出头
-	content = strings.TrimPrefix(content, "\ufeff")
-	content = strings.TrimSpace(content)
-
-	if m := enabledRe.FindStringSubmatch(content); m != nil {
-		o.Enabled = m[1] == "true"
-	}
-	if m := worldgenPresetRe.FindStringSubmatch(content); m != nil {
-		o.WorldGenPreset = m[1]
-	}
-	if m := settingsPresetRe.FindStringSubmatch(content); m != nil {
-		o.SettingsPreset = m[1]
-	}
-	// 遗留的单键 preset：同时充当上面两个
-	if o.WorldGenPreset == "" || o.SettingsPreset == "" {
-		if m := legacyPresetRe.FindStringSubmatch(content); m != nil {
-			if o.WorldGenPreset == "" {
-				o.WorldGenPreset = m[1]
-			}
-			if o.SettingsPreset == "" {
-				o.SettingsPreset = m[1]
-			}
-		}
-	}
-
-	// overrides 块：块结构必须用括号配对，正则会被嵌套大括号截断
-	if loc := overridesBlockRe.FindStringIndex(content); loc != nil {
-		if body, ok := extractBraces(content, loc[1]-1); ok {
-			for _, raw := range strings.Split(body, "\n") {
-				line := strings.TrimSpace(stripLuaComment(raw))
-				if line == "" {
-					continue
-				}
-				m := overrideItemRe.FindStringSubmatch(line)
-				if m == nil {
-					continue
-				}
-				name := m[1]
-				if name == "" {
-					name = m[2]
-				}
-				if name != "" {
-					o.Overrides[name] = m[3]
-				}
-			}
-		}
+	o, _, err := readOverride(content)
+	if err != nil {
+		return parseLegacyOverride(content)
 	}
 	return o
 }
@@ -192,7 +141,11 @@ func (o *Override) String() string {
 	if len(others) > 0 {
 		sb.WriteString("\t\t-- 其它（面板清单未收录，原样保留）\n")
 		for _, n := range others {
-			sb.WriteString(fmt.Sprintf("\t\t%s = %q,\n", n, o.Overrides[n]))
+			if original, ok := o.literals[n]; ok && original.value == o.Overrides[n] {
+				sb.WriteString(fmt.Sprintf("\t\t[%q] = %s,\n", n, original.raw))
+			} else {
+				sb.WriteString(fmt.Sprintf("\t\t%s = %q,\n", n, o.Overrides[n]))
+			}
 		}
 		sb.WriteString("\n")
 	}
@@ -221,7 +174,11 @@ func ReadFile(clusterDir, shard, location string) (*Override, bool, error) {
 		}
 		return nil, false, fmt.Errorf("读取 %s 失败: %w", path, err)
 	}
-	return ParseOverride(string(b)), true, nil
+	o, _, err := readOverride(string(b))
+	if err != nil {
+		return nil, true, fmt.Errorf("解析 %s 失败: %w", path, err)
+	}
+	return o, true, nil
 }
 
 // WriteFile 写入某分片的配置（原子写，避免写一半被服务器读到）。
@@ -238,7 +195,15 @@ func WriteFile(clusterDir, shard string, o *Override) error {
 
 // Validate 校验整份配置：选项必须存在，取值必须在允许范围内。
 func (o *Override) Validate() error {
+	return o.validateChanges(nil)
+}
+
+// 保留源文件中的未知字面量时不重新解释它；只有变更值才进入输入校验。
+func (o *Override) validateChanges(previous map[string]string) error {
 	for name, value := range o.Overrides {
+		if old, ok := previous[name]; ok && old == value {
+			continue
+		}
 		if err := ValidateValue(name, value); err != nil {
 			return err
 		}

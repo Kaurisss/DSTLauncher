@@ -946,18 +946,72 @@ input[type="radio"] {
 .opt-group-count { font-size: 12px; font-weight: 400; color: var(--text-muted); }
 
 .opt-group-body {
-  /* 密排网格：一格一配置。下拉取值普遍只有几个字，格子收窄换更多列 */
+  /* 三列密排，与游戏内世界设置界面一致 */
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 10px 12px;
   padding: 4px 0 14px;
 }
 
-/* 单个选项单元格：大图标在左，右侧标签在上、控件在下（对齐游戏内布局） */
+/* 单元格内的左右箭头：游戏里是两侧的大三角，满高、淡色、悬停加深 */
+.opt-arrow {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 64px;
+  padding: 0;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: color-mix(in srgb, var(--primary) 65%, var(--muted-foreground));
+  cursor: pointer;
+  transition: background-color .15s ease, color .15s ease;
+}
+.opt-arrow svg {
+  width: 22px;
+  height: 22px;
+  fill: currentColor;
+  stroke: none;
+}
+.opt-arrow:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--primary) 12%, transparent);
+  color: var(--primary);
+}
+.opt-arrow:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}
+.opt-arrow:disabled {
+  color: var(--border-strong);
+  cursor: not-allowed;
+}
+
+/* 当前取值：等宽字体，避免翻值时单元格宽度跳动 */
+.opt-row-value {
+  display: block;
+  width: 100%;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.opt-row-input {
+  text-align: center;
+}
+.opt-row.is-readonly .opt-row-value {
+  color: var(--muted-foreground);
+}
+
+/* 单个选项单元格：对齐游戏内「世界设置」——图标在左、箭头翻值、
+   标签在上、当前值在下。三列密排。 */
 .opt-row {
   display: flex;
-  gap: 10px;
-  align-items: flex-start;
+  gap: 8px;
+  align-items: center;
   min-width: 0;
   padding: 8px;
   border: 1px solid var(--border);
@@ -989,8 +1043,8 @@ input[type="radio"] {
   display: grid;
   place-items: center;
   flex-shrink: 0;
-  width: 96px;
-  height: 96px;
+  width: 64px;
+  height: 64px;
   border: 1px solid var(--border);
   border-radius: 0;
   background: var(--surface);
@@ -1004,9 +1058,10 @@ input[type="radio"] {
 .opt-row-main {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
   flex: 1;
   min-width: 0;
+  align-items: center;
 }
 .opt-row-header {
   display: flex;
@@ -1018,12 +1073,11 @@ input[type="radio"] {
 .opt-row-label {
   font-size: 12.5px;
   color: var(--text-2);
-  text-align: left;
+  text-align: center;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  flex: 1;
-  min-width: 0;
+  width: 100%;
 }
 .opt-row.is-changed .opt-row-label {
   color: var(--foreground);

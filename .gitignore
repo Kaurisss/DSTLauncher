@@ -25,6 +25,15 @@ panel.json
 ugc_mods/
 extract-worldsettings.exe
 
+# 本地验证产物与 Python 缓存
+/dist-test/
+/.scratch/*.exe
+/.scratch/dst-panel-linux
+/.scratch/iacheck/
+/.scratch/iacheck2/
+__pycache__/
+*.pyc
+
 # Docker 运行数据挂载点（compose 里 ./data:/data）与本机临时环境变量
 /data/
 /.env

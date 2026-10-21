@@ -102,7 +102,9 @@ export const logApi = {
 
 export const worldApi = {
   get: (roomId, shard) => request('/api/worldconfig', { params: { room: roomId, shard } }),
-  save: payload => request('/api/worldconfig', { method: 'PUT', body: payload }),
+  save: payload => request('/api/worldconfig', {
+    method: 'PUT', params: { room: payload.room, shard: payload.shard }, body: payload,
+  }),
 };
 
 /* ---------- 服务器文件安装 ---------- */
