@@ -1213,6 +1213,8 @@ input[type="radio"] {
 .table tr:last-child td { border-bottom: none; }
 .table .num { font-family: "JetBrains Mono", ui-monospace, monospace; }
 .table .right { text-align: right; white-space: nowrap; }
+/* 同一格里并排的操作按钮（备份的 回滚/导出/删除）之间留间距，否则会粘成一整块 */
+.table td .btn + .btn { margin-left: 6px; }
 
 /* --------------------------------------------------------------------------
    存档管理

@@ -14,7 +14,7 @@ defineProps({
    * - 'list': 通用列表项（复用 .mod，实测 56.3px 高、行距 10px）
    * - 'mod': 模组封面列表（72px 封面 + 名称/状态/ID，窄屏操作区换行）
    * - 'table': 备份/存档表格（复用 .table，实测表头 34px + 每行 52px）
-   * - 'code' | 'editor': 配置文件/代码预览块（复用 .file-body，实测 313px 高）
+   * - 'code' | 'editor': 配置文件/代码预览块（复用 .file-card/.file-body，实测 313px 高/卡）
    * - 'card': 房间卡片（实测 343x375px 卡片）
    * - 'form': 表单选项（复用 .opt，实测控件 32px 高、行距 43px）
    */
@@ -103,22 +103,25 @@ const widthOf = i => WIDTHS[(i - 1) % WIDTHS.length];
     </table>
   </div>
 
-  <!-- 代码 / 配置文件预览：套用 .file-head + .file-body（内容区 313px 高） -->
-  <div v-else-if="variant === 'code' || variant === 'editor'" class="file-card">
-    <div class="file-head">
-      <Skeleton class="h-4 w-44" />
-      <Skeleton class="h-[22px] w-[55px] rounded-full" />
+  <!-- 代码 / 配置文件预览：套用 .file-card / .file-head / .file-body。
+       每个分片一份 server.ini，所以卡片数量由调用方给，否则加载完页面会矮一截再擑开。 -->
+  <template v-else-if="variant === 'code' || variant === 'editor'">
+    <div v-for="i in rows" :key="i" class="file-card">
+      <div class="file-head">
+        <Skeleton class="h-4 w-44" />
+        <Skeleton class="h-[22px] w-[55px] rounded-full" />
+      </div>
+      <div class="file-body min-h-[313px] space-y-1.5">
+        <Skeleton class="code-bar h-3.5 w-3/4" />
+        <Skeleton class="code-bar h-3.5 w-1/2" />
+        <Skeleton class="code-bar h-3.5 w-5/6" />
+        <Skeleton class="code-bar h-3.5 w-2/3" />
+        <Skeleton class="code-bar h-3.5 w-4/5" />
+        <Skeleton class="code-bar h-3.5 w-3/5" />
+        <Skeleton class="code-bar h-3.5 w-2/4" />
+      </div>
     </div>
-    <div class="file-body min-h-[313px] space-y-1.5">
-      <Skeleton class="h-3.5 w-3/4" />
-      <Skeleton class="h-3.5 w-1/2" />
-      <Skeleton class="h-3.5 w-5/6" />
-      <Skeleton class="h-3.5 w-2/3" />
-      <Skeleton class="h-3.5 w-4/5" />
-      <Skeleton class="h-3.5 w-3/5" />
-      <Skeleton class="h-3.5 w-2/4" />
-    </div>
-  </div>
+  </template>
 
   <!-- 房间卡片：直接复用 .room-grid / .room-card，min-h 补到实测的 375px -->
   <div v-else-if="variant === 'card'" class="room-grid">
@@ -162,4 +165,7 @@ const widthOf = i => WIDTHS[(i - 1) % WIDTHS.length];
 /* 真实表格行内容高 29px（按钮决定），加内边距后每行 52px；
    骨架条只有 16px，用行高把总高补到与真实一致。 */
 .skeleton-cell { height: 51px; }
+
+/* 代码块是深底，白条会像闪光；用代码边框色做低对比占位 */
+.code-bar { background: var(--code-border); }
 </style>
