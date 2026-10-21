@@ -7,6 +7,8 @@
 // 改过的项在标签旁点一个小圆点，方便在两百多项里一眼看出自己改了什么。
 
 import { computed, ref } from 'vue';
+import { HugeiconsIcon } from '@hugeicons/vue';
+import { ChevronLeftIcon, ChevronRightIcon } from '@hugeicons/core-free-icons';
 
 import { iconOf } from '@/lib/worldIcons.js';
 import { Input } from '@/components/ui/input';
@@ -48,21 +50,23 @@ function step(delta) {
   emit('change', values.value[next].data);
 }
 
-function onInput(e) {
+function onInput(value) {
   if (props.disabled) return;
-  emit('change', e.target.value);
+  emit('change', value);
 }
 </script>
 
 <template>
   <div class="opt-row" :class="{ 'is-changed': changed, 'is-readonly': disabled }">
-    <!-- 图标位常驻：即使某张图缺失，单元格布局也不会变形 -->
+    <!-- 图标位常驻：即使某张图缺失，单元格布局也不会变形。
+         解码设为 sync：切分片/分类会重建这排 img，异步解码会先空一帧再浮现（整片图标闪一下）。 -->
     <span class="opt-row-icon">
       <img
         v-if="icon && !iconFailed"
         :src="icon"
         :alt="''"
         loading="lazy"
+        decoding="sync"
         @error="iconFailed = true"
       >
     </span>
@@ -88,12 +92,12 @@ function onInput(e) {
     <template v-else>
       <button
         type="button"
-        class="opt-arrow"
+        class="opt-arrow opt-arrow-prev"
         :disabled="disabled"
         :aria-label="`${option.label || option.name} 上一项`"
         @click="step(-1)"
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7z" /></svg>
+        <HugeiconsIcon :icon="ChevronLeftIcon" aria-hidden="true" />
       </button>
 
       <div class="opt-row-main">
@@ -111,7 +115,7 @@ function onInput(e) {
         :aria-label="`${option.label || option.name} 下一项`"
         @click="step(1)"
       >
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7z" /></svg>
+        <HugeiconsIcon :icon="ChevronRightIcon" aria-hidden="true" />
       </button>
     </template>
   </div>

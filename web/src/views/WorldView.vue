@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/select';
 import OptionGroupPanel from '@/components/world/OptionGroupPanel.vue';
 import { worldApi } from '@/lib/api.js';
+import { iconOf } from '@/lib/worldIcons.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard, toast } from '@/lib/toast.js';
 import { WORLD_TYPE_LABEL, MOD_LABEL, shardLabel } from '@/lib/format.js';
@@ -46,7 +47,6 @@ const onlyChanged = ref(false);
 
 /** 选项标签页：世界规则 / 世界生成 */
 const category = ref('settings');
-const categorySwitching = ref(false);
 
 /** 用户手动选过类别后，不再自动跳转 */
 const categoryPinned = ref(false);
@@ -56,16 +56,6 @@ function pickCategory(key) {
   categoryPinned.value = true;
   category.value = key;
 }
-
-watch(category, () => {
-  categorySwitching.value = true;
-  // 留出两帧，让骨架屏先绘制一次，再挂载大量选项控件。
-  // 必须自己把状态复位：onCleanup 只在 watcher 重跑或卸载时调用，
-  // 正常一次切换不会触发它，骨架屏会永远盖住选项。
-  requestAnimationFrame(() => {
-    requestAnimationFrame(() => { categorySwitching.value = false; });
-  });
-});
 
 /* ---------- 派生状态 ---------- */
 
@@ -234,6 +224,7 @@ function onOptionChange(o, value) {
 function applyView(data) {
   view.value = data;
   originalOverrides.value = { ...data.config.overrides };
+  preloadIcons(data.groups || []);
   // leveldataoverride.lua 里没有 override_enabled / 预设字段：它本身就是完整定义，
   // 游戏恒定按它生效，所以开关与预设固定为启用、无预设。
   const levelData = !!data.levelDataInUse;
@@ -275,6 +266,26 @@ function selectShard(name) {
   if (!name || name === shard.value) return;
   shard.value = name;
   load();
+}
+
+/**
+ * 预解码一组图标。
+ * 切分片/分类会重建整批 OptionField，新的 <img> 要重新解码，
+ * 表现为切换后第一帧整片图标空白——先把位图暖进解码缓存就没有这块空白。
+ */
+function preloadIcons(groups) {
+  const urls = new Set();
+  for (const g of groups) {
+    for (const o of g.options) {
+      const url = iconOf(o.name);
+      if (url) urls.add(url);
+    }
+  }
+  for (const url of urls) {
+    // eslint-disable-next-line no-undef -- 浏览器全局 Image
+    const img = new Image();
+    img.src = url;
+  }
 }
 
 async function save() {
@@ -368,7 +379,8 @@ onMounted(() => selectShard(rooms.shards[0]));
 
       <UiSkeleton v-if="!rooms.loaded" variant="form" :rows="2" />
       <UiEmpty v-else-if="!rooms.current" icon="globe" text="请先在「房间」页新建一个房间" />
-      <UiSkeleton v-else-if="loading" variant="form" :rows="2" />
+      <!-- 只在首次加载时铺骨架；切分片保留旧内容到新数据回来，避免整页重建闪一下 -->
+      <UiSkeleton v-else-if="loading && !view" variant="form" :rows="2" />
       <p v-else-if="loadError" class="field-tip">读取失败：{{ loadError }}</p>
 
       <div v-else-if="view" class="world-config-body">
@@ -454,7 +466,7 @@ onMounted(() => selectShard(rooms.shards[0]));
       </div>
     </UiCard>
 
-    <UiCard v-if="view && !loading && !loadError" class="world-options-card" :aria-busy="categorySwitching">
+    <UiCard v-if="view && !loadError" class="world-options-card" :aria-busy="loading">
       <template #title>选项</template>
       <template #hint>共 {{ totalOptions }} 项</template>
 
@@ -498,12 +510,8 @@ onMounted(() => selectShard(rooms.shards[0]));
         </div>
       </div>
 
-      <div v-if="categorySwitching" class="world-category-skeleton" role="status">
-        <span class="sr-only">正在加载选项…</span>
-        <UiSkeleton variant="options" :rows="12" aria-hidden="true" />
-      </div>
       <UiEmpty
-        v-else-if="!visibleGroups.length"
+        v-if="!visibleGroups.length"
         icon="inbox"
         :text="onlyChanged ? '还没有改动过任何选项' : '没有匹配的选项'"
       />
@@ -514,17 +522,6 @@ onMounted(() => selectShard(rooms.shards[0]));
           <Icon name="info" size="16" />
           <span>
             服务器运行中，选项已冻结。请先<strong>关闭服务器</strong>再修改。
-          </span>
-        </div>
-        <!-- 世界已生成：世界生成类选项只在生成世界时读取，锁死防止无效修改 -->
-        <div
-          v-else-if="worldGenerated && category === 'worldgen'"
-          class="notice"
-          style="margin-bottom: 12px"
-        >
-          <Icon name="info" size="16" />
-          <span>
-            世界已生成，世界生成类选项已冻结——它们只在生成世界时读取。
           </span>
         </div>
 

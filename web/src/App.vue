@@ -98,6 +98,7 @@ onUnmounted(() => {
         id="page-content"
         tabindex="-1"
         class="flex-1 min-w-0 md:rounded-tl-xl bg-background md:border-t md:border-l border-border shadow-xs flex flex-col overflow-y-auto"
+        style="scrollbar-gutter: stable"
       >
         <div class="w-full max-w-[2400px] min-w-0 p-4 md:p-6">
           <!-- 不延迟旧视图卸载，快速导航和换房始终只保留一个业务实例。 -->

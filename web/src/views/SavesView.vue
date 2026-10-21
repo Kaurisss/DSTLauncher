@@ -93,7 +93,8 @@ async function remove(item) {
       没有房间认领的存档只能在本页清理。
     </p>
 
-    <UiSkeleton v-if="loading" variant="table" :rows="4" />
+    <!-- 列宽按真实存档表的实测比例（1071px 下六列各 14/16/30/12/19%，末列自适应） -->
+    <UiSkeleton v-if="loading" variant="table" :rows="4" :cols="['14%', '16%', '30%', '12%', '19%', 'auto']" />
     <UiEmpty v-else-if="loadError" icon="alert" :text="'读取失败：' + loadError" />
     <UiEmpty v-else-if="!items.length" icon="folder" text="磁盘上还没有任何存档" />
 
