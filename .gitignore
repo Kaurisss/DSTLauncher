@@ -26,6 +26,8 @@ ugc_mods/
 extract-worldsettings.exe
 
 # 本地验证产物与 Python 缓存
+/.scratch/audit/
+/.scratch/screenshots/
 /dist-test/
 /.scratch/*.exe
 /.scratch/dst-panel-linux
