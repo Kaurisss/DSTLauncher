@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import UiStat from '@/components/ui/UiStat.vue';
 import ShardList from '@/components/overview/ShardList.vue';
 import InstallPanel from '@/components/overview/InstallPanel.vue';
+import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import LogConsole from '@/components/overview/LogConsole.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
@@ -123,6 +124,7 @@ const serverTone = computed(() => {
       <UiCard>
         <template #title>房间状态</template>
         <template #actions>
+          <RollbackDialog />
           <Button size="sm" :disabled="!rooms.current || rooms.starting" @click="proc.start('')">
             {{ rooms.starting ? '准备开服中…' : (system.installed ? '全部启动' : '安装并启动') }}
           </Button>

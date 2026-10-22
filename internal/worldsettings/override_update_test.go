@@ -83,3 +83,53 @@ func TestImportedUnknownLiteralsKeepTypes(t *testing.T) {
 		t.Fatal(err)
 	}
 }
+
+func TestGameWrappedOverrideReadAndUpdate(t *testing.T) {
+	for _, prefix := range []string{"KLEI     1 ", "\ufeffKLEI     1 "} {
+		t.Run(prefix, func(t *testing.T) {
+			root := t.TempDir()
+			path := FilePath(root, "Master")
+			if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+				t.Fatal(err)
+			}
+			original := prefix + "return {override_enabled=true, worldgen_preset='SURVIVAL_TOGETHER', overrides={weather='rare', world_size='small', custom={true, 42}}}"
+			if err := os.WriteFile(path, []byte(original), 0644); err != nil {
+				t.Fatal(err)
+			}
+			o, exists, err := ReadFile(root, "Master", "forest")
+			if err != nil || !exists {
+				t.Fatalf("读取游戏生成的配置失败: exists=%v err=%v", exists, err)
+			}
+			if o.WorldGenPreset != "SURVIVAL_TOGETHER" || o.Overrides["world_size"] != "small" {
+				t.Fatalf("配置读取不完整: %+v", o)
+			}
+			if err := UpdateFile(root, "Master", o); err != nil {
+				t.Fatal(err)
+			}
+			b, err := os.ReadFile(path)
+			if err != nil || string(b) != original {
+				t.Fatalf("无修改时文件发生变化: %v %q", err, b)
+			}
+			o.Overrides["weather"] = "often"
+			if err := UpdateFile(root, "Master", o); err != nil {
+				t.Fatal(err)
+			}
+			b, err = os.ReadFile(path)
+			if want := strings.Replace(original, "weather='rare'", "weather='often'", 1); err != nil || string(b) != want {
+				t.Fatalf("局部更新破坏了文件头或未修改内容: %v %q", err, b)
+			}
+		})
+	}
+}
+
+func TestKleiHeaderKeepsStaticLuaValidation(t *testing.T) {
+	for _, source := range []string{
+		"KLEI     2 return {overrides={weather='often'}}",
+		"KLEI     1 return {overrides={weather=choose()}}",
+		"KLEI     1 return {overrides={weather='often'}} os.exit()",
+	} {
+		if _, _, err := readOverride(source); err == nil {
+			t.Errorf("接受了不支持的编码或动态 Lua: %q", source)
+		}
+	}
+}

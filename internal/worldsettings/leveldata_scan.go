@@ -318,7 +318,14 @@ func (s *levelScanner) table(depth int) *levelTable {
 	return t
 }
 func scanLevelRoot(src string) (*levelTable, error) {
-	s := &levelScanner{src: src, pos: len(src) - len(strings.TrimPrefix(src, "\ufeff"))}
+	pos := len(src) - len(strings.TrimPrefix(src, "\ufeff"))
+	// 游戏会给明文持久化文件加此文件头。保留原文与偏移，局部更新时才能
+	// 逐字节保留文件头、注释和未修改的字段；其它压缩/编码版本仍拒绝解析。
+	const kleiPlainHeader = "KLEI     1 "
+	if strings.HasPrefix(src[pos:], kleiPlainHeader) {
+		pos += len(kleiPlainHeader)
+	}
+	s := &levelScanner{src: src, pos: pos}
 	s.next()
 	if s.tok.kind != 'i' || s.tok.text != "return" {
 		s.fail("文件必须返回一张表")

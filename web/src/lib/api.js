@@ -81,6 +81,9 @@ export const procApi = {
     params: { room: roomId, shard, timeout },
   }),
   restart: (roomId, shard) => request('/api/restart', { params: { room: roomId, shard } }),
+  rollback: (roomId, count) => request('/api/rollback', {
+    method: 'POST', params: { room: roomId }, body: { count },
+  }),
   cmd: (roomId, shard, cmd) => request('/api/cmd', { params: { room: roomId, shard, cmd } }),
 };
 

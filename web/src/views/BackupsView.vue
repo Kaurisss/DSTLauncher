@@ -7,6 +7,7 @@ import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiSkeleton from '@/components/ui/UiSkeleton.vue';
 import BackupTable from '@/components/backups/BackupTable.vue';
+import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { backupApi } from '@/lib/api.js';
 import { guard, toast } from '@/lib/toast.js';
@@ -87,6 +88,7 @@ function exportSave(name) {
     <template #title>存档备份</template>
     <template #hint>整房间备份（cluster.ini + 地表 + 洞穴），最多保留 10 份</template>
     <template #actions>
+      <RollbackDialog />
       <button class="btn btn-sm btn-primary" :disabled="!rooms.current" @click="create">
         立即备份
       </button>

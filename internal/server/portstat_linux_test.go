@@ -5,6 +5,7 @@ package server
 import (
 	"net"
 	"os"
+	"os/exec"
 	"testing"
 )
 
@@ -20,7 +21,16 @@ func TestPortOwnedBySelf(t *testing.T) {
 	if !portOwnedBy(port, self) {
 		t.Fatalf("端口 %d 已绑定，却没有识别为当前进程所有", port)
 	}
-	if portOwnedBy(port, self+1) {
+	// 相邻 PID 可能是当前进程的线程 ID，同样持有该 socket；用独立进程校验。
+	other := exec.Command("sleep", "30")
+	if err := other.Start(); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_ = other.Process.Kill()
+		_ = other.Wait()
+	})
+	if portOwnedBy(port, other.Process.Pid) {
 		t.Error("不应把当前进程的 UDP 端口归属给其它 PID")
 	}
 }
