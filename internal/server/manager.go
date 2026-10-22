@@ -153,6 +153,7 @@ type process struct {
 	logWriter *LogTailer
 	done      chan struct{}
 	closeOnce sync.Once
+	exited    atomic.Bool // 由 watch 在 Wait 返回后发布，避免并发读取 Cmd.ProcessState
 
 	// res 存上一次的资源采样，CPU 占用率要靠它做差值（见 procResource）
 	res procSample
@@ -201,7 +202,9 @@ type Manager struct {
 	// 之间必须原子：并发点击启动会让同一分片起两个进程抢同一个端口。
 	ops chan struct{}
 	// closing 置位后拒绝一切新的启动，包括崩溃自动重启。
-	closing atomic.Bool
+	closing       atomic.Bool
+	rollbackMu    sync.Mutex
+	rollbackUntil map[string]time.Time
 
 	// 模组预更新的状态。单独一把锁：更新可能持续几十分钟，
 	// 不能让它的读写挤在管理分片进程的 mu 上。
@@ -556,7 +559,10 @@ func (m *Manager) RunningShards() []string {
 
 	var out []string
 	for _, p := range m.procs {
-		switch p.state {
+		p.mu.RLock()
+		state := p.state
+		p.mu.RUnlock()
+		switch state {
 		case StateRunning, StateStarting, StateStopping:
 			out = append(out, p.cluster.Key()+"/"+p.shard)
 		}
@@ -581,6 +587,7 @@ func (m *Manager) watch(p *process) {
 	// Wait 返回的 error 在正常退出时为 nil，崩溃时非 nil；
 	// 这里只依赖退出码判定，error 仅作日志参考
 	_ = p.cmd.Wait()
+	p.exited.Store(true)
 
 	// cmd.Wait 返回后 ProcessState 才有效
 	p.mu.Lock()
@@ -877,6 +884,7 @@ func (m *Manager) Status(clusterKey string) []Status {
 		if clusterKey != "" && p.cluster.Key() != clusterKey {
 			continue
 		}
+		p.mu.RLock()
 		st := Status{
 			Cluster:     p.cluster.Key(),
 			ClusterID:   p.cluster.ID,
@@ -888,6 +896,7 @@ func (m *Manager) Status(clusterKey string) []Status {
 			Port:        p.cluster.port(p.shard).ServerPort,
 			Version:     p.startVersion,
 		}
+		p.mu.RUnlock()
 		if p.isAlive() {
 			st.PID = p.pid
 			st.Uptime = time.Since(p.startedAt).Truncate(time.Second).String()
@@ -907,18 +916,13 @@ func (m *Manager) Status(clusterKey string) []Status {
 
 // isAlive 判断进程是否仍存活。
 //
-// 注意：Go 中 cmd.ProcessState 只有在 cmd.Wait() 返回之后才会被填充，
-// 进程运行期间它一直是 nil。因此 nil 必须视为"存活"，
-// 否则启动后立即会被误判为已退出。
+// Cmd.ProcessState 由 Wait 写入，不能与 Wait 并发读取。
+// watch 在 Wait 返回后通过原子标记发布退出状态。
 func (p *process) isAlive() bool {
 	if p.cmd == nil || p.cmd.Process == nil {
 		return false
 	}
-	if p.cmd.ProcessState == nil {
-		// Wait 尚未返回，进程仍在运行
-		return true
-	}
-	return !p.cmd.ProcessState.Exited()
+	return !p.exited.Load()
 }
 
 // close 释放进程资源，关闭 done 通道。

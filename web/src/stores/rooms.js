@@ -45,6 +45,8 @@ export const useRoomsStore = defineStore('rooms', () => {
   const statusLoaded = ref(false);
   const loaded = ref(false);
   const starting = ref(false);
+  const rollingBack = ref(false);
+  const rollbackDeadlines = ref({});
   let statusRequest = 0;
   let lastStatusRequest = 0;
 
@@ -195,11 +197,30 @@ export const useRoomsStore = defineStore('rooms', () => {
     await procApi.cmd(room.id, shard, cmd);
   }
 
+  async function rollback(count) {
+    const room = current.value;
+    if (!room) throw new Error('请先选择房间');
+    if (!Number.isInteger(count) || count < 1 || count > 99) throw new Error('回退存档次数必须是 1-99 的整数');
+    if (rollingBack.value || Date.now() < (rollbackDeadlines.value[room.id] || 0)) {
+      throw new Error('正在回档，请等待世界重新加载');
+    }
+    const roomId = room.id;
+    rollingBack.value = true;
+    try {
+      const result = await procApi.rollback(roomId, count);
+      rollbackDeadlines.value[roomId] = Date.now() + (result.retryAfterSeconds || 60) * 1000;
+      return result;
+    } finally {
+      rollingBack.value = false;
+    }
+  }
+
   return {
     list, currentId, meta, statuses, statusLoaded, loaded, starting,
+    rollingBack, rollbackDeadlines,
     current, shards, running, hasToken,
     load, loadMeta, refreshStatus, select,
     create, update, remove,
-    start, stop, restart, sendCmd,
+    start, stop, restart, sendCmd, rollback,
   };
 });

@@ -113,6 +113,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/start", s.handleStart)
 	mux.HandleFunc("/api/stop", s.handleStop)
 	mux.HandleFunc("/api/restart", s.handleRestart)
+	mux.HandleFunc("/api/rollback", s.handleRollback)
 	mux.HandleFunc("/api/cmd", s.handleCmd)
 
 	// 日志

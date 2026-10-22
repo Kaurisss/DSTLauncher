@@ -96,6 +96,27 @@ function deferred() {
   const promise = new Promise(r => { resolve = r; });
   return { promise, resolve };
 }
+
+test('回档绑定原房间，拦截并发请求与冷却期重复提交，拒绝非法次数', async () => {
+  const rooms = roomsStore();
+  const response = deferred();
+  const send = mock.method(procApi, 'rollback', (id, count) => {
+    assert.equal(id, 1);
+    assert.equal(count, 2);
+    return response.promise;
+  });
+  const task = rooms.rollback(2);
+  rooms.select(2);
+  await assert.rejects(rooms.rollback(1), /正在回档/);
+  response.resolve({ requested: true, retryAfterSeconds: 60 });
+  await task;
+  assert.ok(rooms.rollbackDeadlines[1] > Date.now());
+  assert.equal(rooms.rollbackDeadlines[2], undefined);
+  rooms.select(1);
+  await assert.rejects(rooms.rollback(1), /正在回档/);
+  for (const n of [0, 1.5, 100]) await assert.rejects(rooms.rollback(n), /整数/);
+  assert.equal(send.mock.calls.length, 1);
+});
 const running = [{ shard: 'Master', state: 'running' }];
 const stopped = [{ shard: 'Master', state: 'stopped' }];
 
