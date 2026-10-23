@@ -42,9 +42,9 @@ function onTheme() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-20 flex h-14 shrink-0 items-center bg-sidebar text-sidebar-foreground">
+  <header class="sticky top-0 z-20 flex h-14 w-full min-w-0 shrink-0 items-center bg-sidebar text-sidebar-foreground">
     <!-- 左侧：与侧边栏图标列严格对齐的触发按钮区域 -->
-    <div class="flex h-14 w-12 shrink-0 items-center justify-center">
+    <div class="flex h-14 w-11 sm:w-12 shrink-0 items-center justify-center">
       <SidebarTrigger
         aria-controls="app-navigation"
         aria-label="切换导航"
@@ -54,11 +54,11 @@ function onTheme() {
     </div>
 
     <!-- 品牌标识与标题 -->
-    <div class="flex items-center gap-2.5 pr-3">
+    <div class="flex min-w-0 items-center gap-2 pr-2 sm:gap-2.5 sm:pr-3">
       <img
         src="/icon.png"
         alt="DST"
-        class="size-8 shrink-0 rounded-lg object-cover shadow-xs"
+        class="size-7 sm:size-8 shrink-0 rounded-lg object-cover shadow-xs"
       />
       <div class="min-w-0">
         <p class="truncate text-sm font-semibold leading-tight text-sidebar-foreground">DST 开服控制台</p>
@@ -67,22 +67,22 @@ function onTheme() {
     </div>
 
     <!-- 中间：当前页面 -->
-    <div class="hidden md:flex items-center gap-2 pl-1">
+    <div class="hidden md:flex min-w-0 items-center gap-2 pl-1">
       <Separator orientation="vertical" class="h-4 bg-sidebar-border" />
-      <h1 class="text-sm font-medium text-sidebar-foreground">{{ pageTitle }}</h1>
+      <h1 class="shrink-0 text-sm font-medium text-sidebar-foreground">{{ pageTitle }}</h1>
       <span class="text-xs text-muted-foreground truncate" :title="pageSub">· {{ pageSub }}</span>
     </div>
 
     <!-- 右侧：房间 + 主题 -->
-    <div class="ml-auto flex items-center gap-2 pr-4 md:pr-6">
-      <Field orientation="horizontal" class="*:data-[slot=field-label]:flex-none">
+    <div class="ml-auto flex min-w-0 shrink-0 items-center gap-1.5 pr-3 sm:gap-2 sm:pr-4 md:pr-6">
+      <Field orientation="horizontal" class="w-auto min-w-0 *:data-[slot=field-label]:flex-none">
         <FieldLabel for="roomSelect" class="hidden sm:block text-sidebar-foreground">房间</FieldLabel>
         <Select
           :model-value="rooms.currentId ? String(rooms.currentId) : ''"
           :disabled="!rooms.list.length"
           @update:model-value="(val) => rooms.select(val)"
         >
-          <SelectTrigger id="roomSelect" class="w-40 sm:w-48 bg-background/80">
+          <SelectTrigger id="roomSelect" class="w-32 max-w-[38vw] sm:w-48 sm:max-w-none bg-background/80">
             <SelectValue :placeholder="rooms.list.length ? '选择房间' : '（暂无房间）'" />
           </SelectTrigger>
           <SelectContent position="popper">
@@ -94,8 +94,8 @@ function onTheme() {
           </SelectContent>
         </Select>
       </Field>
-      <Button variant="outline" size="sm" class="bg-background/80" :title="themeTitle" aria-label="切换主题" @click="onTheme">
-        <HugeiconsIcon :icon="themeIcon" data-icon="inline-start" aria-hidden="true" />
+      <Button variant="outline" size="sm" class="shrink-0 px-2 sm:pl-2 sm:pr-2.5 bg-background/80" :title="themeTitle" aria-label="切换主题" @click="onTheme">
+        <HugeiconsIcon :icon="themeIcon" aria-hidden="true" />
         <span class="hidden sm:inline">{{ theme.label.value }}</span>
       </Button>
     </div>

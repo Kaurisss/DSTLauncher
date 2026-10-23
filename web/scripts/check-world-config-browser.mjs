@@ -410,5 +410,37 @@ test('改动计数与重置保存位于选项卡头右侧，切分片保留并�
     ['Master', { mild: 'shortseason' }],
     ['Caves', { dragoons: 'often' }],
   ]);
+
+  // 桌面端工具栏单行排列，窄屏下顶部导航栏不溢出且工具栏分为上下两行
+  await page.setViewportSize({ width: 1280, height: 800 });
+  const desktopToolbar = await page.evaluate(() => {
+    const seg = document.querySelector('.world-toolbar .seg').getBoundingClientRect();
+    const search = document.querySelector('.world-toolbar .world-search').getBoundingClientRect();
+    const sw = document.querySelector('.world-toolbar label').getBoundingClientRect();
+    return { segTop: seg.top, searchTop: search.top, swTop: sw.top };
+  });
+  assert.ok(Math.abs(desktopToolbar.segTop - desktopToolbar.searchTop) < 8, '桌面端分类与搜索应同行');
+  assert.ok(Math.abs(desktopToolbar.searchTop - desktopToolbar.swTop) < 8, '桌面端搜索与只看已改动应同行');
+
+  await page.setViewportSize({ width: 375, height: 812 });
+  const mobileLayout = await page.evaluate(() => {
+    const h = document.querySelector('header');
+    const btn = document.querySelector('header button[aria-label="切换主题"]');
+    const seg = document.querySelector('.world-toolbar .seg').getBoundingClientRect();
+    const search = document.querySelector('.world-toolbar .world-search').getBoundingClientRect();
+    const sw = document.querySelector('.world-toolbar label').getBoundingClientRect();
+    return {
+      scrollWidth: h.scrollWidth,
+      clientWidth: h.clientWidth,
+      btnRight: btn.getBoundingClientRect().right,
+      segBottom: seg.bottom,
+      searchTop: search.top,
+      swTop: sw.top,
+    };
+  });
+  assert.ok(mobileLayout.scrollWidth <= mobileLayout.clientWidth, `header 不应溢出: ${JSON.stringify(mobileLayout)}`);
+  assert.ok(mobileLayout.btnRight <= 375, `主题按钮不应超出屏幕右侧: ${JSON.stringify(mobileLayout)}`);
+  assert.ok(mobileLayout.searchTop >= mobileLayout.segBottom, '移动端搜索应换到分类下一行');
+  assert.ok(Math.abs(mobileLayout.searchTop - mobileLayout.swTop) < 8, '移动端搜索与只看已改动应同行');
   await page.close();
 });

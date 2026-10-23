@@ -19,6 +19,6 @@ defineProps({
       <div v-if="$slots.actions" class="ml-auto flex flex-wrap items-center gap-2"><slot name="actions" /></div>
     </CardHeader>
     <Separator v-if="$slots.title || $slots.actions" />
-    <CardContent :class="cn('min-h-0 flex-1', flush ? 'p-0' : 'p-6')"><slot /></CardContent>
+    <CardContent :class="cn('min-h-0 flex-1', flush ? 'p-0' : 'p-4 sm:p-6')"><slot /></CardContent>
   </Card>
 </template>

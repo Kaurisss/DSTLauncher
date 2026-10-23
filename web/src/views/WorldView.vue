@@ -591,7 +591,7 @@ onMounted(() => selectShard(rooms.shards[0]));
         </button>
       </template>
 
-      <div class="world-toolbar">
+      <div class="world-toolbar world-toolbar-sub">
         <div class="seg">
           <button
             class="seg-btn"
@@ -612,11 +612,8 @@ onMounted(() => selectShard(rooms.shards[0]));
             世界生成 <span class="seg-count">{{ categoryCounts.worldgen }}</span>
           </button>
         </div>
-      </div>
-
-      <div class="world-toolbar world-toolbar-sub">
         <Input v-model="keyword" placeholder="搜索选项（中英文均可）" class="world-search" />
-        <label class="inline-flex items-center gap-2 cursor-pointer select-none text-sm text-foreground">
+        <label class="world-only-changed inline-flex shrink-0 items-center gap-1.5 cursor-pointer select-none whitespace-nowrap text-foreground">
           <Switch v-model="onlyChanged" />
           <span>只看已改动</span>
         </label>
