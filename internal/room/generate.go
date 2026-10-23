@@ -201,6 +201,11 @@ func ensureWorldPresets(root, confDir string, r *Room) error {
 		if config.FileExists(path) {
 			continue
 		}
+		// 已经有 leveldataoverride.lua 的分片也不补：那是游戏自己的完整世界定义，
+		// 再写一份 worldgenoverride 会 merge 在上面、盖住存档里的真实值。
+		if config.FileExists(worldsettings.LevelDataPath(clusterDir, name)) {
+			continue
+		}
 		if err := worldsettings.WriteFile(clusterDir, name, worldsettings.NewShardDefault(s.WorldType)); err != nil {
 			return fmt.Errorf("写入 %s 的世界预设失败: %w", name, err)
 		}

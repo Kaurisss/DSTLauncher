@@ -184,22 +184,25 @@ func readVersion(root string) string {
 }
 
 var (
-	groupRe       = regexp.MustCompile(`^\s*\["([\w_]+)"\]\s*=\s*\{\s*$`)
-	containerRe   = regexp.MustCompile(`^local (WORLDGEN|WORLDSETTINGS)_(GROUP|MISC)\s*=\s*\{`)
-	itemsRe       = regexp.MustCompile(`\bitems\s*=\s*\{`)
-	fieldValueRe  = regexp.MustCompile(`\bvalue\s*=\s*"([^"]*)"`)
-	fieldDescRe   = regexp.MustCompile(`\bdesc\s*=\s*([\w_.]+)`)
-	fieldOrderRe  = regexp.MustCompile(`\border\s*=\s*(\d+)`)
-	fieldWorldRe  = regexp.MustCompile(`\bworld\s*=\s*\{([^}]*)\}`)
-	textFieldRe   = regexp.MustCompile(`\btext\s*=\s*([\w_.]+)`)
-	descEntryRe   = regexp.MustCompile(`\{\s*text\s*=\s*([\w_.]+)\s*,\s*data\s*=\s*"([^"]*)"\s*\}`)
+	groupRe      = regexp.MustCompile(`^\s*\["([\w_]+)"\]\s*=\s*\{\s*$`)
+	containerRe  = regexp.MustCompile(`^local (WORLDGEN|WORLDSETTINGS)_(GROUP|MISC)\s*=\s*\{`)
+	itemsRe      = regexp.MustCompile(`\bitems\s*=\s*\{`)
+	fieldValueRe = regexp.MustCompile(`\bvalue\s*=\s*"([^"]*)"`)
+	fieldDescRe  = regexp.MustCompile(`\bdesc\s*=\s*([\w_.]+)`)
+	fieldOrderRe = regexp.MustCompile(`\border\s*=\s*(\d+)`)
+	fieldWorldRe = regexp.MustCompile(`\bworld\s*=\s*\{([^}]*)\}`)
+	textFieldRe  = regexp.MustCompile(`\btext\s*=\s*([\w_.]+)`)
+	descEntryRe  = regexp.MustCompile(`\{\s*text\s*=\s*([\w_.]+)\s*,\s*data\s*=\s*"([^"]*)"\s*\}`)
 	// 表名不一定以 _descriptions 结尾：出生保护用的就是 `local autodetect = {...}`。
 	// 只认 _descriptions 会把这张表漏掉，导致该项被当成“取值由运行时决定”而只能手填。
-	descTableRe   = regexp.MustCompile(`(?m)^\s*(?:local\s+)?(\w*(?:descriptions|autodetect))\s*=\s*\{`)
+	descTableRe = regexp.MustCompile(`(?m)^\s*(?:local\s+)?(\w*(?:descriptions|autodetect))\s*=\s*\{`)
 	// ocean_ 派生表：`t = {}` + `for ... do t[i] = {text=d.text, data="ocean_"..d.data} end`
 	derivedDescRe = regexp.MustCompile(`(?s)(\w+)\s*=\s*\{\}\s*\nfor\s+\w+,\s*\w+\s+in\s+ipairs\((\w+)\)\s+do\s*\n\s*\w+\[\w+\]\s*=\s*\{text\s*=\s*\w+\.text,?\s*data\s*=\s*"([^"]*)"\s*\.\.\s*\w+\.data\}`)
 	presetDataRe  = regexp.MustCompile(`LEVELCATEGORY\.(WORLDGEN|SETTINGS),\s*LEVELTYPE\.(\w+)\)`)
 	quotedStringR = regexp.MustCompile(`"(?:[^"\\]|\\.)*"`)
+	// 预设的两种分步写法：deepcopy 基底，或空表后逐字段赋值。
+	// 第二组是基底变量名（空表没有基底，取空串）。
+	rePresetVar = regexp.MustCompile(`^local\s+(\w+)\s*=\s*(?:deepcopy\((\w+)\)|\{\})`)
 )
 
 // parseDescriptionTables 提取所有 * _descriptions 表：表名 -> 取值列表。
@@ -516,16 +519,43 @@ func parseOptionLine(line string, category string, descs map[string][]optionValu
 
 // parsePresets 从 levels 文件里提取可用的预设。
 //
-//	AddLevel(...)         -> settings_preset（世界规则）
-//	AddWorldGenLevel(...) -> worldgen_preset（地图生成）
+//	AddSettingsPreset(...) -> settings_preset（世界规则）
+//	AddWorldGenLevel(...)  -> worldgen_preset（地图生成）
 //
-// 两者的 level 定义里都有 location 字段，用它区分 forest / cave。
-// 返回的 key 形如 forest_settings / cave_worldgen。
+// 游戏的 GetSettingsList / GetWorldGenList 就只读这两张表；AddLevel 注册的是
+// 「level」清单（另一套 id），拿它当规则预设会既漏（ENDLESS 等只有
+// AddSettingsPreset 一份）又多（COMPLETE_DARKNESS 等已弃用的别名）。
+//
+// 定义里的 location 字段区分 forest / cave，返回的 key 形如 forest_settings / cave_worldgen。
+//
+// hideinfrontend = true 的预设游戏自己就不在界面上列出（levels.lua 里列表
+// 只在 hideinfrontend ~= true 时插入）：MOD_MISSING 是模组预设丢失时的兜底占位，
+// COMPLETE_DARKNESS / SURVIVAL_TOGETHER_CLASSIC 是给老存档留的别名。
+// 面板照着同一个规则过滤，否则下拉框里会冒出「<模组丢失>」这种玩家选不了的项。
 func parsePresets(src string, labels map[string]string) map[string][]preset {
-	type info struct{ id, location string }
+	type info struct {
+		id, location string
+		hidden       bool
+	}
+	// 同名变量会先后被重新定义（forest.lua 的 worldgen_survival_plus 先代表
+	// TERRARIA、后来又代表 SURVIVAL_DEFAULT_PLUS），所以存全部定义带位置，
+	// 取用时选「调用点之前最近的那一个」，否则前一个 id 会被后一个顶掉。
+	type def struct {
+		pos  int
+		info info
+	}
+	vars := map[string][]def{}
+	lookup := func(name string, pos int) (info, bool) {
+		best, bestPos := info{}, -1
+		for _, d := range vars[name] {
+			if d.pos < pos && d.pos > bestPos {
+				best, bestPos = d.info, d.pos
+			}
+		}
+		return best, bestPos >= 0
+	}
 
-	// 变量名 -> 定义体里的 id 与 location（AddLevel 常以变量传入）
-	vars := map[string]info{}
+	// 变量名 -> 定义体里的 id、location 与 hideinfrontend（预设常以变量传入）
 	for _, m := range regexp.MustCompile(`(?m)^local\s+(\w+)\s*=\s*\{`).FindAllStringSubmatchIndex(src, -1) {
 		body, ok := extractBraces(src, m[1]-1)
 		if !ok {
@@ -535,15 +565,24 @@ func parsePresets(src string, labels map[string]string) map[string][]preset {
 		if id == "" {
 			continue
 		}
-		vars[src[m[2]:m[3]]] = info{id: id, location: firstSub(body, `\blocation\s*=\s*"(\w+)"`)}
+		name := src[m[2]:m[3]]
+		vars[name] = append(vars[name], def{pos: m[0], info: info{
+			id:       id,
+			location: firstSub(body, `\blocation\s*=\s*"(\w+)"`),
+			hidden:   isHidden(body),
+		}})
 	}
 
-	// 另一批预设是派生出来的：local relaxed = deepcopy(survival_together) + relaxed.id = "RELAXED"
-	// 不处理这种写法会漏掉一半以上的预设。
+	// 另一批预设是分步写出来的：
+	//	local relaxed = deepcopy(survival_together) + relaxed.id = "RELAXED"
+	//	local nosweat_settings = {} + nosweat_settings.id = "RELAXED"
+	// 不处理这两种写法，世界规则预设会漏掉一半（轻松/无尽/荒野/暗无天日）。
 	lines := strings.Split(src, "\n")
+	offset := 0
 	for i, l := range lines {
-		m := regexp.MustCompile(`^local\s+(\w+)\s*=\s*deepcopy\((\w+)\)`).FindStringSubmatch(l)
+		m := rePresetVar.FindStringSubmatch(l)
 		if m == nil {
+			offset += len(l) + 1
 			continue
 		}
 		name, base := m[1], m[2]
@@ -555,24 +594,33 @@ func parsePresets(src string, labels map[string]string) map[string][]preset {
 		block := strings.Join(lines[i:end], "\n")
 		id := firstSub(block, `\b`+regexp.QuoteMeta(name)+`\.id\s*=\s*"([A-Z_0-9]+)"`)
 		if id == "" {
+			offset += len(l) + 1
 			continue
 		}
+		baseInfo, _ := lookup(base, offset)
 		loc := firstSub(block, `\b`+regexp.QuoteMeta(name)+`\.location\s*=\s*"(\w+)"`)
 		if loc == "" {
-			loc = vars[base].location
+			loc = baseInfo.location
 		}
-		vars[name] = info{id: id, location: loc}
+		// deepcopy 会连 hideinfrontend 一起复制；只有显式改写才算覆盖。
+		hidden := baseInfo.hidden
+		if v := firstSub(block, `\b`+regexp.QuoteMeta(name)+`\.hideinfrontend\s*=\s*(true|false)`); v != "" {
+			hidden = v == "true"
+		}
+		vars[name] = append(vars[name], def{pos: offset, info: info{id: id, location: loc, hidden: hidden}})
+		offset += len(l) + 1
 	}
 
 	out := map[string][]preset{}
 	seen := map[string]bool{}
-	callRe := regexp.MustCompile(`(AddWorldGenLevel|AddLevel)\(LEVELTYPE\.\w+\s*,\s*`)
+	callRe := regexp.MustCompile(`(AddSettingsPreset|AddWorldGenLevel)\(LEVELTYPE\.\w+\s*,\s*`)
 
 	for _, m := range callRe.FindAllStringSubmatchIndex(src, -1) {
 		kind := src[m[2]:m[3]]
 		rest := src[m[1]:]
 
 		var id, loc string
+		hidden := false
 		if i := strings.Index(rest, "{"); i >= 0 && strings.TrimSpace(rest[:i]) == "" {
 			body, ok := extractBraces(src, m[1]+i)
 			if !ok {
@@ -580,15 +628,16 @@ func parsePresets(src string, labels map[string]string) map[string][]preset {
 			}
 			id = firstSub(body, `\bid\s*=\s*"([A-Z_0-9]+)"`)
 			loc = firstSub(body, `\blocation\s*=\s*"(\w+)"`)
+			hidden = isHidden(body)
 		} else if nm := regexp.MustCompile(`^\s*(\w+)`).FindStringSubmatch(rest); nm != nil {
-			v, ok := vars[nm[1]]
+			v, ok := lookup(nm[1], m[0])
 			if !ok {
 				continue
 			}
-			id, loc = v.id, v.location
+			id, loc, hidden = v.id, v.location, v.hidden
 		}
 
-		if id == "" || (loc != "forest" && loc != "cave") {
+		if id == "" || (loc != "forest" && loc != "cave") || hidden {
 			continue
 		}
 		category := "settings"
@@ -610,6 +659,11 @@ func parsePresets(src string, labels map[string]string) map[string][]preset {
 		sort.Slice(out[k], func(a, b int) bool { return out[k][a].Data < out[k][b].Data })
 	}
 	return out
+}
+
+// isHidden 判断一个 level/settings 定义体是否标了 hideinfrontend = true。
+func isHidden(body string) bool {
+	return firstSub(body, `\bhideinfrontend\s*=\s*(true)`) == "true"
 }
 
 // firstSub 返回第一个捕获组的内容，没有匹配则返回空串。

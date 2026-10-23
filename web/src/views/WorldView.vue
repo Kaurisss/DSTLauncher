@@ -27,6 +27,7 @@ import { WORLD_TYPE_LABEL, MOD_LABEL, shardLabel } from '@/lib/format.js';
 const rooms = useRoomsStore();
 
 const shard = ref('');
+const loadedShard = ref('');
 const view = ref(null);
 const loading = ref(false);
 const saving = ref(false);
@@ -41,6 +42,9 @@ const draft = reactive({});
 /** 载入时的原始值，用于判断有没有未保存的改动 */
 const original = reactive({ enabled: true, worldgenPreset: '', settingsPreset: '' });
 const originalOverrides = ref({});
+/** 按分片缓存视图与未保存草稿，切分片不丢改动 */
+const shardCache = reactive({});
+let loadSeq = 0;
 
 const keyword = ref('');
 const onlyChanged = ref(false);
@@ -127,7 +131,10 @@ const settingsChanged = computed(() =>
   || worldgenPreset.value !== original.worldgenPreset
   || settingsPreset.value !== original.settingsPreset);
 
-const dirty = computed(() => Object.keys(draft).length > 0 || settingsChanged.value);
+const currentDirty = computed(() => Object.keys(draft).length > 0 || settingsChanged.value);
+const otherShardsDirty = computed(() =>
+  Object.entries(shardCache).some(([s, st]) => s !== shard.value && isShardStateDirty(st)));
+const dirty = computed(() => currentDirty.value || otherShardsDirty.value);
 const canReset = computed(() => settingsChanged.value || displayGroups.value.some(g =>
   !(worldgenFrozen.value && g.category === 'worldgen') && g.options.some(isChanged)));
 
@@ -200,6 +207,15 @@ const visibleGroups = computed(() => {
     .filter(g => g.options.length > 0);
 });
 
+/**
+ * 预热当前可见选项的图标。
+ *
+ * 跟着 visibleGroups 走，而不是在 applyView 里按整份数据预热：
+ * 那样会把另一个分类、被隐藏的火山岛专项、以及搜索时被过滤掉的项全部拉下来，
+ * 一次 180+ 请求，既让 <img loading="lazy"> 形同虚设，也白下载几十张永远不显示的图。
+ */
+watch(visibleGroups, groups => preloadIcons(groups), { immediate: true });
+
 /* ---------- 取值读写 ---------- */
 
 function isChanged(o) {
@@ -221,38 +237,91 @@ function onOptionChange(o, value) {
 
 /* ---------- 加载与保存 ---------- */
 
-function applyView(data) {
-  view.value = data;
-  originalOverrides.value = { ...data.config.overrides };
-  preloadIcons(data.groups || []);
+function isShardStateDirty(st) {
+  if (!st) return false;
+  return Object.keys(st.draft).length > 0
+    || st.enabled !== st.original.enabled
+    || st.worldgenPreset !== st.original.worldgenPreset
+    || st.settingsPreset !== st.original.settingsPreset;
+}
+
+function syncToCache() {
+  const cur = loadedShard.value;
+  if (!cur || !shardCache[cur]) return;
+  shardCache[cur].enabled = enabled.value;
+  shardCache[cur].worldgenPreset = worldgenPreset.value;
+  shardCache[cur].settingsPreset = settingsPreset.value;
+  shardCache[cur].draft = { ...draft };
+}
+
+function restoreFromCache(name) {
+  const st = shardCache[name];
+  if (!st) return false;
+  loadedShard.value = name;
+  view.value = st.view;
+  originalOverrides.value = { ...st.originalOverrides };
+  original.enabled = st.original.enabled;
+  original.worldgenPreset = st.original.worldgenPreset;
+  original.settingsPreset = st.original.settingsPreset;
+  enabled.value = st.enabled;
+  worldgenPreset.value = st.worldgenPreset;
+  settingsPreset.value = st.settingsPreset;
+  Object.keys(draft).forEach(k => delete draft[k]);
+  Object.assign(draft, st.draft);
+  return true;
+}
+
+function clearShardCache() {
+  loadedShard.value = '';
+  Object.keys(shardCache).forEach(k => delete shardCache[k]);
+}
+
+function applyView(name, data) {
   // leveldataoverride.lua 里没有 override_enabled / 预设字段：它本身就是完整定义，
   // 游戏恒定按它生效，所以开关与预设固定为启用、无预设。
   const levelData = !!data.levelDataInUse;
-  enabled.value = levelData ? true : data.config.overrideEnabled;
-  worldgenPreset.value = data.config.worldgenPreset || '';
-  settingsPreset.value = data.config.settingsPreset || '';
-  original.enabled = enabled.value;
-  original.worldgenPreset = worldgenPreset.value;
-  original.settingsPreset = settingsPreset.value;
-
-  Object.keys(draft).forEach(k => delete draft[k]);
+  const initEnabled = levelData ? true : data.config.overrideEnabled;
+  const initWorldgen = data.config.worldgenPreset || '';
+  const initSettings = data.config.settingsPreset || '';
   // 原配置另存快照：未知键与隐藏项不计为待保存改动，也不会丢失。
+  shardCache[name] = {
+    view: data,
+    originalOverrides: { ...data.config.overrides },
+    original: {
+      enabled: initEnabled,
+      worldgenPreset: initWorldgen,
+      settingsPreset: initSettings,
+    },
+    enabled: initEnabled,
+    worldgenPreset: initWorldgen,
+    settingsPreset: initSettings,
+    draft: {},
+  };
+  if (shard.value === name) restoreFromCache(name);
 }
 
-async function load() {
-  if (!rooms.currentId || !shard.value) {
+async function load(target = shard.value) {
+  const roomId = rooms.currentId;
+  if (!roomId || !target) {
     view.value = null;
+    loadedShard.value = '';
     return;
   }
+  const seq = ++loadSeq;
   loading.value = true;
   loadError.value = '';
   try {
-    applyView(await worldApi.get(rooms.currentId, shard.value));
+    const data = await worldApi.get(roomId, target);
+    if (rooms.currentId !== roomId) return;
+    applyView(target, data);
   } catch (err) {
-    loadError.value = err.message;
-    view.value = null;
+    if (seq === loadSeq) {
+      loadError.value = err.message;
+      view.value = null;
+      loadedShard.value = '';
+    }
   } finally {
-    loading.value = false;
+    if (seq === loadSeq) loading.value = false;
   }
 }
 
@@ -264,14 +333,26 @@ async function load() {
  */
 function selectShard(name) {
   if (!name || name === shard.value) return;
+  syncToCache();
+  loadedShard.value = '';
   shard.value = name;
-  load();
+  if (restoreFromCache(name)) {
+    ++loadSeq;
+    loading.value = false;
+    loadError.value = '';
+    return;
+  }
+  load(name);
 }
 
 /**
  * 预解码一组图标。
  * 切分片/分类会重建整批 OptionField，新的 <img> 要重新解码，
  * 表现为切换后第一帧整片图标空白——先把位图暖进解码缓存就没有这块空白。
+ *
+ * 只预热当前分类真正会渲染的那批：早先这里是全量预加载（含未展开分类、
+ * 被隐藏的火山岛专项），一次 180+ 个请求，既把 loading="lazy" 变成摆设，
+ * 也多下几十张永远不会显示的图。
  */
 function preloadIcons(groups) {
   const urls = new Set();
@@ -288,30 +369,53 @@ function preloadIcons(groups) {
   }
 }
 
+function buildSavePayload(roomId, shardName, st) {
+  const levelData = !!st.view?.levelDataInUse;
+  return {
+    room: roomId,
+    shard: shardName,
+    overrideEnabled: st.enabled,
+    worldgenPreset: st.worldgenPreset,
+    settingsPreset: st.settingsPreset,
+    overrides: onlySettingsFor(st.view, levelData
+      ? { ...st.draft }
+      : { ...st.originalOverrides, ...st.draft }),
+  };
+}
+
 async function save() {
   if (frozen.value) {
     toast('服务器运行中，请先关闭服务器再保存', 'warn');
     return;
   }
+  syncToCache();
+  const roomId = rooms.currentId;
+  const currentShard = shard.value;
+  const ordered = [
+    ...rooms.shards.filter(s => s in shardCache),
+    ...Object.keys(shardCache).filter(s => !rooms.shards.includes(s)),
+  ];
+  const targets = ordered.filter(s => isShardStateDirty(shardCache[s]));
+  if (!targets.length) return;
+
   saving.value = true;
   const { ok, data } = await guard(
-    () => worldApi.save({
-      room: rooms.currentId,
-      shard: shard.value,
-      overrideEnabled: enabled.value,
-      worldgenPreset: worldgenPreset.value,
-      settingsPreset: settingsPreset.value,
-      overrides: onlySettings(levelDataInUse.value
-        ? { ...draft }
-        : { ...originalOverrides.value, ...draft }),
-    }),
+    async () => {
+      let needRestart = false;
+      for (const s of targets) {
+        const res = await worldApi.save(buildSavePayload(roomId, s, shardCache[s]));
+        if (res && res.needRestart) needRestart = true;
+        if (s !== currentShard) delete shardCache[s];
+      }
+      return { needRestart };
+    },
     { success: '世界配置已保存' },
   );
   saving.value = false;
   if (!ok) return;
   // 游戏只在启动时读这个文件，运行中的分片感知不到改动
   if (data && data.needRestart) toast('有分片正在运行，重启后才会生效');
-  await load();
+  await load(currentShard);
 }
 
 function resetAll() {
@@ -325,9 +429,12 @@ function resetAll() {
 }
 
 /** leveldata 只提交规则增量；普通文件整表保存，必须保留只读生成原值。 */
-function onlySettings(overrides) {
-  if (!levelDataInUse.value) return overrides;
-  const categoryOf = worldsettingsCategory.value;
+function onlySettingsFor(viewData, overrides) {
+  if (!viewData?.levelDataInUse) return overrides;
+  const categoryOf = {};
+  for (const g of viewData.groups || []) {
+    for (const o of g.options) categoryOf[o.name] = g.category;
+  }
   const out = {};
   for (const [k, v] of Object.entries(overrides)) {
     if (categoryOf[k] !== 'worldgen') out[k] = v;
@@ -345,12 +452,17 @@ const worldsettingsCategory = computed(() => {
 /* ---------- 生命周期 ---------- */
 
 watch(() => rooms.currentId, () => {
+  clearShardCache();
   shard.value = '';
   selectShard(rooms.shards[0]);
 });
 // 分片被停用或删除后，当前选中的世界会失效，回落到列表第一个
 watch(() => rooms.shards.join(','), () => {
+  for (const k of Object.keys(shardCache)) {
+    if (!rooms.shards.includes(k)) delete shardCache[k];
+  }
   if (rooms.shards.includes(shard.value)) return;
+  loadedShard.value = '';
   shard.value = '';
   selectShard(rooms.shards[0]);
 });
@@ -469,6 +581,15 @@ onMounted(() => selectShard(rooms.shards[0]));
     <UiCard v-if="view && !loadError" class="world-options-card" :aria-busy="loading">
       <template #title>选项</template>
       <template #hint>共 {{ totalOptions }} 项</template>
+      <template #actions>
+        <span class="world-count">
+          {{ changedCount ? '已改 ' + changedCount + ' 项' : '未做改动' }}
+        </span>
+        <button class="btn btn-sm" :disabled="!canReset || frozen" @click="resetAll">重置</button>
+        <button class="btn btn-sm btn-primary" :disabled="!dirty || frozen || saving" @click="save">
+          {{ saving ? '保存中…' : '保存' }}
+        </button>
+      </template>
 
       <div class="world-toolbar">
         <div class="seg">
@@ -499,15 +620,6 @@ onMounted(() => selectShard(rooms.shards[0]));
           <Switch v-model="onlyChanged" />
           <span>只看已改动</span>
         </label>
-        <div class="world-toolbar-actions">
-          <span class="world-count">
-            {{ changedCount ? '已改 ' + changedCount + ' 项' : '未做改动' }}
-          </span>
-          <button class="btn btn-sm" :disabled="!canReset || frozen" @click="resetAll">重置</button>
-          <button class="btn btn-sm btn-primary" :disabled="!dirty || frozen || saving" @click="save">
-            {{ saving ? '保存中…' : '保存' }}
-          </button>
-        </div>
       </div>
 
       <UiEmpty

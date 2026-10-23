@@ -45,6 +45,7 @@ const { confirmAction, confirmState, handleCancel, handleConfirm } = await vite.
 const { useProcessControl } = await vite.ssrLoadModule('/src/composables/useProcessControl.js');
 const { default: Banner } = await vite.ssrLoadModule('/src/components/CurrentRoomBanner.vue');
 const { default: RoomCard } = await vite.ssrLoadModule('/src/components/rooms/RoomCard.vue');
+const { default: ShardList } = await vite.ssrLoadModule('/src/components/overview/ShardList.vue');
 const logs = useLogs();
 let pinia;
 beforeEach(() => {
@@ -256,6 +257,33 @@ test('后端成功返回空分片列表时显示已停止，换房后才重新�
   rooms.select(2);
   const pending = await renderToString(createSSRApp(Banner).use(pinia));
   assert.ok(pending.includes('等待状态'));
+});
+
+test('只启动一个分片时，其余分片仍保留启动按钮', async () => {
+  const rooms = useRoomsStore(pinia);
+  rooms.list = [{
+    id: 1, name: '房间 1', key: 'Cluster_1', gameMode: 'survival',
+    shards: ['Master', 'Caves', 'Island', 'Volcano'].map(name => ({ name })),
+  }];
+  rooms.currentId = 1;
+  // 后端只返回有进程记录的分片：只开了 Master
+  rooms.statuses = [{ shard: 'Master', state: 'running', pid: 28924, port: 11002 }];
+
+  const html = await renderToString(createSSRApp(ShardList).use(pinia));
+  const rows = html.match(/class="shard-row"/g) || [];
+  assert.equal(rows.length, 4, '每个启用分片都要有一行');
+  for (const name of ['Master', 'Caves', 'Island', 'Volcano']) {
+    assert.ok(html.includes(name), `缺少 ${name} 行`);
+  }
+  // Master 一个停止+重启，其余三个各一个启动（未装服务器时文案是「安装并启动」）。
+  // SSR 会把文本节点包在 <!--[-->…<!--]--> 里，所以按「包含」数而不是结尾匹配。
+  const buttons = html.match(/<button\b[^>]*>[\s\S]*?<\/button>/g) || [];
+  assert.equal(buttons.length, 5, '每行都要有可操作按钮');
+  const count = text => buttons.filter(b => b.includes(text)).length;
+  assert.equal(count('停止'), 1);
+  assert.equal(count('重启'), 1);
+  assert.equal(count('启动'), 3, '其余分片要有启动按钮');
+  assert.ok(html.includes('未启动'), '未启动的分片显示未启动');
 });
 
 test('SSE 重复订阅不重连，增删分片仅更新差异，换房才重建', () => {

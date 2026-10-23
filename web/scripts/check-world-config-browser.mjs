@@ -17,7 +17,7 @@ before(async () => {
     server: { port, strictPort: true, host: '127.0.0.1' },
   });
   await vite.listen();
-  browser = await chromium.launch();
+  browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
 });
 
 after(async () => {
@@ -53,6 +53,8 @@ const SHIPWRECKED = {
 
 async function openWorldPage(data) {
   data = globalThis.structuredClone(data);
+  const byShard = data.Master ? data : null;
+  const shardOf = name => (byShard ? byShard[name] || byShard.Master : data);
   const page = await browser.newPage();
   const requests = [];
   await page.route('**/api/**', async route => {
@@ -76,16 +78,17 @@ async function openWorldPage(data) {
     if (url.pathname === '/api/worldconfig') {
       if (route.request().method() === 'PUT') {
         const payload = route.request().postDataJSON();
+        const target = shardOf(payload.shard);
         // 普通文件整表替换；游戏 leveldata 文件只合并规则增量。
-        data.config = {
+        target.config = {
           ...payload,
-          overrides: data.levelDataInUse
-            ? { ...data.config.overrides, ...payload.overrides }
+          overrides: target.levelDataInUse
+            ? { ...target.config.overrides, ...payload.overrides }
             : payload.overrides,
         };
         return ok({ needRestart: false });
       }
-      return ok(data);
+      return ok(shardOf(url.searchParams.get('shard')));
     }
     if (url.pathname === '/api/logs/stream') {
       return route.fulfill({ status: 200, contentType: 'text/event-stream', body: '' });
@@ -364,5 +367,48 @@ test('图标按选项名正确落到模组目录', async () => {
   await page.locator('.opt-row img').first().waitFor();
   const srcs = await page.locator('.opt-row img').evaluateAll(els => els.map(e => e.getAttribute('src')));
   assert.ok(srcs.every(src => src.startsWith('/world-icons/')), srcs.join(','));
+  await page.close();
+});
+
+test('改动计数与重置保存位于选项卡头右侧，切分片保留并一并保存未提交改动', async () => {
+  const caves = globalThis.structuredClone(SHIPWRECKED);
+  caves.shard = 'Caves';
+  caves.location = 'volcanoworld';
+  caves.file = '/data/dst_save/DST/Cluster_2/Caves/leveldataoverride.lua';
+  caves.config.overrides = { dragoons: 'default' };
+  caves.groups = [{
+    id: 'monsters', label: '怪物', category: 'settings', order: 1,
+    options: [{ name: 'dragoons', label: '火龙', default: 'default', values: [{ data: 'default', label: '默认' }, { data: 'often', label: '较多' }] }],
+  }];
+
+  const { page, requests } = await openWorldPage({ Master: SHIPWRECKED, Caves: caves });
+  const header = page.locator('.world-options-card [data-slot="card-header"]');
+  await header.locator('.world-count').waitFor();
+  await header.getByRole('button', { name: '重置', exact: true }).waitFor();
+  await header.getByRole('button', { name: '保存', exact: true }).waitFor();
+
+  // 在海难分片修改世界规则，切换到火山分片后再切回，未保存改动不丢失
+  await page.getByRole('button', { name: '温和季 下一项', exact: true }).click();
+  assert.equal(await page.locator('.opt-row-value').first().innerText(), '短');
+
+  await page.locator('.shard-tab', { hasText: '火山' }).click();
+  await page.locator('.opt-row', { hasText: '火龙' }).waitFor();
+  assert.equal(await header.getByRole('button', { name: '保存', exact: true }).isEnabled(), true);
+
+  await page.locator('.shard-tab', { hasText: '海难' }).click();
+  await page.locator('.opt-row', { hasText: '温和季' }).waitFor();
+  assert.equal(await page.locator('.opt-row-value').first().innerText(), '短');
+
+  // 切到火山再改一项并保存，两个分片的改动都会落盘
+  await page.locator('.shard-tab', { hasText: '火山' }).click();
+  await page.getByRole('button', { name: '火龙 下一项', exact: true }).click();
+  await saveAndRefresh(page, requests);
+
+  const puts = requests.filter(r => r.path === '/api/worldconfig' && r.method === 'PUT').map(r => JSON.parse(r.body));
+  assert.equal(puts.length, 2);
+  assert.deepEqual(puts.map(p => [p.shard, p.overrides]), [
+    ['Master', { mild: 'shortseason' }],
+    ['Caves', { dragoons: 'often' }],
+  ]);
   await page.close();
 });

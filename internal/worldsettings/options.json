@@ -1,7 +1,7 @@
 {
   "version": 1,
   "gameVersion": "756039",
-  "generatedAt": "2026-10-21T12:11:08+08:00",
+  "generatedAt": "2026-10-22T11:01:55+08:00",
   "source": "scripts/map/customize.lua",
   "presets": {
     "cave_settings": [
@@ -12,6 +12,10 @@
       {
         "data": "DST_CAVE_PLUS",
         "label": "洞穴加强"
+      },
+      {
+        "data": "TERRARIA_CAVE",
+        "label": "泰拉瑞亚的洞穴"
       }
     ],
     "cave_worldgen": [
@@ -30,42 +34,12 @@
     ],
     "forest_settings": [
       {
-        "data": "COMPLETE_DARKNESS",
-        "label": "暗无天日"
-      },
-      {
-        "data": "MOD_MISSING",
-        "label": "\u003c模组丢失\u003e"
-      },
-      {
-        "data": "SURVIVAL_DEFAULT_PLUS",
-        "label": "丰富森林"
-      },
-      {
-        "data": "SURVIVAL_TOGETHER",
-        "label": "生存"
-      },
-      {
-        "data": "SURVIVAL_TOGETHER_CLASSIC",
-        "label": "这里没有巨人"
-      }
-    ],
-    "forest_worldgen": [
-      {
-        "data": "COMPLETE_DARKNESS",
-        "label": "暗无天日"
-      },
-      {
         "data": "ENDLESS",
         "label": "无尽"
       },
       {
         "data": "LIGHTS_OUT",
         "label": "暗无天日"
-      },
-      {
-        "data": "MOD_MISSING",
-        "label": "\u003c模组丢失\u003e"
       },
       {
         "data": "RELAXED",
@@ -80,8 +54,38 @@
         "label": "生存"
       },
       {
-        "data": "SURVIVAL_TOGETHER_CLASSIC",
-        "label": "这里没有巨人"
+        "data": "TERRARIA",
+        "label": "泰拉瑞亚之味"
+      },
+      {
+        "data": "WILDERNESS",
+        "label": "荒野"
+      }
+    ],
+    "forest_worldgen": [
+      {
+        "data": "ENDLESS",
+        "label": "无尽"
+      },
+      {
+        "data": "LIGHTS_OUT",
+        "label": "暗无天日"
+      },
+      {
+        "data": "RELAXED",
+        "label": "轻松"
+      },
+      {
+        "data": "SURVIVAL_DEFAULT_PLUS",
+        "label": "丰富森林"
+      },
+      {
+        "data": "SURVIVAL_TOGETHER",
+        "label": "生存"
+      },
+      {
+        "data": "TERRARIA",
+        "label": "泰拉瑞亚之味"
       },
       {
         "data": "WILDERNESS",

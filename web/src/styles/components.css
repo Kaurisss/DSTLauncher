@@ -917,7 +917,6 @@ input[type="radio"] {
   z-index: 15;
 }
 .world-search { flex: 1 1 240px; min-width: 0; max-width: 384px; }
-.world-toolbar-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-left: auto; }
 .world-count { font-size: 12px; color: var(--text-muted); }
 
 /* 分组折叠面板 */
@@ -1415,8 +1414,6 @@ input[type="radio"] {
   .opt-row { padding: 7px; gap: 9px; }
   .opt-row-icon { width: 56px; height: 56px; }
   .world-presets { grid-template-columns: 1fr; gap: 16px; }
-  .world-toolbar-actions { flex: 1 1 100%; margin-left: 0; }
-  .world-toolbar-actions .world-count { margin-right: auto; }
   /* 分片卡片：窄屏下端口单列，名字与类型各占一行 */
   .shard-ports { grid-template-columns: 1fr; }
   .shard-name-input, .shard-type-select { flex: 1 1 100%; width: 100%; }

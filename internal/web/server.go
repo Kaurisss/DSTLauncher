@@ -168,11 +168,18 @@ func (s *Server) Handler() http.Handler {
 	return mux
 }
 
-// noCacheHTML 对 HTML 文档响应禁用缓存，带 hash 的静态资源不受影响。
+// noCacheHTML 对 HTML 文档响应禁用缓存，其余静态资源改用强缓存。
+//
+// go:embed 里的文件没有修改时间，http.FileServer 因此不会发 Last-Modified/ETag，
+// 浏览器只能每次都重新拉。世界配置页一次要 180+ 张图标（约 1.5MB），
+// 全部重下是这页刷新慢的主因。图标与 assets/ 都是随二进制发布的固定内容，
+// 直接用 max-age 强缓存；index.html 保持 no-cache，新版发布不会卡在旧壳上。
 func noCacheHTML(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, ".html") {
 			w.Header().Set("Cache-Control", "no-cache, must-revalidate")
+		} else {
+			w.Header().Set("Cache-Control", "public, max-age=86400")
 		}
 		next.ServeHTTP(w, r)
 	})

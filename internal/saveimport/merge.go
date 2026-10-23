@@ -118,9 +118,40 @@ func (p *Parsed) WriteInto(root, confDir string, r *room.Room) ([]string, error)
 				"存档里的 %s 没有世界数据（save 目录为空），该分片沿用房间现有存档", s.Name))
 		}
 
-		// 2. 世界设置：统一写成面板管理的 worldgenoverride.lua。
-		// 存档里通常只有 leveldataoverride.lua，解析后转换过来，世界配置页才能二次编辑。
-		if s.HasOverride {
+		// 2. 世界定义：leveldataoverride.lua 原样拷过去。
+		//
+		// 它是游戏真正生效的完整世界定义，location（shipwrecked / volcanoworld）
+		// 与嵌套表（required_setpieces 等）都在里面；只做有损转换的话这些字段全丢，
+		// 模组世界的维度信息就没了，面板只能退回 forest。
+		//
+		// 整个配置块只在该分片确实换了世界数据时动：没有 save 数据的分片沿用
+		// 房间现有存档，它的世界定义与设置都应该跟着存档一起留着。
+		if !s.HasSave {
+			continue
+		}
+		srcLD := filepath.Join(p.ClusterDir, s.Dir, levelDataOverrideName)
+		dstLD := filepath.Join(shardDir, levelDataOverrideName)
+		if config.FileExists(srcLD) {
+			if err := copyFile(srcLD, dstLD); err != nil {
+				return notes, fmt.Errorf("导入 %s 的 %s 失败: %w", s.Name, levelDataOverrideName, err)
+			}
+			notes = append(notes, fmt.Sprintf("%s 的世界定义已从 %s 原样导入", s.Name, levelDataOverrideName))
+		} else if err := removeIfExists(dstLD); err != nil {
+			// 存档没带这个文件，说明它不靠它生效；目标目录里那份属于
+			// 刚被替换掉的旧世界，留着会盖住新导入的世界数据。
+			return notes, fmt.Errorf("清理 %s 的旧 %s 失败: %w", s.Name, levelDataOverrideName, err)
+		}
+
+		// 3. 世界设置：转成面板管理的 worldgenoverride.lua。
+		//
+		// 有 leveldataoverride 时不能写这份：游戏先读 leveldata 再把它 merge 在上面，
+		// 旧值会盖住用户后来在面板里改的项。单一事实来源比两套文件更重要。
+		overridePath := worldsettings.FilePath(clusterDir, s.Name)
+		if config.FileExists(srcLD) {
+			if err := removeIfExists(overridePath); err != nil {
+				return notes, fmt.Errorf("清理 %s 的旧 worldgenoverride.lua 失败: %w", s.Name, err)
+			}
+		} else if s.HasOverride {
 			if err := worldsettings.WriteFile(clusterDir, s.Name, s.Override); err != nil {
 				return notes, fmt.Errorf("写入 %s 世界设置失败: %w", s.Name, err)
 			}
@@ -129,7 +160,7 @@ func (p *Parsed) WriteInto(root, confDir string, r *room.Room) ([]string, error)
 		}
 	}
 
-	// 3. 名单：只有存档里确实存在该文件时才覆盖，
+	// 4. 名单：只有存档里确实存在该文件时才覆盖，
 	// 否则会把用户在面板里维护好的名单清空
 	for _, f := range []struct {
 		name    string
@@ -149,6 +180,14 @@ func (p *Parsed) WriteInto(root, confDir string, r *room.Room) ([]string, error)
 	}
 
 	return notes, nil
+}
+
+// removeIfExists 删除文件；文件本来就不存在时不算失败。
+func removeIfExists(path string) error {
+	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
 }
 
 // replaceDir 用 src 整体替换 dst 目录。

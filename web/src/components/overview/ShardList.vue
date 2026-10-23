@@ -14,11 +14,16 @@ const rooms = useRoomsStore();
 const system = useSystemStore();
 const proc = useProcessControl();
 
-// 后端只返回「有进程记录」的分片，首次启动前列表是空的。
-// 这里按启用中的分片补出占位行，否则用户看不到启动按钮。
+// 后端只返回「有进程记录」的分片（已启动过、被停止过都算），
+// 从未启动过的分片没有记录。
+//
+// 所以不能「有记录就整份用记录」：只启动一个分片时，
+// 其它分片的行会跟着消失，用户看不到它们的启动按钮。
+// 按房间启用中的分片列表对齐，缺的分片补成 stopped 占位行。
 const rows = computed(() => {
-  if (rooms.statuses.length) return rooms.statuses;
-  return rooms.shards.map(name => ({ shard: name, state: 'stopped', placeholder: true }));
+  const byShard = new Map(rooms.statuses.map(s => [s.shard, s]));
+  return rooms.shards.map(name =>
+    byShard.get(name) || { shard: name, state: 'stopped', placeholder: true });
 });
 
 const isLive = s => s.state === 'running' || s.state === 'starting';
