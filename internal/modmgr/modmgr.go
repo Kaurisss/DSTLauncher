@@ -328,18 +328,65 @@ func commaIfNotLast(i, total int) string {
 	return ""
 }
 
-// stripLuaComments 移除 Lua 单行注释，避免注释中的 key = value 被误解析。
+// stripLuaComments 剥掉 Lua 单行注释（--...）与块注释（--[[...]]），保留字符串与换行。
 func stripLuaComments(s string) string {
-	lines := strings.Split(s, "\n")
-	var out []string
-	for _, l := range lines {
-		if idx := strings.Index(l, "--"); idx >= 0 {
-			// 保留缩进，移除注释文本
-			l = l[:idx]
+	var sb strings.Builder
+	sb.Grow(len(s))
+	inStr := false
+	var quote byte
+
+	for i := 0; i < len(s); i++ {
+		c := s[i]
+		if inStr {
+			sb.WriteByte(c)
+			if c == '\\' && i+1 < len(s) {
+				i++
+				sb.WriteByte(s[i])
+				continue
+			}
+			if c == quote {
+				inStr = false
+			}
+			continue
 		}
-		out = append(out, l)
+		if c == '"' || c == '\'' {
+			inStr = true
+			quote = c
+			sb.WriteByte(c)
+			continue
+		}
+		if c == '[' && i+1 < len(s) && s[i+1] == '[' {
+			end := strings.Index(s[i+2:], "]]")
+			if end >= 0 {
+				sb.WriteString(s[i : i+2+end+2])
+				i += 2 + end + 1
+				continue
+			}
+		}
+		if c == '-' && i+1 < len(s) && s[i+1] == '-' {
+			if i+3 < len(s) && s[i+2] == '[' && s[i+3] == '[' {
+				end := strings.Index(s[i+4:], "]]")
+				if end >= 0 {
+					for _, ch := range s[i : i+4+end+2] {
+						if ch == '\n' {
+							sb.WriteByte('\n')
+						}
+					}
+					i += 4 + end + 1
+					continue
+				}
+			}
+			for i < len(s) && s[i] != '\n' {
+				i++
+			}
+			if i < len(s) {
+				sb.WriteByte('\n')
+			}
+			continue
+		}
+		sb.WriteByte(c)
 	}
-	return strings.Join(out, "\n")
+	return sb.String()
 }
 
 func stripBOM(s string) string {
@@ -701,12 +748,17 @@ func modInfoValue(expr string) string {
 // containsCJK 判断字符串是否含中日韩字符。
 // 双语 mod 的名字表达式里，含中文的那个串通常就是面板用户想要的名字。
 func containsCJK(s string) bool {
+	return cjkCount(s) > 0
+}
+
+func cjkCount(s string) int {
+	n := 0
 	for _, r := range s {
 		if r >= 0x4E00 && r <= 0x9FFF {
-			return true
+			n++
 		}
 	}
-	return false
+	return n
 }
 
 // stripLuaTrailingComment 去掉行尾注释（-- 及其后内容），保留字符串字面量。
@@ -766,17 +818,25 @@ func luaStringsIn(s string) []string {
 	return out
 }
 
+// OptionChoice 表示下拉配置项的一个候选值及其显示文案。
+type OptionChoice struct {
+	Data        string `json:"data"`
+	Description string `json:"description,omitempty"`
+}
+
 // ConfigSchema 解析 modinfo.lua 中的 configuration_options 定义。
 // 这是 mod 作者声明的可配置项清单，用于在 Web 面板上自动渲染表单。
 type ConfigOption struct {
-	Name        string   `json:"name"`
-	Label       string   `json:"label"`
-	Type        string   `json:"type"` // string / number / boolean / select
-	Default     string   `json:"default"`
-	Options     []string `json:"options,omitempty"` // type=select 时的候选值
-	Description string   `json:"description"`
-	Min         string   `json:"min,omitempty"`
-	Max         string   `json:"max,omitempty"`
+	Name              string         `json:"name"`
+	Label             string         `json:"label"`
+	Type              string         `json:"type"` // string / number / boolean / select
+	Default           string         `json:"default"`
+	DefaultUnresolved bool           `json:"defaultUnresolved,omitempty"`
+	Options           []string       `json:"options,omitempty"` // type=select 时的候选值
+	Choices           []OptionChoice `json:"choices,omitempty"` // 候选值及其中文描述
+	Description       string         `json:"description"`
+	Min               string         `json:"min,omitempty"`
+	Max               string         `json:"max,omitempty"`
 }
 
 type configOptionBlock struct {
@@ -785,10 +845,21 @@ type configOptionBlock struct {
 	Type        string
 	Default     string
 	Options     []string
+	Choices     []OptionChoice
 	Description string
 	Min         string
 	Max         string
 }
+
+var (
+	configOptsAssignRe = regexp.MustCompile(`\bconfiguration_options\s*=`)
+	localTableRe       = regexp.MustCompile(`(?m)^\s*local\s+(\w+)\s*=\s*\{`)
+	fallbackOptsRe     = regexp.MustCompile(`configuration_options\[[^\]]+\]\.options\s*=\s*configuration_options\[[^\]]+\]\.options\s+or\s+(\w+)`)
+	fallbackDefaultRe  = regexp.MustCompile(`configuration_options\[[^\]]+\]\.default\s*=\s*configuration_options\[[^\]]+\]\.default\s*==\s*nil\s+and\s+(true|false|-?[0-9.]+)`)
+	literalValueRe     = regexp.MustCompile(`^(?:-?[0-9]+(?:\.[0-9]+)?|true|false)$`)
+	numberLiteralRe    = regexp.MustCompile(`^-?[0-9]+(?:\.[0-9]+)?$`)
+	zhEntryRe          = regexp.MustCompile(`(?:\["zh"\]|\['zh'\]|\bzh)\s*=\s*("[^"]*"|'[^']*')`)
+)
 
 // ConfigSchema 解析模组声明的配置项。
 func (m *Manager) ConfigSchema(id string) ([]ConfigOption, error) {
@@ -800,49 +871,131 @@ func (m *Manager) ConfigSchema(id string) ([]ConfigOption, error) {
 	if err != nil {
 		return nil, fmt.Errorf("读取 modinfo 失败: %w", err)
 	}
+	return parseConfigSchemaText(string(data))
+}
 
-	// 截取 configuration_options = { ... } 块，用括号配对定位结束位置
-	text := string(data)
-	idx := strings.Index(text, "configuration_options")
-	if idx < 0 {
+func parseConfigSchemaText(raw string) ([]ConfigOption, error) {
+	text := stripLuaComments(raw)
+	loc := configOptsAssignRe.FindStringIndex(text)
+	if loc == nil {
 		return nil, nil // 该模组无配置项
 	}
-	start := strings.Index(text[idx:], "{")
+	idx := loc[0]
+	start := strings.Index(text[loc[1]:], "{")
 	if start < 0 {
 		return nil, nil
 	}
-	start += idx
-
-	depth := 0
-	end := -1
-	for i := start; i < len(text); i++ {
-		switch text[i] {
-		case '{':
-			depth++
-		case '}':
-			depth--
-			if depth == 0 {
-				end = i
-			}
-		}
-		if end > 0 {
-			break
-		}
-	}
+	start += loc[1]
+	end := matchBrace(text, start)
 	if end < 0 {
 		return nil, fmt.Errorf("configuration_options 块未闭合，modinfo.lua 可能损坏")
 	}
 
 	block := text[start : end+1]
+	// 双语模组常写成 `configuration_options = L and { ...英文... } or { ...中文... }`
+	// 若紧跟着 or 分支且中文字符更多，取中文分支。
+	rest := strings.TrimLeft(text[end+1:], " \t\r\n")
+	if strings.HasPrefix(rest, "or") && (len(rest) == 2 || !isIdentChar(rest[2])) {
+		if rel := strings.Index(rest, "{"); rel >= 0 {
+			open2 := len(text) - len(rest) + rel
+			if close2 := matchBrace(text, open2); close2 > open2 {
+				alt := text[open2 : close2+1]
+				if cjkCount(alt) > cjkCount(block) {
+					block = alt
+					end = close2
+				}
+			}
+		}
+	}
+
+	// 收集顶层 `local xxx = { ... }` 候选表（如岛屿冒险的 options_enable）
+	localOpts := map[string][]OptionChoice{}
+	for _, m := range localTableRe.FindAllStringSubmatchIndex(text[:idx], -1) {
+		open := m[1] - 1
+		closeIdx := matchBrace(text, open)
+		if closeIdx <= open {
+			continue
+		}
+		if choices := extractChoices(text[open+1 : closeIdx]); len(choices) > 0 {
+			localOpts[text[m[2]:m[3]]] = choices
+		}
+	}
+
+	var fallbackChoices []OptionChoice
+	if m := fallbackOptsRe.FindStringSubmatch(text[end+1:]); m != nil {
+		fallbackChoices = localOpts[m[1]]
+	}
+	fallbackDefault := ""
+	if m := fallbackDefaultRe.FindStringSubmatch(text[end+1:]); m != nil {
+		fallbackDefault = m[1]
+	}
+
+	stringsBlock := extractBraceBlock(text[:idx], "STRINGS")
+
 	// 每个配置项是一个独立表，按 depth=1 的边界切分
 	var out []ConfigOption
 	for _, item := range splitLuaTables(block[1 : len(block)-1]) {
-		opt := parseConfigOption(item)
-		if opt.Name != "" {
-			out = append(out, opt)
+		trimmed := strings.TrimSpace(item)
+		if !strings.HasPrefix(trimmed, "{") {
+			continue
 		}
+		opt := parseConfigOptionWithLocals(trimmed, localOpts, fallbackChoices, fallbackDefault)
+		if opt.Name == "" {
+			continue
+		}
+		// 兼容通过顶层 STRINGS[name] 注入多语言文案的模组（如 Insight）
+		if opt.Label == "" && stringsBlock != "" {
+			applyStringsTable(&opt, trimmed, stringsBlock)
+		}
+		// 跳过伪装成单空选项的分段标题（如 Title / EmptyNull）
+		if len(opt.Choices) == 1 && opt.Choices[0].Description == "" {
+			continue
+		}
+		out = append(out, opt)
 	}
 	return out, nil
+}
+
+func applyStringsTable(opt *ConfigOption, rawItem, stringsBlock string) {
+	entry := extractBraceBlock(stringsBlock, opt.Name)
+	if entry == "" {
+		return
+	}
+	if lbl := extractBraceBlock(entry, "label"); lbl != "" {
+		opt.Label = textutil.Clean(evalTextExpr(lbl))
+	}
+	if opt.Description == "" {
+		if hvr := extractBraceBlock(entry, "hover"); hvr != "" {
+			opt.Description = textutil.Clean(evalTextExpr(hvr))
+		}
+	}
+	if optsBlock := extractBraceBlock(entry, "options"); optsBlock != "" {
+		for i := range opt.Choices {
+			if opt.Choices[i].Description != "" {
+				continue
+			}
+			key := regexp.QuoteMeta(opt.Choices[i].Data)
+			re := regexp.MustCompile(`(?:\["` + key + `"\]|\['` + key + `'\]|\[` + key + `\]|\b` + key + `)\s*=\s*\{`)
+			if loc := re.FindStringIndex(optsBlock); loc != nil {
+				open := loc[1] - 1
+				if closeIdx := matchBrace(optsBlock, open); closeIdx > open {
+					if desc := extractBraceBlock(optsBlock[open+1:closeIdx], "description"); desc != "" {
+						opt.Choices[i].Description = textutil.Clean(evalTextExpr(desc))
+					}
+				}
+			}
+		}
+	}
+	if tags := extractBraceBlock(rawItem, "tags"); strings.Contains(tags, `"undefined"`) {
+		opt.Choices = append(opt.Choices, OptionChoice{Data: "undefined", Description: "默认"})
+		opt.Options = append(opt.Options, "undefined")
+		opt.Default = "undefined"
+		opt.DefaultUnresolved = false
+	}
+}
+
+func isIdentChar(c byte) bool {
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_'
 }
 
 // splitLuaTables 按顶层逗号切分多个 Lua 表。
@@ -890,58 +1043,232 @@ func splitLuaTables(s string) []string {
 //
 // 注意 DST 的 modinfo 里 default/min/max 既可能是字符串也可能是裸字面量
 // （default = 3 / default = true），options 既可能是字符串数组也可能是
-// {description=..., data=...} 的表数组，因此不能只按字符串匹配。
+// {description=..., data=...} 的表数组，label/hover/description 也常写双语表达式。
 func parseConfigOption(s string) ConfigOption {
+	return parseConfigOptionWithLocals(s, nil, nil, "")
+}
+
+func parseConfigOptionWithLocals(
+	s string,
+	localOpts map[string][]OptionChoice,
+	fallbackChoices []OptionChoice,
+	fallbackDefault string,
+) ConfigOption {
+	s = stripLuaComments(s)
+	trimmed := strings.TrimSpace(s)
+	if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
+		s = trimmed[1 : len(trimmed)-1]
+	}
 	block := configOptionBlock{}
 
 	// 先把 options 块整体摘出去。否则 options 里每个候选项的
 	// description = "简单" 会被当成配置项自身的 description。
 	scalar := s
-	if optBody := extractBraceBlock(s, "options"); optBody != "" {
-		if a, b := braceBlockRange(s, "options"); a >= 0 {
-			scalar = s[:a] + s[b+1:]
+	hasExplicitOptions := false
+	if a, b := braceBlockRange(s, "options"); a >= 0 && b > a {
+		hasExplicitOptions = true
+		optBody := s[a+1 : b]
+		scalar = s[:a] + s[b+1:]
+		block.Choices = extractChoices(optBody)
+	} else if localOpts != nil {
+		if ident := strings.TrimSpace(extractFieldExpr(scalar, "options")); ident != "" {
+			hasExplicitOptions = true
+			block.Choices = localOpts[ident]
 		}
-		block.Options = extractOptions(optBody)
+	}
+	if !hasExplicitOptions && len(fallbackChoices) > 0 {
+		block.Choices = fallbackChoices
+		for _, c := range block.Choices {
+			block.Options = append(block.Options, c.Data)
+		}
+	}
+	if len(block.Options) == 0 {
+		for _, c := range block.Choices {
+			block.Options = append(block.Options, c.Data)
+		}
 	}
 
-	// 字符串字面量，用 \b 防止 label_name 命中 name
 	str := func(field string) string {
-		re := regexp.MustCompile(`\b` + field + `\s*=\s*"([^"]*)"`)
-		if m := re.FindStringSubmatch(scalar); m != nil {
-			return m[1]
-		}
-		return ""
+		return textutil.Clean(evalTextExpr(extractFieldExpr(scalar, field)))
 	}
-	// 任意字面量：先字符串，再数字/布尔
 	lit := func(field string) string {
-		if v := str(field); v != "" {
-			return v
-		}
-		re := regexp.MustCompile(`\b` + field + `\s*=\s*(-?[0-9.]+|true|false)`)
-		if m := re.FindStringSubmatch(scalar); m != nil {
-			return m[1]
-		}
-		return ""
+		value, _ := evalLiteralExpr(extractFieldExpr(scalar, field))
+		return value
 	}
 
-	block.Name = str("name")
+	block.Name = evalTextExpr(extractFieldExpr(scalar, "name"))
 	block.Label = str("label")
 	block.Type = str("type")
-	block.Default = lit("default")
+	defaultExpr := extractFieldExpr(scalar, "default")
+	defaultValue, defaultKnown := evalLiteralExpr(defaultExpr)
+	block.Default = defaultValue
+	if (defaultExpr == "" || defaultExpr == "nil") && fallbackDefault != "" {
+		block.Default = fallbackDefault
+		defaultKnown = true
+	}
 	block.Description = str("description")
+	if block.Description == "" {
+		block.Description = str("hover")
+	}
 	block.Min = lit("min")
 	block.Max = lit("max")
 
-	return ConfigOption{
-		Name:        block.Name,
-		Label:       block.Label,
-		Type:        block.Type,
-		Default:     block.Default,
-		Options:     block.Options,
-		Description: block.Description,
-		Min:         block.Min,
-		Max:         block.Max,
+	if block.Type == "" && len(block.Options) == 0 {
+		if block.Default == "true" || block.Default == "false" {
+			block.Type = "boolean"
+		} else if numberLiteralRe.MatchString(block.Default) {
+			block.Type = "number"
+		}
 	}
+
+	return ConfigOption{
+		Name:              block.Name,
+		Label:             block.Label,
+		Type:              block.Type,
+		Default:           block.Default,
+		DefaultUnresolved: !defaultKnown,
+		Options:           block.Options,
+		Choices:           block.Choices,
+		Description:       block.Description,
+		Min:               block.Min,
+		Max:               block.Max,
+	}
+}
+
+// extractFieldExpr 提取表内 `field = <expr>` 的表达式部分（在顶层逗号/分号处截断）。
+func extractFieldExpr(s, field string) string {
+	re := regexp.MustCompile(`\b` + field + `\s*=\s*`)
+	loc := re.FindStringIndex(s)
+	if loc == nil {
+		return ""
+	}
+	rest := s[loc[1]:]
+	parenDepth, braceDepth := 0, 0
+	inStr := false
+	var quote byte
+	for i := 0; i < len(rest); i++ {
+		c := rest[i]
+		if inStr {
+			if c == '\\' {
+				i++
+				continue
+			}
+			if c == quote {
+				inStr = false
+			}
+			continue
+		}
+		switch c {
+		case '"', '\'':
+			inStr = true
+			quote = c
+		case '(':
+			parenDepth++
+		case ')':
+			if parenDepth > 0 {
+				parenDepth--
+			}
+		case '{':
+			braceDepth++
+		case '}':
+			if braceDepth == 0 {
+				return strings.TrimSpace(rest[:i])
+			}
+			braceDepth--
+		case ',', ';':
+			if parenDepth == 0 && braceDepth == 0 {
+				return strings.TrimSpace(rest[:i])
+			}
+		}
+	}
+	return strings.TrimSpace(rest)
+}
+
+// evalTextExpr 从 Lua 文本表达式（字面量、`..` 拼接、`L and a or b`、`en_zh(a, b)`）中提取字符串。
+// 双语表达式优先取含中文的字符串。
+func evalTextExpr(expr string) string {
+	expr = strings.TrimSpace(expr)
+	if expr == "" {
+		return ""
+	}
+	strs := luaStringsIn(expr)
+	if len(strs) == 0 {
+		return ""
+	}
+	if len(strs) == 1 {
+		return strs[0]
+	}
+	// 判断是否为纯字符串拼接（"a" .. "b"）
+	if isStringConcatExpr(expr) {
+		return strings.Join(strs, "")
+	}
+	if m := zhEntryRe.FindStringSubmatch(expr); m != nil {
+		if zh := luaStringsIn(m[1]); len(zh) > 0 && zh[0] != "" {
+			return zh[0]
+		}
+	}
+	for _, s := range strs {
+		if containsCJK(s) {
+			return s
+		}
+	}
+	return strs[0]
+}
+
+func isStringConcatExpr(expr string) bool {
+	inStr := false
+	var quote byte
+	hasConcat := false
+	for i := 0; i < len(expr); i++ {
+		c := expr[i]
+		if inStr {
+			if c == '\\' {
+				i++
+				continue
+			}
+			if c == quote {
+				inStr = false
+			}
+			continue
+		}
+		if c == '"' || c == '\'' {
+			inStr = true
+			quote = c
+			continue
+		}
+		if c == '.' && i+1 < len(expr) && expr[i+1] == '.' {
+			hasConcat = true
+			i++
+			continue
+		}
+		if c == ' ' || c == '\t' || c == '\r' || c == '\n' {
+			continue
+		}
+		return false
+	}
+	return hasConcat
+}
+
+func evalLiteralExpr(expr string) (string, bool) {
+	expr = strings.TrimSpace(expr)
+	if len(expr) >= 2 && (expr[0] == '"' || expr[0] == '\'') {
+		for i := 1; i < len(expr); i++ {
+			if expr[i] == '\\' {
+				i++
+				continue
+			}
+			if expr[i] == expr[0] {
+				if i == len(expr)-1 {
+					return unescapeLuaString(expr[1:i]), true
+				}
+				break
+			}
+		}
+	}
+	if literalValueRe.MatchString(expr) {
+		return expr, true
+	}
+	return "", false
 }
 
 // braceBlockRange 返回 field 之后第一个 {...} 的起止下标（含大括号）。
@@ -976,29 +1303,42 @@ func extractBraceBlock(s, field string) string {
 	return s[a+1 : b]
 }
 
-// extractOptions 抽取配置项的可选值。
+// extractChoices 抽取配置项的可选值及其显示文案。
 // DST 有两种写法：
 //
 //	options = {"Easy", "Hard"}
 //	options = {{description = "Easy", data = 1}, {description = "Hard", data = 2}}
-//
-// 配置下发需要的是 data，因此优先取 data，取不到再退回字符串数组。
-func extractOptions(body string) []string {
-	var out []string
-	dataRe := regexp.MustCompile(`\bdata\s*=\s*(?:"([^"]*)"|(-?[0-9.]+)|(true|false))`)
-	for _, m := range dataRe.FindAllStringSubmatch(body, -1) {
-		for i := 1; i <= 3; i++ {
-			if m[i] != "" {
-				out = append(out, m[i])
-				break
+func extractChoices(body string) []OptionChoice {
+	var out []OptionChoice
+	for _, item := range splitLuaTables(body) {
+		trimmed := strings.TrimSpace(item)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
+			inner := trimmed[1 : len(trimmed)-1]
+			dataExpr := extractFieldExpr(inner, "data")
+			descExpr := extractFieldExpr(inner, "description")
+			if data, known := evalLiteralExpr(dataExpr); known {
+				out = append(out, OptionChoice{
+					Data:        data,
+					Description: textutil.Clean(evalTextExpr(descExpr)),
+				})
 			}
+			continue
+		}
+		if value, known := evalLiteralExpr(trimmed); known {
+			out = append(out, OptionChoice{Data: value, Description: value})
 		}
 	}
-	if len(out) > 0 {
-		return out
-	}
-	for _, q := range regexp.MustCompile(`"([^"]*)"`).FindAllStringSubmatch(body, -1) {
-		out = append(out, q[1])
+	return out
+}
+
+func extractOptions(body string) []string {
+	choices := extractChoices(body)
+	out := make([]string, 0, len(choices))
+	for _, c := range choices {
+		out = append(out, c.Data)
 	}
 	return out
 }

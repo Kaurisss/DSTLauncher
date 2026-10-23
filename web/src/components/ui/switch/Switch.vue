@@ -3,19 +3,19 @@ import { SwitchRoot, SwitchThumb, useForwardPropsEmits } from "reka-ui";
 import { cn } from "cn";
 
 const props = defineProps({
-  defaultChecked: { type: Boolean, required: false },
-  checked: { type: [Boolean, String], required: false },
+  defaultValue: { type: Boolean, required: false },
+  modelValue: { type: [Boolean, null], required: false },
   disabled: { type: Boolean, required: false },
-  required: { type: Boolean, required: false },
-  name: { type: String, required: false },
-  value: { type: String, required: false },
   id: { type: String, required: false },
+  value: { type: String, required: false },
   asChild: { type: Boolean, required: false },
   as: { type: null, required: false },
+  name: { type: String, required: false },
+  required: { type: Boolean, required: false },
   class: { type: [Boolean, null, String, Object, Array], required: false },
 });
 
-const emits = defineEmits(["update:checked"]);
+const emits = defineEmits(["update:modelValue"]);
 const forwarded = useForwardPropsEmits(props, emits);
 </script>
 

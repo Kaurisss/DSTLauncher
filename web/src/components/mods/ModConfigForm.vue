@@ -23,16 +23,27 @@ const props = defineProps({
 
 const schema = ref([]);
 const values = reactive({});
+const initialValues = {};
 const loading = ref(true);
 const loadError = ref('');
 const saving = ref(false);
 
 /** 配置项的类型：有 options 就是下拉框，否则看 type */
 function fieldType(option) {
-  if (option.options && option.options.length) return 'select';
+  if ((option.choices && option.choices.length) || (option.options && option.options.length)) return 'select';
   if (option.type === 'boolean') return 'boolean';
   if (option.type === 'number') return 'number';
   return 'string';
+}
+
+function choiceList(option) {
+  if (option.choices && option.choices.length) {
+    return option.choices.map(c => ({
+      data: String(c.data),
+      label: c.description || String(c.data),
+    }));
+  }
+  return (option.options || []).map(v => ({ data: String(v), label: String(v) }));
 }
 
 /**
@@ -58,8 +69,10 @@ onMounted(async () => {
     schema.value = list || [];
     const current = props.mod.config || {};
     schema.value.forEach(o => {
+      if (!(o.name in current) && o.defaultUnresolved) return;
       const raw = (o.name in current) ? current[o.name] : o.default;
       values[o.name] = normalize(o, raw);
+      initialValues[o.name] = values[o.name];
     });
   } catch (err) {
     loadError.value = err.message;
@@ -80,6 +93,7 @@ async function save() {
     for (const o of schema.value) {
       const type = fieldType(o);
       const raw = values[o.name];
+      if (raw === undefined || (o.defaultUnresolved && raw === initialValues[o.name])) continue;
       // 后端按 JSON 字面量解析 value 参数，数字/布尔要原样传
       let value;
       if (type === 'number') value = JSON.stringify(Number(raw) || 0);
@@ -121,8 +135,8 @@ async function save() {
         </SelectTrigger>
         <SelectContent position="popper">
           <SelectGroup>
-            <SelectItem v-for="op in o.options" :key="op" :value="String(op)">
-              {{ op }}
+            <SelectItem v-for="op in choiceList(o)" :key="op.data" :value="op.data">
+              {{ op.label }}
             </SelectItem>
           </SelectGroup>
         </SelectContent>
@@ -139,8 +153,8 @@ async function save() {
         </SelectTrigger>
         <SelectContent position="popper">
           <SelectGroup>
-            <SelectItem value="true">true</SelectItem>
-            <SelectItem value="false">false</SelectItem>
+            <SelectItem value="true">开启</SelectItem>
+            <SelectItem value="false">关闭</SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>

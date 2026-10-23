@@ -4,6 +4,17 @@
 // 以后接口调整只改这个文件，不用全项目搜索字符串。
 
 const TIMEOUT_MS = 60000;
+let unauthorizedHandler = null;
+
+export function onUnauthorized(fn) {
+  unauthorizedHandler = fn;
+}
+
+function makeUnauthorizedError(msg) {
+  const err = new Error(msg || '请先登录面板');
+  err.unauthorized = true;
+  return err;
+}
 
 async function request(path, { method = 'GET', params, body } = {}) {
   const url = new URL(path, location.origin);
@@ -41,11 +52,31 @@ async function request(path, { method = 'GET', params, body } = {}) {
   try {
     json = await res.json();
   } catch (err) {
+    if (res.status === 401) {
+      if (unauthorizedHandler) unauthorizedHandler();
+      throw makeUnauthorizedError();
+    }
     throw new Error(`接口返回异常（HTTP ${res.status}）`, { cause: err });
+  }
+  if (res.status === 401 || json.code === 401) {
+    if (unauthorizedHandler) unauthorizedHandler();
+    throw makeUnauthorizedError(json.message);
   }
   if (json.code !== 200) throw new Error(json.message || '请求失败');
   return json.data;
 }
+
+/* ---------- 鉴权 ---------- */
+
+export const authApi = {
+  status: () => request('/api/auth/status'),
+  login: password => request('/api/auth/login', { method: 'POST', body: { password } }),
+  logout: () => request('/api/auth/logout', { method: 'POST' }),
+  setPassword: (currentPassword, newPassword) => request('/api/auth/password', {
+    method: 'PUT',
+    body: { currentPassword, newPassword },
+  }),
+};
 
 /* ---------- 房间 ---------- */
 
@@ -241,6 +272,11 @@ export const saveApi = {
           json = JSON.parse(xhr.responseText);
         } catch (_) {
           reject(new Error(`接口返回异常（HTTP ${xhr.status}）`));
+          return;
+        }
+        if (xhr.status === 401 || json.code === 401) {
+          if (unauthorizedHandler) unauthorizedHandler();
+          reject(makeUnauthorizedError(json.message));
           return;
         }
         if (json.code !== 200) {

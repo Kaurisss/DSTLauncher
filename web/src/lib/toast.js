@@ -22,7 +22,7 @@ export async function guard(fn, { success = '', kind = '' } = {}) {
     if (success) toast(success, kind);
     return { ok: true, data };
   } catch (err) {
-    toast(err.message, 'err');
+    if (!err?.unauthorized) toast(err.message, 'err');
     return { ok: false, error: err };
   }
 }

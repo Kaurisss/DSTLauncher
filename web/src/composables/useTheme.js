@@ -33,14 +33,19 @@ function apply() {
   document.documentElement.dataset.theme = resolved.value;
 }
 
-/** 按「浅色 → 深色 → 跟随系统」循环。 */
-function cycle() {
-  mode.value = MODES[(MODES.indexOf(mode.value) + 1) % MODES.length];
+function set(next) {
+  if (!MODES.includes(next)) return mode.value;
+  mode.value = next;
   try {
     localStorage.setItem(KEY, mode.value);
   } catch (_) {}
   apply();
   return mode.value;
+}
+
+/** 按「浅色 → 深色 → 跟随系统」循环。 */
+function cycle() {
+  return set(MODES[(MODES.indexOf(mode.value) + 1) % MODES.length]);
 }
 
 let inited = false;
@@ -66,5 +71,6 @@ export function useTheme() {
     label: computed(() => MODE_LABEL[mode.value]),
     nextLabel: computed(() => MODE_LABEL[MODES[(MODES.indexOf(mode.value) + 1) % MODES.length]]),
     cycle,
+    set,
   };
 }

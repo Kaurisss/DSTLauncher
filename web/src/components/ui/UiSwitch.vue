@@ -13,9 +13,9 @@ const emit = defineEmits(['update:modelValue']);
 <template>
   <label class="inline-flex items-center gap-2 cursor-pointer select-none text-sm text-foreground">
     <Switch
-      :checked="modelValue"
+      :model-value="modelValue"
       :disabled="disabled"
-      @update:checked="emit('update:modelValue', $event)"
+      @update:model-value="emit('update:modelValue', $event)"
     />
     <span v-if="label">{{ label }}</span>
   </label>

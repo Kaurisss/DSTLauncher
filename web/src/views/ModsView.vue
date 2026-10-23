@@ -36,11 +36,17 @@ const workshopError = ref('');
 const pendingDetails = new Set();
 let loadRequest = 0;
 
+const hasCJK = s => /[\u4e00-\u9fff]/.test(s || '');
+
 const displayMods = computed(() => mods.value.map(mod => {
   const detail = workshopDetails.value[mod.id.slice('workshop-'.length)];
-  return detail && mod.id.startsWith('workshop-')
-    ? { ...mod, name: detail.title || mod.name, previewUrl: detail.previewUrl || '' }
-    : mod;
+  if (!detail || !mod.id.startsWith('workshop-')) return mod;
+  const preferLocal = hasCJK(mod.name) && !hasCJK(detail.title);
+  return {
+    ...mod,
+    name: (preferLocal ? mod.name : detail.title) || mod.name,
+    previewUrl: detail.previewUrl || '',
+  };
 }));
 
 // 工坊信息独立加载并在本页缓存；Steam 不可达时仍能管理本地模组。

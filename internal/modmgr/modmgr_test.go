@@ -118,6 +118,74 @@ func TestParseConfigOptionNestedOptions(t *testing.T) {
 	if len(opt.Options) != 3 || opt.Options[0] != "1" || opt.Options[2] != "3" {
 		t.Errorf("options = %v（应取 data 值）", opt.Options)
 	}
+	if len(opt.Choices) != 3 || opt.Choices[0].Description != "简单" || opt.Choices[2].Description != "困难" {
+		t.Errorf("choices = %+v（应保留中文候选项描述）", opt.Choices)
+	}
+}
+
+func TestParseConfigSchemaChinesePatterns(t *testing.T) {
+	src := `
+local L = locale ~= "zh"
+local function en_zh(en, zh) return zh end
+local options_enable = {
+    {description = en_zh("Disabled", "关闭"), data = false},
+    {description = en_zh("Enabled", "开启"), data = true},
+}
+configuration_options = L and {
+    {name = "Title", label = "Section", options = {{description = "", data = ""}}, default = ""},
+    {
+        name = "lang",
+        label = "Language",
+        hover = "Set mod language.",
+        options = {
+            {description = "English", data = "en"},
+            {description = "Chinese", data = "zh"},
+        },
+        default = "en",
+    },
+} or {
+    {name = "Title", label = "特殊设置", options = {{description = "", data = ""}}, default = ""},
+    {
+        name = "lang",
+        label = "设置语言",
+        hover = "设置模组语言",
+        options = {
+            -- {description = "自动", data = "auto"},
+            {description = "英文", data = "en"},
+            {description = "中文", data = "zh"},
+        },
+        default = "zh",
+    },
+    {
+        name = "newloot",
+        label = en_zh("Additional Treasures", "额外宝藏"),
+        hover = en_zh("Treasures from SW", "来自海难的额外宝藏"),
+    },
+}
+for i = 1, #configuration_options do
+    configuration_options[i].options = configuration_options[i].options or options_enable
+    configuration_options[i].default = configuration_options[i].default == nil and true or configuration_options[i].default
+end
+`
+	opts, err := parseConfigSchemaText(src)
+	if err != nil {
+		t.Fatalf("parseConfigSchemaText 失败: %v", err)
+	}
+	if len(opts) != 2 {
+		t.Fatalf("应跳过伪标题并解析出 2 个配置项，实际: %+v", opts)
+	}
+	if opts[0].Label != "设置语言" || opts[0].Description != "设置模组语言" {
+		t.Errorf("应选中 or 后的中文分支并提取 hover: %+v", opts[0])
+	}
+	if len(opts[0].Choices) != 2 || opts[0].Choices[0].Description != "英文" || opts[0].Choices[1].Description != "中文" {
+		t.Errorf("应跳过注释掉的候选项并保留中文描述: %+v", opts[0].Choices)
+	}
+	if opts[1].Label != "额外宝藏" || opts[1].Description != "来自海难的额外宝藏" || opts[1].Default != "true" {
+		t.Errorf("应解析 en_zh 与尾部默认回填: %+v", opts[1])
+	}
+	if len(opts[1].Choices) != 2 || opts[1].Choices[0].Description != "关闭" || opts[1].Choices[1].Description != "开启" {
+		t.Errorf("应回填顶层 options_enable 中文候选: %+v", opts[1].Choices)
+	}
 }
 
 // TestParseConfigOptionScalarTypes 覆盖数字/布尔/上下限的解析。
@@ -140,6 +208,45 @@ func TestParseConfigOptionScalarTypes(t *testing.T) {
 	}
 	if opt.Type != "number" {
 		t.Errorf("type = %q", opt.Type)
+	}
+}
+
+func TestConfigSchemaLiteralDefaultsAndNilFallback(t *testing.T) {
+	src := `configuration_options = {
+    {name="font", default=FONTS[1]},
+    {name="font_name", default=FONTS["zh"]},
+    {name="computed", default=not false},
+    {name="empty", default=""},
+    {name="disabled", default=false},
+    {name="zero", default=0},
+    {name="escaped", default="say \"hi\""},
+    {name="missing"},
+    {name="nil_default", default=nil},
+}
+for i=1,#configuration_options do
+    configuration_options[i].default = configuration_options[i].default == nil and true or configuration_options[i].default
+end`
+	opts, err := parseConfigSchemaText(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := []struct {
+		value      string
+		unresolved bool
+	}{
+		{"", true}, {"", true}, {"", true}, {"", false}, {"false", false},
+		{"0", false}, {`say "hi"`, false}, {"true", false}, {"true", false},
+	}
+	if len(opts) != len(want) {
+		t.Fatalf("配置项丢失: %+v", opts)
+	}
+	for i, expected := range want {
+		if opts[i].Default != expected.value || opts[i].DefaultUnresolved != expected.unresolved {
+			t.Errorf("%s: default=%q unresolved=%v，期望 %q/%v", opts[i].Name, opts[i].Default, opts[i].DefaultUnresolved, expected.value, expected.unresolved)
+		}
+		if expected.unresolved && opts[i].Type != "" {
+			t.Errorf("未解析表达式不应推断类型: %+v", opts[i])
+		}
 	}
 }
 

@@ -37,6 +37,7 @@ export const useUiStore = defineStore('ui', () => {
     { key: 'backups', label: '备份', icon: 'archive' },
     { key: 'saves', label: '存档', icon: 'folder' },
     { key: 'config', label: '配置预览', icon: 'fileCode' },
+    { key: 'settings', label: '设置', icon: 'settings' },
   ];
 
   // 初值取上次的选择；存了不认识的旧 key（版本迭代删过页面）时回落到概览

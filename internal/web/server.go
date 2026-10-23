@@ -40,6 +40,7 @@ type Options struct {
 	WorkDir  string // 程序目录，用于读写 panel.json
 	UgcDir   string // 共享工坊模组目录（-ugc_directory）
 	Version  string // 面板版本号，展示在侧边栏，便于确认「跑的是哪个构建」
+	Password string // 启动参数或环境变量指定的面板访问密码（优先于 panel.json）
 }
 
 // Server 汇集所有模块的处理器，向前端暴露统一 API。
@@ -47,15 +48,21 @@ type Options struct {
 // 模组与备份管理器不预先构造：它们的目录随房间变化，
 // 每次请求按 room 参数现算（构造本身只是拼路径，开销可忽略）。
 type Server struct {
-	mgr      *server.Manager
-	rooms    *room.Store
-	steam    *steamcmd.Manager
-	staticFS fs.FS
-	rootDir  string
-	confDir  string
-	workDir  string
-	ugcDir   string
-	version  string
+	mgr            *server.Manager
+	rooms          *room.Store
+	steam          *steamcmd.Manager
+	staticFS       fs.FS
+	rootDir        string
+	confDir        string
+	workDir        string
+	ugcDir         string
+	version        string
+	envPassword    string
+	authSecret     []byte
+	authMu         sync.Mutex
+	authConfigSeen bool
+	failCount      int
+	lockUntil      time.Time
 
 	// taskMu 串行化「开服 / 安装更新服务端 / 模组下载」这四类会改动共享状态
 	// （游戏安装目录、共享 ugc 目录）的操作，让「检查是否忙 → 启动」成为原子动作，
@@ -66,15 +73,18 @@ type Server struct {
 // NewServer 创建 HTTP 服务。
 func NewServer(o Options) *Server {
 	return &Server{
-		mgr:      o.Mgr,
-		rooms:    o.Rooms,
-		steam:    o.Steam,
-		staticFS: o.StaticFS,
-		rootDir:  o.RootDir,
-		confDir:  o.ConfDir,
-		workDir:  o.WorkDir,
-		ugcDir:   o.UgcDir,
-		version:  o.Version,
+		mgr:            o.Mgr,
+		rooms:          o.Rooms,
+		steam:          o.Steam,
+		staticFS:       o.StaticFS,
+		rootDir:        o.RootDir,
+		confDir:        o.ConfDir,
+		workDir:        o.WorkDir,
+		ugcDir:         o.UgcDir,
+		version:        o.Version,
+		envPassword:    strings.TrimSpace(o.Password),
+		authSecret:     generateSecret(),
+		authConfigSeen: o.WorkDir != "" && panelcfg.Exists(o.WorkDir),
 	}
 }
 
@@ -100,6 +110,12 @@ func (s *Server) Handler() http.Handler {
 	// 健康检查：供容器编排/反向代理探活。只要面板进程在跑、路由能响应就算健康，
 	// 不以「游戏是否已安装/是否有分片在跑」为失败条件——那会让未安装时容器被误判为不健康。
 	mux.HandleFunc("/healthz", s.handleHealth)
+
+	// 面板登录与密码配置
+	mux.HandleFunc("/api/auth/status", s.handleAuthStatus)
+	mux.HandleFunc("/api/auth/login", s.handleAuthLogin)
+	mux.HandleFunc("/api/auth/logout", s.handleAuthLogout)
+	mux.HandleFunc("/api/auth/password", s.handleAuthPassword)
 
 	// 房间（配置的唯一事实来源）
 	mux.HandleFunc("/api/rooms", s.handleRooms)
@@ -165,7 +181,7 @@ func (s *Server) Handler() http.Handler {
 	// 表现为「后端明明更新了，页面行为还是老的」
 	mux.Handle("/", noCacheHTML(http.FileServer(http.FS(s.staticFS))))
 
-	return mux
+	return s.withAuth(mux)
 }
 
 // noCacheHTML 对 HTML 文档响应禁用缓存，其余静态资源改用强缓存。
@@ -923,7 +939,11 @@ func (s *Server) handleWorkshopKey(w http.ResponseWriter, r *http.Request) {
 			respond(w, 200, nil, fmt.Errorf("解析请求体失败: %w", err))
 			return
 		}
-		cfg := panelcfg.Load(s.workDir)
+		cfg, err := s.loadPanelConfig()
+		if err != nil {
+			respond(w, 200, nil, err)
+			return
+		}
 		cfg.SteamApiKey = strings.TrimSpace(req.SteamApiKey)
 		if err := panelcfg.Save(s.workDir, cfg); err != nil {
 			respond(w, 200, nil, fmt.Errorf("写入 %s 失败: %w", panelcfg.Path(s.workDir), err))
@@ -1698,6 +1718,12 @@ func (s *Server) handleServer(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		cfg, err := s.loadPanelConfig()
+		if err != nil {
+			respond(w, 200, nil, err)
+			return
+		}
+
 		// ServerDir 为空表示「保持/恢复自动探测」，此时只改架构
 		if _, err := s.steam.Configure(req.ServerDir, req.Arch, ""); err != nil {
 			respond(w, 200, nil, err)
@@ -1707,7 +1733,6 @@ func (s *Server) handleServer(w http.ResponseWriter, r *http.Request) {
 		// 落盘，重启面板后仍然生效。
 		// 以磁盘上的现有配置为底，只覆盖本次请求涉及的字段——
 		// 否则设置页保存一次就会把别的接口写入的字段（如 steamApiKey）抹掉
-		cfg := panelcfg.Load(s.workDir)
 		cfg.ServerDir = strings.TrimSpace(req.ServerDir)
 		cfg.Arch = s.steam.ArchPref()
 		if err := panelcfg.Save(s.workDir, cfg); err != nil {

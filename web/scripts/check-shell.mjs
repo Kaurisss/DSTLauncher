@@ -200,16 +200,16 @@ test('房间选择持久化，列表轮询保留对象身份与当前选择', as
   assert.equal(rooms.currentId, 2);
 });
 
-test('七个页面使用同一导航清单，选择持久化且拒绝未知页面', async () => {
+test('八个页面使用同一导航清单，选择持久化且拒绝未知页面', async () => {
   const ui = useUiStore(pinia);
-  assert.equal(ui.tabs.length, 7);
+  assert.equal(ui.tabs.length, 8);
   for (const tab of ui.tabs) ui.select(tab.key);
   await Promise.resolve();
-  assert.equal(ui.activeTab, 'config');
-  assert.equal(saved.get('dst-tab'), 'config');
+  assert.equal(ui.activeTab, 'settings');
+  assert.equal(saved.get('dst-tab'), 'settings');
   ui.select('not-a-page');
-  assert.equal(ui.activeTab, 'config');
-  assert.equal(useUiStore(createPinia()).activeTab, 'config');
+  assert.equal(ui.activeTab, 'settings');
+  assert.equal(useUiStore(createPinia()).activeTab, 'settings');
 });
 
 test('三态主题与首屏脚本一致，跟随系统并仅注册一次监听', () => {

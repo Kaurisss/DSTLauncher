@@ -8,6 +8,7 @@ package panelcfg
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,8 @@ type Config struct {
 	// SteamApiKey 是免费的 Steam Web API Key，用于创意工坊关键词搜索。
 	// 留空只影响搜索：按 ID/链接查详情与下载不受影响（那些接口免 key）。
 	SteamApiKey string `json:"steamApiKey,omitempty"`
+	// PasswordHash 是面板登录密码的摘要（salt:hash）；为空表示未开启密码保护。
+	PasswordHash string `json:"passwordHash,omitempty"`
 }
 
 // Path 返回配置文件路径。
@@ -45,23 +48,32 @@ func Exists(workDir string) bool {
 	return err == nil
 }
 
-// Load 读取配置。任何失败（文件不存在、内容损坏）都返回零值：
-// 配置坏了最多是回到自动探测，不该拦住面板启动。
+// Load 读取可回退到默认值的本机设置；鉴权与配置写入必须使用 Read 检查错误。
 func Load(workDir string) Config {
-	var c Config
+	c, _ := Read(workDir)
+	return c
+}
+
+// Read 读取配置并保留文件不存在、读取失败或内容损坏的错误。
+func Read(workDir string) (Config, error) {
 	data, err := os.ReadFile(Path(workDir))
 	if err != nil {
-		return c
+		return Config{}, err
 	}
 	// 容忍用户手工编辑时加上的 BOM
 	text := strings.TrimPrefix(string(data), "\xEF\xBB\xBF")
+	var c *Config
 	if err := json.Unmarshal([]byte(text), &c); err != nil {
-		return Config{}
+		return Config{}, err
+	}
+	if c == nil {
+		return Config{}, fmt.Errorf("面板配置必须是 JSON 对象")
 	}
 	c.ServerDir = strings.TrimSpace(c.ServerDir)
 	c.Arch = strings.TrimSpace(c.Arch)
 	c.SteamApiKey = strings.TrimSpace(c.SteamApiKey)
-	return c
+	c.PasswordHash = strings.TrimSpace(c.PasswordHash)
+	return *c, nil
 }
 
 // Save 原子写入配置。

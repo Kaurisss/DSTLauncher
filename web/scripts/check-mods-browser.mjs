@@ -15,7 +15,7 @@ before(async () => {
   });
   await vite.listen();
   origin = vite.resolvedUrls.local[0];
-  browser = await chromium.launch();
+  browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
 });
 after(async () => {
   await browser?.close();
@@ -35,6 +35,7 @@ const details = [
 
 async function openMods({
   failDetails = false, running = false, delayDetails = false, delayMods = false, width = 1280,
+  schema = [], config = {},
   updateStatuses = [{ running: false, output: [] }],
 } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
@@ -49,6 +50,7 @@ async function openMods({
   const waitForMods = delayMods ? new Promise(resolve => { releaseMods = resolve; }) : Promise.resolve();
   const requests = [];
   let currentMods = globalThis.structuredClone(mods);
+  currentMods[1].config = config;
   let updateStatusIndex = 0;
   await page.route('https://fixtures.invalid/**', route => {
     if (route.request().url().endsWith('broken.png')) return route.fulfill({ status: 404, body: '' });
@@ -76,6 +78,7 @@ async function openMods({
       currentMods = currentMods.filter(mod => mod.id !== url.searchParams.get('id'));
       return ok({});
     }
+    if (url.pathname === '/api/mods/schema') return ok(schema);
     if (url.pathname === '/api/workshop/details') {
       await waitForDetails;
       if (failDetails) return route.fulfill({
@@ -99,6 +102,39 @@ async function openMods({
 async function waitForTitle(page) {
   await page.getByRole('link', { name: '工坊模组 <测试>' }).waitFor();
 }
+
+test('未知默认值保持未设置，保留已有配置和显式空值，手动编辑后才提交', async () => {
+  const { page, requests } = await openMods({
+    schema: [
+      { name: 'font', label: '字体', default: '', defaultUnresolved: true },
+      { name: 'existing', label: '已有配置', default: '', defaultUnresolved: true },
+      { name: 'empty', label: '空默认值', default: '' },
+    ],
+    config: { existing: false },
+  });
+  try {
+    await page.locator('.mod').nth(1).getByRole('button', { name: '配置', exact: true }).click();
+    const font = page.getByLabel('字体', { exact: true });
+    await font.waitFor();
+    assert.equal(await font.inputValue(), '');
+    assert.equal(await page.getByLabel('已有配置', { exact: true }).inputValue(), 'false');
+    const save = page.getByRole('button', { name: '保存配置', exact: true });
+    await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === '/api/mods/config' && new URL(r.url()).searchParams.get('key') === 'empty'),
+      save.click(),
+    ]);
+    const writes = requests.filter(r => r.path === '/api/mods/config');
+    assert.deepEqual(writes.map(r => [r.params.key, JSON.parse(r.params.value)]), [['empty', '']]);
+    await font.fill('custom-font');
+    await Promise.all([
+      page.waitForResponse(r => new URL(r.url()).pathname === '/api/mods/config' && new URL(r.url()).searchParams.get('key') === 'font'),
+      save.click(),
+    ]);
+    assert.equal(JSON.parse(requests.find(r => r.path === '/api/mods/config' && r.params.key === 'font').params.value), 'custom-font');
+  } finally {
+    await page.close();
+  }
+});
 
 test('未下载模组异步补全工坊名称、封面和安全的新标签页链接，刷新复用元数据', async () => {
   const { page, requests, releaseDetails } = await openMods({ delayDetails: true });
