@@ -53,9 +53,8 @@ export const LANGUAGE_LABEL = {
 };
 
 /**
- * 世界类型。分片的名字是存档目录名，可以随便取；
- * 类型才决定世界生成预设与可用设置项，所以 UI 上一律按类型给标签。
- * 后两项由模组提供（岛屿冒险），不写入 rooms.json，只按存档里的 location 实时判断。
+ * 分片类型（用于「新增世界」下拉）：只描述存档生成方式，
+ * 与具体是哪张地图无关，所以用「型」而不是「世界」。
  */
 export const WORLD_TYPE_LABEL = {
   forest: '地表型',
@@ -69,19 +68,19 @@ export const MOD_LABEL = {
   'island-adventures': '岛屿冒险',
 };
 
-/** 常见分片的友好名。自定义分片直接显示原名。 */
+/**
+ * 分片显示名：优先按存档里读到的 location，缺失时按目录名。
+ *
+ * 同一张地图有多个常见目录名（地表可能是 Master 或 Forest），
+ * 名字只是目录，location 才是事实；拿不到 location 时才用这里的映射。
+ */
 export const SHARD_NAME_LABEL = {
-  Master: '地表',
+  Master: '森林',
+  Forest: '森林',
   Caves: '洞穴',
+  Cave: '洞穴',
 };
 
-/**
- * 分片标签按存档里的 location 显示世界名。
- *
- * 分片目录名只是目录名：Cluster_2 里的 Cave 装着火山、Caves 装着洞穴，
- * 靠名字猜一定会错，所以以 location 为准。拿不到（还没生成过世界）
- * 才回落到名字。
- */
 export const SHARD_LOCATION_LABEL = {
   forest: '森林',
   cave: '洞穴',
@@ -89,9 +88,15 @@ export const SHARD_LOCATION_LABEL = {
   volcanoworld: '火山',
 };
 
+/** 分片显示名。location 拿不到（世界还没生成）时才回落到目录名。 */
 export function shardLabel(name, location) {
   if (location) return SHARD_LOCATION_LABEL[location] || WORLD_TYPE_LABEL[location] || location;
   return SHARD_NAME_LABEL[name] || name;
+}
+
+/** 房间列表里的分片显示名：按存档 location 优先，与其它页面保持一致。 */
+export function roomShardLabel(room, shard) {
+  return shardLabel(shard.name, room?.locations?.[shard.name]);
 }
 
 /** 进程事件类型 -> 展示用前缀，undefined 表示按普通日志处理。 */

@@ -6,7 +6,7 @@ import { computed } from 'vue';
 import UiPill from '@/components/ui/UiPill.vue';
 import Icon from '@/components/ui/Icon.vue';
 import { Button } from '@/components/ui/button';
-import { GAME_MODE_LABEL, SHARD_NAME_LABEL } from '@/lib/format.js';
+import { GAME_MODE_LABEL, roomShardLabel } from '@/lib/format.js';
 
 const props = defineProps({
   room: { type: Object, required: true },
@@ -20,8 +20,8 @@ const running = computed(() => (props.room.statuses || []).some(s => s.state ===
 const modeLabel = computed(() => GAME_MODE_LABEL[props.room.gameMode] || props.room.gameMode);
 const enabledCount = computed(() => shards.value.filter(s => !s.disabled).length);
 
-/** 常见分片给友好名（地表 / 洞穴），自定义世界直接显示名字 */
-const shardLabel = s => SHARD_NAME_LABEL[s.name] || s.name;
+/** 分片显示名：优先按存档 location，岛屿冒险的海难/火山才不会退成目录名 */
+const shardLabel = s => roomShardLabel(props.room, s);
 
 /** 端口按「游戏端口 / Steam 主端口 / Steam 认证端口」顺序展示 */
 function ports(s) {

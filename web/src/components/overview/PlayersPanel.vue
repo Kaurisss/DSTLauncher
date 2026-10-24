@@ -38,6 +38,8 @@ const CHARACTERS = {
   wortox: '沃拓克斯', wormwood: '沃姆伍德', warly: '沃利', wurt: '沃特',
   walter: '沃尔特', wanda: '旺达', wonkey: '芜猴',
 };
+const labelOf = name => shardLabel(name, rooms.current?.locations?.[name]);
+
 const LABELS = { kick: '踢出', ban: '封禁', revive: '复活', teleport: '传送', admin: '设为管理员' };
 const targets = computed(() => teleport.value ? players.value.filter(player =>
   player.shard === teleport.value.shard && player.userid !== teleport.value.userid && player.inWorld) : []);
@@ -112,7 +114,7 @@ async function act(player, action, target = '') {
             : '将当前分片中的幽灵玩家复活。';
       if (!await confirmAction({
         title: `${label}「${name}」？`,
-        description: `${player.userid} · 房间「${roomName}」 · ${shardLabel(player.shard)}。${description}`,
+        description: `${player.userid} · 房间「${roomName}」 · ${labelOf(player.shard)}。${description}`,
         destructive: action === 'kick' || action === 'ban',
       })) return;
     }
@@ -168,14 +170,14 @@ function preventWhileBusy(event) {
         暂无在线玩家
       </p>
       <div v-if="Object.keys(errors).length" role="status" class="mb-3 grid gap-1 break-words text-sm text-amber-700 dark:text-amber-400">
-        <p v-for="(message, shard) in errors" :key="shard">{{ shardLabel(shard) }}：{{ message }}</p>
+        <p v-for="(message, shard) in errors" :key="shard">{{ labelOf(shard) }}：{{ message }}</p>
       </div>
       <p v-if="actionError && !teleportOpen" role="alert" class="mb-3 break-words text-sm text-destructive">{{ actionError }}</p>
 
       <div class="grid gap-3">
         <article
           v-for="player in players" :key="`${player.shard}:${player.userid}`"
-          :aria-label="`${player.name || player.userid} ${player.userid} ${shardLabel(player.shard)}`"
+          :aria-label="`${player.name || player.userid} ${player.userid} ${labelOf(player.shard)}`"
           class="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"
         >
           <div class="min-w-0 flex-1 basis-48">
@@ -186,7 +188,7 @@ function preventWhileBusy(event) {
             </div>
             <p class="break-all font-mono text-xs text-muted-foreground">{{ player.userid }}</p>
             <p class="mt-1 break-words text-xs text-muted-foreground">
-              {{ shardLabel(player.shard) }} · {{ CHARACTERS[player.prefab] || player.prefab || '选角中' }}
+              {{ labelOf(player.shard) }} · {{ CHARACTERS[player.prefab] || player.prefab || '选角中' }}
               · {{ player.days == null ? '天数未知' : player.days + ' 天' }}{{ player.ghost ? ' · 幽灵' : '' }}
             </p>
           </div>

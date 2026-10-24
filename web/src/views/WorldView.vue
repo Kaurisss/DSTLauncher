@@ -145,7 +145,7 @@ const settingsPresets = computed(() => view.value?.presets?.settings || []);
  * 预设与分片类型不一致。
  *
  * 引擎只按预设生成世界，既不看分片叫什么，也不看面板里的类型：
- * 洞穴分片配成 SURVIVAL_TOGETHER 就会长出第二张地表图。
+ * 洞穴型分片配成 SURVIVAL_TOGETHER 就会长出第二张地表型地图。
  * 世界生成不可逆，所以这里必须显式提醒，而不是等玩家下去才发现。
  *
  * 模组世界不套这个规则：海难与火山的预设本来就不同名，也不带 CAVE 字样。

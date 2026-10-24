@@ -292,7 +292,7 @@ async function save() {
           label="通信密钥"
           for-id="f_clusterKey"
           wide
-          tip="地表与洞穴之间的认证密钥，两边必须一致；改动后需重启全部已启用的分片。"
+          tip="各分片之间的认证密钥，全部启用分片必须一致；改动后需重启全部分片。"
         >
           <Input id="f_clusterKey" v-model="form.clusterKey" type="text" />
         </UiField>

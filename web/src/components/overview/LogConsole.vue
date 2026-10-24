@@ -4,18 +4,23 @@
 // 分片数量由房间决定（未开启洞穴时只有 Master），因此这里是动态列表，
 // 而不是写死两个框。
 
+import { computed } from 'vue';
+
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import LogPane from '@/components/overview/LogPane.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
+import { shardLabel } from '@/lib/format.js';
 
 const rooms = useRoomsStore();
+const shardNames = computed(() => rooms.shards.map(name =>
+  shardLabel(name, rooms.current?.locations?.[name])).join('、'));
 </script>
 
 <template>
   <section class="log-section" aria-label="实时日志">
     <div class="log-section-head">
       <h2>实时日志</h2>
-      <p>地表与洞穴是独立进程，日志分屏查看</p>
+      <p>{{ shardNames }}是独立进程，日志分屏查看</p>
     </div>
 
     <div v-if="!rooms.shards.length" class="log-empty">

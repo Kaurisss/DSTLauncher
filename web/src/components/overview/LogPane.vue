@@ -13,6 +13,7 @@ import Icon from '@/components/ui/Icon.vue';
 import { useLogs } from '@/composables/useLogs.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard } from '@/lib/toast.js';
+import { shardLabel } from '@/lib/format.js';
 
 const props = defineProps({
   /** 分片名：Master / Caves */
@@ -28,8 +29,8 @@ const state = computed(() => channels[props.shard] || FALLBACK);
 const lines = computed(() => state.value.lines);
 const connected = computed(() => !!state.value.connected);
 
-const SUBTITLE = { Master: '地表世界', Caves: '洞穴世界' };
-const subtitle = computed(() => SUBTITLE[props.shard] || '');
+/** 分片显示名：按存档 location 优先，与玩家列表、世界配置页一致。 */
+const label = computed(() => shardLabel(props.shard, rooms.current?.locations?.[props.shard]));
 
 /** 只有运行中的分片才接受控制台命令，其余情况禁用输入并说明原因。 */
 const running = computed(() => {
@@ -92,12 +93,12 @@ async function submit() {
 </script>
 
 <template>
-  <section class="log-pane" :aria-label="`${shard} 日志`">
+  <section class="log-pane" :aria-label="`${label}（${shard}）日志`">
     <header class="log-pane-head">
       <div class="log-pane-title">
         <Icon name="terminal" :size="15" />
-        <span class="log-pane-name">{{ shard }}</span>
-        <span v-if="subtitle" class="log-pane-sub">{{ subtitle }}</span>
+        <span class="log-pane-name">{{ label }}</span>
+        <span class="log-pane-sub">{{ shard }}</span>
         <span class="log-connection" :class="connected ? 'is-connected' : ''">
           {{ connected ? '已连接' : '重连中' }}
         </span>
@@ -105,7 +106,7 @@ async function submit() {
 
       <div class="log-pane-tools">
         <label class="log-autoscroll" title="关闭后可以安静地往上翻历史，滚回底部会自动重新打开">
-          <Switch v-model="autoscroll" :aria-label="`${shard} 自动滚动`" />
+          <Switch v-model="autoscroll" :aria-label="`${label} 自动滚动`" />
           <span>自动滚动</span>
         </label>
         <Button variant="ghost" size="sm" @click="clear(shard)">清屏</Button>
@@ -117,11 +118,11 @@ async function submit() {
       class="console"
       tabindex="0"
       role="region"
-      :aria-label="`${shard} 日志输出`"
+      :aria-label="`${label} 日志输出`"
       @scroll="onScroll"
     >
       <div v-if="!lines.length" class="console-empty">
-        <p>暂无 {{ shard }} 的日志输出。</p>
+        <p>暂无 {{ label }} 的日志输出。</p>
         <p>启动该分片后，这里的输出会实时刷新。</p>
       </div>
       <div v-for="l in lines" :key="l.id" class="log-line" :class="'k-' + l.kind">
@@ -135,9 +136,9 @@ async function submit() {
         v-model="input"
         class="flex-1 min-w-0"
         autocomplete="off"
-        :aria-label="`${shard} 控制台命令`"
+        :aria-label="`${label} 控制台命令`"
         :disabled="!running"
-        :placeholder="running ? '控制台命令，如 c_save() / c_listallplayers()' : shard + ' 未运行'"
+        :placeholder="running ? '控制台命令，如 c_save() / c_listallplayers()' : label + ' 未运行'"
       />
       <Button type="submit" size="sm" :disabled="!running">执行</Button>
     </form>

@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
 import { useProcessControl } from '@/composables/useProcessControl.js';
-import { STATE_LABEL, fmtSize } from '@/lib/format.js';
+import { STATE_LABEL, fmtSize, shardLabel } from '@/lib/format.js';
 
 const rooms = useRoomsStore();
 const system = useSystemStore();
@@ -27,6 +27,10 @@ const rows = computed(() => {
 });
 
 const isLive = s => s.state === 'running' || s.state === 'starting';
+
+function label(s) {
+  return shardLabel(s.shard, rooms.current?.locations?.[s.shard]);
+}
 
 function meta(s) {
   if (s.placeholder) return '未启动';
@@ -71,7 +75,7 @@ function staleTip(s) {
   <template v-else>
     <div v-for="s in rows" :key="s.shard" class="shard-row">
       <span class="dot" :class="s.state" />
-      <span class="shard-name">{{ s.shard }}</span>
+      <span class="shard-name">{{ label(s) }}</span>
       <span v-if="staleVersion(s)" class="pill pill-warn" :title="staleTip(s)">需重启</span>
       <span class="shard-meta">{{ meta(s) }}</span>
       <!-- 占用率按「占整机」口径，与任务管理器一致 -->

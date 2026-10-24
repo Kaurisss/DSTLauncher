@@ -60,6 +60,34 @@ beforeEach(() => {
 });
 after(() => { logs.disconnect(); logs.clearAll(); });
 
+test('分片显示名按存档 location：森林/洞穴/海难/火山，不显示目录名', async () => {
+  const { shardLabel, roomShardLabel } = await vite.ssrLoadModule('/src/lib/format.js');
+  assert.equal(shardLabel('Master', 'forest'), '森林');
+  assert.equal(shardLabel('Caves', 'cave'), '洞穴');
+  assert.equal(shardLabel('Island', 'shipwrecked'), '海难');
+  assert.equal(shardLabel('Volcano', 'volcanoworld'), '火山');
+  assert.equal(shardLabel('Caves', 'volcanoworld'), '火山', '目录名叫 Caves 但存档里是火山');
+  assert.equal(shardLabel('Master'), '森林', '未生成世界时回落到目录名');
+  assert.equal(shardLabel('MyWorld'), 'MyWorld', '自定义分片保留原名');
+  assert.equal(roomShardLabel({ locations: { Volcano: 'volcanoworld' } }, { name: 'Volcano' }), '火山');
+  assert.equal(roomShardLabel({}, { name: 'Caves' }), '洞穴');
+
+  const rooms = useRoomsStore(pinia);
+  rooms.list = [{
+    id: 1, name: '岛屿冒险房间', key: 'Cluster_1', gameMode: 'survival', tickRate: 30, maxSnapshots: 10,
+    shards: [{ name: 'Master' }, { name: 'Caves' }, { name: 'Island' }, { name: 'Volcano' }],
+    locations: { Master: 'shipwrecked', Caves: 'cave', Island: 'shipwrecked', Volcano: 'volcanoworld' },
+    statuses: [],
+  }];
+  rooms.currentId = 1;
+  rooms.statuses = rooms.list[0].shards.map(shard => ({ shard: shard.name, state: 'stopped' }));
+  const list = await renderToString(createSSRApp(ShardList).use(pinia));
+  for (const text of ['海难', '洞穴', '火山']) assert.ok(list.includes(text), `分片列表缺少 ${text}`);
+  assert.ok(!list.includes('>Master<') && !list.includes('>Caves<'), '不应显示目录名');
+  const card = await renderToString(createSSRApp(RoomCard, { room: rooms.list[0] }).use(pinia));
+  for (const text of ['海难', '洞穴', '火山']) assert.ok(card.includes(text), `房间卡片缺少 ${text}`);
+});
+
 test('房间卡片使用整卡选择按钮，独立操作与分片信息保持可用', async () => {
   const room = {
     id: 2, name: '测试房间', key: 'Cluster_2', gameMode: 'survival',
@@ -77,7 +105,7 @@ test('房间卡片使用整卡选择按钮，独立操作与分片信息保持�
     assert.equal((html.match(/<button\b/g) || []).length, 4, '选择按钮与三个操作按钮为同级控件');
     assert.equal((selection.match(/<button\b/g) || []).length, 1, '禁止嵌套按钮');
     assert.doesNotMatch(html, />\s*选中\s*<\/button>/);
-    for (const text of ['编辑', '上传存档', '删除', '10999 / 27018 / 8768', '未启用', 'Cluster_2', '缺令牌']) {
+    for (const text of ['编辑', '上传存档', '删除', '10999 / 27018 / 8768', '未启用', 'Cluster_2', '缺令牌', '森林', '洞穴']) {
       assert.ok(html.includes(text), `保留 ${text}`);
     }
   }
@@ -264,6 +292,7 @@ test('只启动一个分片时，其余分片仍保留启动按钮', async () =>
   rooms.list = [{
     id: 1, name: '房间 1', key: 'Cluster_1', gameMode: 'survival',
     shards: ['Master', 'Caves', 'Island', 'Volcano'].map(name => ({ name })),
+    locations: { Master: 'forest', Caves: 'cave', Island: 'shipwrecked', Volcano: 'volcanoworld' },
   }];
   rooms.currentId = 1;
   // 后端只返回有进程记录的分片：只开了 Master
@@ -272,8 +301,8 @@ test('只启动一个分片时，其余分片仍保留启动按钮', async () =>
   const html = await renderToString(createSSRApp(ShardList).use(pinia));
   const rows = html.match(/class="shard-row"/g) || [];
   assert.equal(rows.length, 4, '每个启用分片都要有一行');
-  for (const name of ['Master', 'Caves', 'Island', 'Volcano']) {
-    assert.ok(html.includes(name), `缺少 ${name} 行`);
+  for (const label of ['森林', '洞穴', '海难', '火山']) {
+    assert.ok(html.includes(label), `缺少 ${label} 行`);
   }
   // Master 一个停止+重启，其余三个各一个启动（未装服务器时文案是「安装并启动」）。
   // SSR 会把文本节点包在 <!--[-->…<!--]--> 里，所以按「包含」数而不是结尾匹配。
