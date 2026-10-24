@@ -97,6 +97,13 @@ func (m *Manager) SetUgcDir(dir string) {
 	m.mu.Unlock()
 }
 
+// UgcDir returns the shared directory used by both downloads and shard startup.
+func (m *Manager) UgcDir() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.ugcDir
+}
+
 // SetModsChecker 注入缺失模组的清点逻辑。必须在更新前设置，
 // 否则更新循环无法感知进度，只会跑一轮。
 func (m *Manager) SetModsChecker(fn ModsChecker) {
@@ -123,8 +130,8 @@ func (m *Manager) baseArgs(c *Cluster, shard string) []string {
 	}
 	// 共享 ugc 目录：所有房间、所有分片读同一份模组实体。
 	// 用绝对路径——相对路径要依赖「工作目录是 bin/」这个隐含约定，太脆。
-	if m.ugcDir != "" {
-		args = append(args, "-ugc_directory", m.ugcDir)
+	if dir := m.UgcDir(); dir != "" {
+		args = append(args, "-ugc_directory", dir)
 	}
 	return args
 }
@@ -135,7 +142,7 @@ func (m *Manager) baseArgs(c *Cluster, shard string) []string {
 // 进行中再点全量会被拒绝（全量本身就是扫全部缺失，排队没有意义）。
 //
 // target 为某个工坊模组（workshop-<数字>）：单模组模式，临时把下载清单
-// 换成只含目标模组，已安装的先删旧文件再重下（强制刷新），
+// 换成只含目标模组，已安装的先备份再重下（失败恢复旧副本），
 // 未安装的只下载它，该目标结束后清单自动恢复并集。
 // 已有会话在跑时不再拒绝，而是**加入下载队列**：会话串行依次消化队列，
 // 每个目标各自交换/恢复清单，互不干扰。
@@ -158,7 +165,7 @@ func (m *Manager) UpdateMods(clusterKey, shard, target string) error {
 	if shard == "" {
 		shard = c.MasterShard()
 	}
-	if m.ugcDir == "" {
+	if m.UgcDir() == "" {
 		return fmt.Errorf("未配置共享模组目录，无法预更新模组")
 	}
 
@@ -204,7 +211,7 @@ func (m *Manager) UpdateMods(clusterKey, shard, target string) error {
 	m.modCancel = false
 	m.modErr = ""
 	if num != "" {
-		m.modOutput = []string{fmt.Sprintf("开始更新模组 workshop-%s（已安装的会先删旧文件再重下）…", num)}
+		m.modOutput = []string{fmt.Sprintf("开始更新模组 workshop-%s（旧文件先备份，下载失败自动恢复）…", num)}
 	} else {
 		m.modOutput = []string{"开始更新模组（引擎每轮可能只下载一两个，会自动多跑几轮）…"}
 	}
@@ -229,7 +236,7 @@ func isDigits(s string) bool {
 
 // targetModDir 返回单模组更新目标在本机共享目录下的实体目录。
 func (m *Manager) targetModDir(num string) string {
-	return filepath.Join(m.ugcDir, "content", "322330", num)
+	return filepath.Join(m.UgcDir(), "content", "322330", num)
 }
 
 // targetModInstalled 判断目标模组是否已有完整本地副本。
@@ -381,7 +388,7 @@ func (m *Manager) runFullUpdate(c *Cluster, shard, exePath, workDir string,
 	return true
 }
 
-// runSingleTarget 下载单个工坊模组：先删旧副本（强制刷新），再把下载清单
+// runSingleTarget 下载单个工坊模组：先备份旧副本，再把下载清单
 // 临时换成只含目标，跑引擎直到目标就位（最多 maxSingleModRuns 轮，Steam
 // 断点续传），最后恢复清单并集。
 //
@@ -392,13 +399,40 @@ func (m *Manager) runSingleTarget(c *Cluster, shard, exePath, workDir, num strin
 ) (installed bool) {
 	log("目标 workshop-%s：开始更新", num)
 
-	// 旧副本先删（强制刷新）：点「下载/重新下载」的语义就是拿一份全新的
-	if _, err := os.Stat(m.targetModDir(num)); err == nil {
-		log("workshop-%s 已有本地副本，先删除旧文件再重新下载（强制刷新）", num)
-		if err := os.RemoveAll(m.targetModDir(num)); err != nil {
-			m.setModErr(fmt.Sprintf("删除旧副本失败: %v", err))
+	// Steam 客户端可能共用这份文件；重新下载失败时必须保留旧副本。
+	target := m.targetModDir(num)
+	if _, err := os.Stat(target); err == nil {
+		backup, err := os.MkdirTemp(filepath.Dir(target), ".dst-panel-backup-")
+		if err != nil {
+			m.setModErr(fmt.Sprintf("备份旧模组失败: %v", err))
 			return false
 		}
+		old := filepath.Join(backup, "files")
+		if err := os.Rename(target, old); err != nil {
+			_ = os.Remove(backup)
+			m.setModErr(fmt.Sprintf("备份旧模组失败: %v", err))
+			return false
+		}
+		defer func() {
+			if !installed {
+				if err := os.RemoveAll(target); err != nil {
+					log("恢复旧模组失败: %v；旧文件保留在 %s", err, old)
+					return
+				}
+				if err := os.Rename(old, target); err != nil {
+					log("恢复旧模组失败: %v；旧文件保留在 %s", err, old)
+					return
+				}
+				log("workshop-%s 下载未完成，已恢复旧副本", num)
+			}
+			if err := os.RemoveAll(backup); err != nil {
+				log("清理模组备份失败: %v；备份保留在 %s", err, backup)
+			}
+		}()
+		log("workshop-%s 旧副本已备份，下载成功后替换，失败自动恢复", num)
+	} else if !os.IsNotExist(err) {
+		m.setModErr(fmt.Sprintf("读取旧模组失败: %v", err))
+		return false
 	}
 	swap, ok := m.getModsSetupSwap()
 	if !ok {

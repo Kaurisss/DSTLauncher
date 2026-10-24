@@ -55,7 +55,6 @@ type Server struct {
 	rootDir        string
 	confDir        string
 	workDir        string
-	ugcDir         string
 	version        string
 	envPassword    string
 	authSecret     []byte
@@ -72,6 +71,9 @@ type Server struct {
 
 // NewServer 创建 HTTP 服务。
 func NewServer(o Options) *Server {
+	if o.Mgr != nil && o.UgcDir != "" {
+		o.Mgr.SetUgcDir(o.UgcDir)
+	}
 	return &Server{
 		mgr:            o.Mgr,
 		rooms:          o.Rooms,
@@ -80,7 +82,6 @@ func NewServer(o Options) *Server {
 		rootDir:        o.RootDir,
 		confDir:        o.ConfDir,
 		workDir:        o.WorkDir,
-		ugcDir:         o.UgcDir,
 		version:        o.Version,
 		envPassword:    strings.TrimSpace(o.Password),
 		authSecret:     generateSecret(),
@@ -123,6 +124,9 @@ func (s *Server) Handler() http.Handler {
 
 	// 房间管理员（adminlist.txt）
 	mux.HandleFunc("/api/admins", s.handleAdmins)
+
+	// 宿主机资源（独立于房间和分片进程）
+	mux.HandleFunc("/api/host", s.handleHostStats)
 
 	// 进程控制
 	mux.HandleFunc("/api/status", s.handleStatus)
@@ -501,7 +505,7 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 
 	// 服务器以 -skip_update_server_mods 启动，缺模组会直接加载失败；
 	// 提前拦下比让用户去翻日志省事
-	if s.ugcDir != "" {
+	if s.mgr.UgcDir() != "" {
 		if missing, err := s.modsFor(rm).MissingMods(); err == nil && len(missing) > 0 {
 			respond(w, 200, nil, fmt.Errorf(
 				"以下模组尚未下载：%s。请先到「模组」页点击「更新模组」",
@@ -731,7 +735,7 @@ func (s *Server) modsFor(rm *room.Room) *modmgr.Manager {
 	return modmgr.NewManager(
 		rm.ClusterDir(s.rootDir, s.confDir),
 		s.steam.GameDir(),
-		s.ugcDir,
+		s.mgr.UgcDir(),
 		rm.ShardNames(),
 	)
 }
@@ -801,7 +805,7 @@ func (s *Server) handleModUpdates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	local, err := workshop.LoadInstalled(s.ugcDir)
+	local, err := workshop.LoadInstalled(s.mgr.UgcDir())
 	if err != nil {
 		respond(w, 200, nil, err)
 		return
@@ -865,7 +869,7 @@ func (s *Server) handleModUpdates(w http.ResponseWriter, r *http.Request) {
 
 // installedSet 返回共享目录里已下载的模组集合。
 func (s *Server) installedSet() map[string]bool {
-	installed, err := modmgr.NewManager("", s.steam.GameDir(), s.ugcDir, nil).InstalledMods()
+	installed, err := modmgr.NewManager("", s.steam.GameDir(), s.mgr.UgcDir(), nil).InstalledMods()
 	if err != nil {
 		return map[string]bool{}
 	}
@@ -962,7 +966,7 @@ func (s *Server) handleWorkshopKey(w http.ResponseWriter, r *http.Request) {
 // 必须成对使用——更新会话以 defer 保证 restore 一定执行。
 func (s *Server) SwapModsSetup(target string) (func(), error) {
 	num := strings.TrimPrefix(target, "workshop-")
-	mods := modmgr.NewManager("", s.steam.GameDir(), s.ugcDir, nil)
+	mods := modmgr.NewManager("", s.steam.GameDir(), s.mgr.UgcDir(), nil)
 	if err := mods.WriteSetupLua([]string{num}); err != nil {
 		return nil, err
 	}
@@ -972,7 +976,7 @@ func (s *Server) SwapModsSetup(target string) (func(), error) {
 // MissingModIDs 汇总所有房间「已启用但尚未下载」的工坊模组（去重）。
 // 供模组更新循环判断进度：它只关心这个列表是否清零。
 func (s *Server) MissingModIDs() ([]string, error) {
-	if s.ugcDir == "" {
+	if s.mgr.UgcDir() == "" {
 		return nil, nil
 	}
 	seen := map[string]bool{}
@@ -1000,7 +1004,7 @@ func (s *Server) MissingModIDs() ([]string, error) {
 // B 房间保存配置会把 A 房间要用的模组从清单里抹掉。
 // 因此每次模组或房间发生增删改之后都要重算一次。
 func (s *Server) syncModsSetup() {
-	if s.ugcDir == "" {
+	if s.mgr.UgcDir() == "" {
 		return
 	}
 	seen := map[string]bool{}
@@ -1019,7 +1023,7 @@ func (s *Server) syncModsSetup() {
 		ids = append(ids, id)
 	}
 	// 不依赖任何具体房间：没有房间时也要能清空清单
-	mods := modmgr.NewManager("", s.steam.GameDir(), s.ugcDir, nil)
+	mods := modmgr.NewManager("", s.steam.GameDir(), s.mgr.UgcDir(), nil)
 	if err := mods.WriteSetupLua(ids); err != nil {
 		fmt.Printf("[!] 写入 dedicated_server_mods_setup.lua 失败: %v\n", err)
 	}
@@ -1123,6 +1127,16 @@ func (s *Server) handleModSchema(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleModDelete(w http.ResponseWriter, r *http.Request) {
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
+	if err := s.busyTaskError(""); err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
+	if s.anyRunning() {
+		respond(w, 200, nil, fmt.Errorf("还有分片在运行，请先全部停止再删除共享模组"))
+		return
+	}
 	rm, err := s.roomByID(r)
 	if err != nil {
 		respond(w, 200, nil, err)
@@ -1644,6 +1658,7 @@ func (s *Server) requireNoRunningShards() error {
 // serverStatus 是 /api/server 的返回结构。
 type serverStatus struct {
 	Root        string              `json:"root"`
+	UgcDir      string              `json:"ugcDir"`
 	Source      string              `json:"source"`
 	Arch        string              `json:"arch"`     // 实际使用中的架构
 	ArchPref    string              `json:"archPref"` // 用户设置的偏好
@@ -1662,6 +1677,7 @@ type serverStatus struct {
 func (s *Server) serverStatus() serverStatus {
 	return serverStatus{
 		Root:        s.steam.Root(),
+		UgcDir:      s.mgr.UgcDir(),
 		Source:      s.steam.Source(),
 		Arch:        s.steam.Arch(),
 		ArchPref:    s.steam.ArchPref(),
@@ -1672,7 +1688,7 @@ func (s *Server) serverStatus() serverStatus {
 		Version:     s.steam.Version(),
 		Executable:  s.steam.Executable(),
 		ConfigPath:  panelcfg.Path(s.workDir),
-		Locked:      s.anyRunning(),
+		Locked:      s.anyRunning() || s.steam.IsInstalling() || s.mgr.ModsUpdating(),
 		ArchOptions: []string{steamcmd.ArchAuto, steamcmd.Arch64, steamcmd.Arch32},
 		// 每次查询都重新探测，用户装完 Steam 版工具后刷新页面就能看到
 		Candidates: steamcmd.DetectInstalled(),
@@ -1701,6 +1717,8 @@ func (s *Server) handleServer(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, s.serverStatus(), nil)
 
 	case http.MethodPut:
+		s.taskMu.Lock()
+		defer s.taskMu.Unlock()
 		var req struct {
 			ServerDir string `json:"serverDir"`
 			Arch      string `json:"arch"`
@@ -1713,8 +1731,8 @@ func (s *Server) handleServer(w http.ResponseWriter, r *http.Request) {
 			respond(w, 200, nil, fmt.Errorf("还有分片在运行，请先全部停止再更改服务器文件位置"))
 			return
 		}
-		if s.steam.IsInstalling() {
-			respond(w, 200, nil, fmt.Errorf("正在安装服务器文件，请等安装结束后再改"))
+		if err := s.busyTaskError(""); err != nil {
+			respond(w, 200, nil, err)
 			return
 		}
 
@@ -1729,6 +1747,9 @@ func (s *Server) handleServer(w http.ResponseWriter, r *http.Request) {
 			respond(w, 200, nil, err)
 			return
 		}
+
+		s.mgr.SetUgcDir(s.steam.WorkshopDir())
+		s.syncModsSetup()
 
 		// 落盘，重启面板后仍然生效。
 		// 以磁盘上的现有配置为底，只覆盖本次请求涉及的字段——

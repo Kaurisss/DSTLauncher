@@ -103,6 +103,12 @@ export const adminApi = {
   remove: (roomId, id) => request('/api/admins', { method: 'DELETE', params: { room: roomId, id } }),
 };
 
+/* ---------- 宿主机资源 ---------- */
+
+export const hostApi = {
+  stats: () => request('/api/host'),
+};
+
 /* ---------- 进程控制 ---------- */
 
 export const procApi = {

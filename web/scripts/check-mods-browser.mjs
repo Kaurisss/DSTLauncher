@@ -35,7 +35,7 @@ const details = [
 
 async function openMods({
   failDetails = false, running = false, delayDetails = false, delayMods = false, width = 1280,
-  schema = [], config = {},
+  schema = [], config = {}, ugcDir = '', serverLocked = false,
   updateStatuses = [{ running: false, output: [] }],
 } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
@@ -70,6 +70,10 @@ async function openMods({
       shards: [{ name: 'Master', worldType: 'forest', isMaster: true }],
     }]);
     if (url.pathname === '/api/status') return ok([{ shard: 'Master', state: running ? 'running' : 'stopped' }]);
+    if (url.pathname === '/api/install') return ok({ installed: true });
+    if (url.pathname === '/api/server') return ok({
+      installed: true, candidates: [], ugcDir, locked: serverLocked, archOptions: ['auto', '64', '32'],
+    });
     if (url.pathname === '/api/mods') {
       await waitForMods;
       return ok(currentMods);
@@ -179,6 +183,20 @@ test('未下载模组异步补全工坊名称、封面和安全的新标签页�
     releaseDetails();
     await page.close();
   }
+});
+
+test('设置展示实际 Steam 工坊路径，下载期间锁定路径切换且手机不溢出', async () => {
+  const ugcDir = 'D:\\很长的 Steam 游戏安装目录\\steamapps\\workshop';
+  const { page, requests } = await openMods({ ugcDir, serverLocked: true });
+  try {
+    await page.locator('#app-navigation').getByRole('button', { name: '设置', exact: true }).click();
+    await page.getByText(ugcDir, { exact: true }).waitFor();
+    await page.getByText('更改服务器文件位置', { exact: true }).click();
+    assert.equal(await page.locator('#srv_dir').isDisabled(), true);
+    await page.setViewportSize({ width: 375, height: 900 });
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    assert.equal(requests.some(r => r.path === '/api/mods/update' && r.method === 'POST'), false);
+  } finally { await page.close(); }
 });
 
 test('已下载模组删除：取消不发请求，确认后删除并刷新列表', async () => {

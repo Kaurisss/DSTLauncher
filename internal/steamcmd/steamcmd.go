@@ -151,6 +151,19 @@ func (m *Manager) Root() string {
 	return m.layout.Root
 }
 
+// WorkshopDir reuses the selected Steam library; standalone installs keep their own cache.
+func (m *Manager) WorkshopDir() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	common := filepath.Dir(m.layout.Root)
+	steamapps := filepath.Dir(common)
+	if m.external && strings.EqualFold(filepath.Base(common), "common") &&
+		strings.EqualFold(filepath.Base(steamapps), "steamapps") {
+		return filepath.Join(steamapps, "workshop")
+	}
+	return filepath.Join(m.workDir, "ugc_mods")
+}
+
 // GameDir returns the directory that contains the game data and mods directory.
 func (m *Manager) GameDir() string {
 	m.mu.RLock()

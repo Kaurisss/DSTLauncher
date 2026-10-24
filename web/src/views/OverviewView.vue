@@ -7,6 +7,7 @@ import UiCard from '@/components/ui/UiCard.vue';
 import { Button } from '@/components/ui/button';
 import UiStat from '@/components/ui/UiStat.vue';
 import ShardList from '@/components/overview/ShardList.vue';
+import HostResources from '@/components/overview/HostResources.vue';
 import InstallPanel from '@/components/overview/InstallPanel.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import LogConsole from '@/components/overview/LogConsole.vue';
@@ -115,6 +116,8 @@ const serverTone = computed(() => {
         :tone="serverTone"
       />
     </div>
+
+    <HostResources />
 
     <!-- 状态区（主）与服务器文件区（辅）按 7:5 分栏：
          分片行要放下「状态 · 运行时长 · PID · 端口 · 重启次数」，

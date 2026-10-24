@@ -52,8 +52,8 @@ func TestDeleteModRemovesInstalledDirectories(t *testing.T) {
 				t.Fatal(err)
 			}
 			installed, err := mgr.InstalledMods()
-			if err != nil || !installed[id] {
-				t.Fatalf("fixture must be installed: %v, %v", installed, err)
+			if err != nil || installed[id] != tc.info {
+				t.Fatalf("only complete mods should be installed: %v, %v", installed, err)
 			}
 			if err := mgr.DeleteMod(id); err != nil {
 				t.Fatal(err)

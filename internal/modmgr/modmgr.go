@@ -581,8 +581,10 @@ func (m *Manager) InstalledMods() (map[string]bool, error) {
 			continue
 		}
 		for _, e := range entries {
-			if e.IsDir() {
-				out["workshop-"+e.Name()] = true
+			id := e.Name()
+			if e.IsDir() && id != "" && strings.Trim(id, "0123456789") == "" &&
+				fileExists(filepath.Join(base, id, "modinfo.lua")) {
+				out["workshop-"+id] = true
 			}
 		}
 	}

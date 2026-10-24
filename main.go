@@ -121,11 +121,7 @@ func main() {
 
 	rootDir := filepath.Join(workDir, defaultRootName)
 	logDir := filepath.Join(workDir, "logs")
-	// 共享工坊模组目录：通过 -ugc_directory 让所有房间、所有分片读同一份模组，
-	// 避免默认布局（按房间/分片各存一份）造成的磁盘翻倍与「换房间要搬文件」
-	ugcDir := filepath.Join(workDir, "ugc_mods")
-
-	for _, d := range []string{rootDir, logDir, ugcDir} {
+	for _, d := range []string{rootDir, logDir} {
 		if err := os.MkdirAll(d, 0755); err != nil {
 			log.Fatalf("创建目录失败 %s: %v", d, err)
 		}
@@ -155,6 +151,12 @@ func main() {
 		log.Fatalf("自动探测服务器失败：%v", err)
 	} else if got != "" {
 		fmt.Printf("自动探测到已安装的专用服务器（%s，%s 位）：%s\n", got, steam.Arch(), steam.Root())
+	}
+
+	// Steam 安装直接复用同一库的工坊目录；独立安装保留面板自己的缓存。
+	ugcDir := steam.WorkshopDir()
+	if err := os.MkdirAll(ugcDir, 0755); err != nil {
+		log.Fatalf("创建模组目录失败 %s: %v", ugcDir, err)
 	}
 
 	if *installOnly {
@@ -213,8 +215,6 @@ func main() {
 	}
 
 	mgr := server.NewManager(rootDir, steam.ServerDir(), logDir)
-	// 共享模组目录：启动分片与模组预更新都要用到
-	mgr.SetUgcDir(ugcDir)
 	// 可执行文件路径在每次启动分片时重新解析：
 	// 用户在面板里点「一键安装」之后，64 位可执行文件才出现，此时无需重启面板
 	mgr.SetExeResolver(func() (string, string) {

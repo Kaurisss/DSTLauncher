@@ -44,7 +44,7 @@ go build -o dst-windows.exe .
 ./dst-windows.exe -v           # 显示版本
 ```
 
-发布 release 只需带上 `dst-windows.exe` 一个文件；`dst_save/`、`ugc_mods/`、`logs/`、`panel.json` 首次运行自动生成，SteamCMD 缺失时面板会自动下载。
+发布 release 只需带上 `dst-windows.exe` 一个文件；`dst_save/`、`logs/`、`panel.json` 首次运行自动生成，SteamCMD 缺失时面板会自动下载。模组目录见下方说明。
 
 ### 命令行参数
 
@@ -58,6 +58,12 @@ go build -o dst-windows.exe .
 | `-data-dir` | 可执行文件同级 | 运行数据根目录（存档/日志/模组/panel.json/SteamCMD）。也可用环境变量 `DST_DATA_DIR`，容器里指向挂载卷 |
 
 服务器目录也可以通过环境变量 `DST_SERVER_DIR` 或 Web 面板里的配置页指定（写入 `panel.json`）。
+
+### 模组目录
+
+- 使用 Steam 库中的服务器时，直接读取并下载到同一库的 `steamapps/workshop/content/322330/<模组 ID>`，开服和模组更新共用这份文件。实际路径显示在「设置 → 服务器文件与架构 → 模组目录」。
+- 独立安装或容器安装继续使用数据目录下的 `ugc_mods/`；切换服务器安装位置时自动重新定位。原有 `ugc_mods/` 保留，不自动搬迁或删除。
+- 更新或删除共享模组前，请退出使用同一份文件的游戏客户端，并暂停 Steam 的工坊更新，避免同时写入。重新下载失败会恢复旧副本；删除会影响客户端及其它房间。
 
 ## Linux / Docker 部署
 
@@ -125,7 +131,7 @@ internal/
   web/                  HTTP API + 静态资源服务
 web/                    Vue 3 + Vite 前端
 dst_save/               运行时数据：存档根目录（-persistent_storage_root）、rooms.json
-ugc_mods/               共享 mod 目录（-ugc_directory）
+ugc_mods/               独立安装的共享 mod 目录（Steam 安装直接复用库内 workshop）
 logs/                   运行日志、mod 更新日志
 ```
 

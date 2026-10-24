@@ -64,7 +64,7 @@ async function remove() {
   const name = props.mod.name || props.mod.id;
   if (!await confirmAction(
     `删除模组「${name}」？\n\n` +
-    `模组实体是所有房间共享的，删除本地文件后其它房间也无法使用；` +
+    `模组文件与其它房间共享，使用 Steam 工坊目录时也会影响游戏客户端；删除后需要重新下载。` +
     `只会从当前房间的 modoverrides 中移除启用记录。`,
   )) return;
 
@@ -76,7 +76,7 @@ async function remove() {
 }
 
 /**
- * 单模组更新：未下载的直接下载；已下载的先删旧文件再重下（强制刷新）。
+ * 单模组更新：未下载的直接下载；已下载的备份旧文件后重新下载，失败恢复。
  * 创意工坊模组才支持，本地模组没有「下载」一说。
  * 有会话在跑时后端会排队串行下载，这里不需要因「更新中」而禁用。
  * 启动交给父组件（轮询归它管），这里只做确认。
@@ -90,8 +90,8 @@ async function updateOne() {
   const name = props.mod.name || props.mod.id;
   if (props.mod.installed && !await confirmAction(
     `重新下载模组「${name}」？\n\n` +
-    `将删除本地文件并从创意工坊重新获取，用于修复损坏或拉取更新；\n` +
-    `模组实体所有房间共享，重下期间其它房间也暂时不可用。`,
+    `将备份本地文件并从创意工坊重新获取，失败会恢复旧副本；\n` +
+    `文件可能与 Steam 客户端共享，请先退出游戏并暂停 Steam 的模组更新；重下期间其它房间也暂时不可用。`,
   )) return;
 
   emit('update', props.mod);

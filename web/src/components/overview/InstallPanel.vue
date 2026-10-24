@@ -158,10 +158,14 @@ onMounted(async () => {
 
     <template v-if="server">
       <Separator />
+      <dl v-if="server.ugcDir" class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 text-sm">
+        <dt class="text-muted-foreground">模组目录</dt>
+        <dd class="break-all font-mono text-xs leading-5">{{ server.ugcDir }}</dd>
+      </dl>
       <details>
         <summary class="cursor-pointer text-sm font-medium">更改服务器文件位置</summary>
         <div class="mt-4 flex flex-col gap-4">
-          <p v-if="locked" class="text-sm text-muted-foreground">开服、安装/更新或分片运行期间不能更改位置。</p>
+          <p v-if="locked" class="text-sm text-muted-foreground">开服、安装/更新、模组下载或分片运行期间不能更改位置。</p>
           <FieldGroup>
             <Field :data-disabled="locked || undefined">
               <FieldLabel for="srv_dir">安装目录</FieldLabel>
