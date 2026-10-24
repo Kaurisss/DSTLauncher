@@ -149,11 +149,12 @@ type process struct {
 	port         int    // 该分片的游戏端口，用于「是否已开始监听」判据
 	startVersion string // 启动时的游戏版本，用于发现「游戏更新后没重启」
 
-	mu        sync.RWMutex
-	logWriter *LogTailer
-	done      chan struct{}
-	closeOnce sync.Once
-	exited    atomic.Bool // 由 watch 在 Wait 返回后发布，避免并发读取 Cmd.ProcessState
+	mu           sync.RWMutex
+	logWriter    *LogTailer
+	done         chan struct{}
+	closeOnce    sync.Once
+	exited       atomic.Bool // 由 watch 在 Wait 返回后发布，避免并发读取 Cmd.ProcessState
+	playersReady atomic.Bool // 仅当前进程日志确认玩家已生成后启用玩家查询
 
 	// res 存上一次的资源采样，CPU 占用率要靠它做差值（见 procResource）
 	res procSample
@@ -461,6 +462,11 @@ func (m *Manager) startShard(c *Cluster, shard string) error {
 		return fmt.Errorf("创建标准输入管道失败: %w", err)
 	}
 
+	p := &process{
+		cluster: c, shard: shard, cmd: cmd, stdin: stdin, state: StateRunning,
+		done: make(chan struct{}), port: sp.ServerPort, startVersion: versionAt(exePath),
+	}
+
 	// stdout/stderr 重定向到日志文件，同时把每一行广播给 Web 前端。
 	// 真实服务器只在 stdout 打印运行日志，必须在这里分流，
 	// 否则前端"实时日志"拿到的只有进程状态事件，看不到游戏日志。
@@ -468,8 +474,10 @@ func (m *Manager) startShard(c *Cluster, shard string) error {
 		if strings.TrimSpace(line) == "" {
 			return
 		}
+		p.observePlayerLog(line)
 		m.emit(c.Key(), shard, "log", line)
 	})
+	p.logWriter = tailer
 	cmd.Stdout = tailer
 	cmd.Stderr = tailer
 
@@ -478,19 +486,8 @@ func (m *Manager) startShard(c *Cluster, shard string) error {
 		return fmt.Errorf("启动进程失败: %w", err)
 	}
 
-	p := &process{
-		cluster:      c,
-		shard:        shard,
-		cmd:          cmd,
-		stdin:        stdin,
-		state:        StateRunning,
-		pid:          cmd.Process.Pid,
-		startedAt:    time.Now(),
-		logWriter:    tailer,
-		done:         make(chan struct{}),
-		port:         sp.ServerPort,
-		startVersion: versionAt(exePath),
-	}
+	p.pid = cmd.Process.Pid
+	p.startedAt = time.Now()
 
 	m.mu.Lock()
 	m.procs[k] = p
@@ -854,16 +851,17 @@ func (p *process) SendCmd(cmd string) error {
 
 // Status 返回分片状态快照。
 type Status struct {
-	Cluster     string    `json:"cluster"` // 集群标识 Cluster_N，前端调用接口时使用
-	ClusterID   int       `json:"clusterId"`
-	ClusterName string    `json:"clusterName"` // 房间名，仅用于展示
-	Shard       string    `json:"shard"`
-	State       string    `json:"state"`
-	PID         int       `json:"pid"`
-	StartedAt   time.Time `json:"startedAt"`
-	Uptime      string    `json:"uptime"`
-	Restarts    int       `json:"restarts"`
-	Port        int       `json:"port"`
+	Cluster      string    `json:"cluster"` // 集群标识 Cluster_N，前端调用接口时使用
+	ClusterID    int       `json:"clusterId"`
+	ClusterName  string    `json:"clusterName"` // 房间名，仅用于展示
+	Shard        string    `json:"shard"`
+	State        string    `json:"state"`
+	PlayersReady bool      `json:"playersReady"`
+	PID          int       `json:"pid"`
+	StartedAt    time.Time `json:"startedAt"`
+	Uptime       string    `json:"uptime"`
+	Restarts     int       `json:"restarts"`
+	Port         int       `json:"port"`
 
 	// 资源占用，仅在进程存活时有效（首次采样 cpuPct 为 0）
 	MemBytes uint64  `json:"memBytes"`
@@ -886,15 +884,16 @@ func (m *Manager) Status(clusterKey string) []Status {
 		}
 		p.mu.RLock()
 		st := Status{
-			Cluster:     p.cluster.Key(),
-			ClusterID:   p.cluster.ID,
-			ClusterName: p.cluster.Name,
-			Shard:       p.shard,
-			State:       p.state.String(),
-			StartedAt:   p.startedAt,
-			Restarts:    p.restarts,
-			Port:        p.cluster.port(p.shard).ServerPort,
-			Version:     p.startVersion,
+			Cluster:      p.cluster.Key(),
+			ClusterID:    p.cluster.ID,
+			ClusterName:  p.cluster.Name,
+			Shard:        p.shard,
+			State:        p.state.String(),
+			PlayersReady: p.state == StateRunning && p.isAlive() && p.playersReady.Load(),
+			StartedAt:    p.startedAt,
+			Restarts:     p.restarts,
+			Port:         p.cluster.port(p.shard).ServerPort,
+			Version:      p.startVersion,
 		}
 		p.mu.RUnlock()
 		if p.isAlive() {

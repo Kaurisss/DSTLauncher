@@ -273,12 +273,12 @@ test('房间删除后选择回退：被删房间若为当前选中，回退至�
   assert.equal(rooms.currentId, 2, '自动回退到剩余的房间 2');
 });
 
-test('管理员界面在无房间或已有房间下正常渲染', async () => {
+test('管理员界面按编辑页传入的房间正常渲染', async () => {
   const rooms = useRoomsStore(pinia);
   rooms.list = [{ id: 1, name: '房间1', key: 'Cluster_1' }];
   rooms.currentId = 1;
 
-  const app = createSSRApp(RoomAdmins);
+  const app = createSSRApp(RoomAdmins, { room: rooms.current });
   app.use(pinia);
   const html = await renderToString(app);
   assert.ok(html.includes('房间管理员'));

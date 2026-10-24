@@ -2,7 +2,7 @@
 // 房间管理员：维护 adminlist.txt（每行一个 Klei ID）。
 //
 // 名单在服务器启动时读取——运行中修改不拦着，但如实提示需重启生效。
-// 组件挂房间页，操作对象是「当前选中」的房间（与顶部当前房间标识一致）。
+// 操作对象由编辑页传入，不随顶部的当前房间选择变化。
 
 import { onMounted, ref, watch } from 'vue';
 
@@ -12,11 +12,10 @@ import UiEmpty from '@/components/ui/UiEmpty.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { adminApi } from '@/lib/api.js';
-import { useRoomsStore } from '@/stores/rooms.js';
 import { guard, toast } from '@/lib/toast.js';
 import { confirmAction } from '@/lib/confirm.js';
 
-const rooms = useRoomsStore();
+const props = defineProps({ room: { type: Object, required: true } });
 
 const admins = ref([]);
 const file = ref('');
@@ -29,7 +28,7 @@ let reqId = 0;
 
 async function load() {
   const req = ++reqId;
-  const room = rooms.current;
+  const room = props.room;
   if (!room) {
     admins.value = [];
     loadError.value = '';
@@ -39,12 +38,12 @@ async function load() {
   loadError.value = '';
   try {
     const data = await adminApi.list(room.id);
-    if (req !== reqId || room.id !== rooms.currentId) return;
+    if (req !== reqId || room.id !== props.room?.id) return;
     admins.value = data.admins || [];
     file.value = data.file || '';
     needRestart.value = !!data.needRestart;
   } catch (err) {
-    if (req !== reqId || room.id !== rooms.currentId) return;
+    if (req !== reqId || room.id !== props.room?.id) return;
     loadError.value = err.message;
   } finally {
     if (req === reqId) loading.value = false;
@@ -52,10 +51,10 @@ async function load() {
 }
 
 onMounted(load);
-watch(() => rooms.currentId, load);
+watch(() => props.room?.id, load);
 
 async function add() {
-  const room = rooms.current;
+  const room = props.room;
   const id = input.value.trim();
   if (!room || !id || busy.value) return;
   if (!/^KU_[A-Za-z0-9]{1,32}$/i.test(id)) {
@@ -68,7 +67,7 @@ async function add() {
   try {
     const { ok, data } = await guard(() => adminApi.add(targetRoomId, id));
     if (!ok) return;
-    if (rooms.currentId === targetRoomId) {
+    if (props.room?.id === targetRoomId) {
       admins.value = data.admins;
       needRestart.value = !!data.needRestart;
       input.value = '';
@@ -80,7 +79,7 @@ async function add() {
 }
 
 async function remove(id) {
-  const room = rooms.current;
+  const room = props.room;
   if (!room || busy.value) return;
   const targetRoomId = room.id;
   busy.value = true;
@@ -89,7 +88,7 @@ async function remove(id) {
 
     const { ok, data } = await guard(() => adminApi.remove(targetRoomId, id));
     if (!ok) return;
-    if (rooms.currentId === targetRoomId) {
+    if (props.room?.id === targetRoomId) {
       admins.value = data.admins;
       needRestart.value = !!data.needRestart;
     }
@@ -107,7 +106,7 @@ async function remove(id) {
 
     <p v-if="file" class="path-line" style="margin-bottom: 12px">{{ file }}</p>
 
-    <UiEmpty v-if="!rooms.current" icon="users" text="请先在「房间」页新建一个房间" />
+    <UiEmpty v-if="!room" icon="users" text="请先在「房间」页新建一个房间" />
     <p v-else-if="loadError" class="field-tip">读取失败：{{ loadError }}</p>
 
     <template v-else>

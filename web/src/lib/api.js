@@ -103,6 +103,15 @@ export const adminApi = {
   remove: (roomId, id) => request('/api/admins', { method: 'DELETE', params: { room: roomId, id } }),
 };
 
+/* ---------- 在线玩家 ---------- */
+
+export const playerApi = {
+  list: roomId => request('/api/players', { params: { room: roomId } }),
+  act: (roomId, body) => request('/api/players/action', {
+    method: 'POST', params: { room: roomId }, body,
+  }),
+};
+
 /* ---------- 宿主机资源 ---------- */
 
 export const hostApi = {

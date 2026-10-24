@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node scripts/check-auto-install.mjs && node scripts/check-shell.mjs && node scripts/check-host-browser.mjs && node scripts/check-room-admin.mjs && node scripts/check-world-icons.mjs && node scripts/check-world-config-browser.mjs && node scripts/check-mods-browser.mjs && node scripts/check-rollback-browser.mjs",
+    "test": "node scripts/check-auto-install.mjs && node scripts/check-shell.mjs && node scripts/check-host-browser.mjs && node scripts/check-players-browser.mjs && node scripts/check-room-admin.mjs && node scripts/check-rooms-browser.mjs && node scripts/check-world-icons.mjs && node scripts/check-world-config-browser.mjs && node scripts/check-mods-browser.mjs && node scripts/check-rollback-browser.mjs",
     "preview": "vite preview",
     "lint": "node scripts/check-src.mjs && eslint .",
     "lint:fix": "eslint . --fix"

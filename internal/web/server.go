@@ -125,6 +125,10 @@ func (s *Server) Handler() http.Handler {
 	// 房间管理员（adminlist.txt）
 	mux.HandleFunc("/api/admins", s.handleAdmins)
 
+	// 在线玩家与结构化管理操作
+	mux.HandleFunc("/api/players", s.handlePlayers)
+	mux.HandleFunc("/api/players/action", s.handlePlayerAction)
+
 	// 宿主机资源（独立于房间和分片进程）
 	mux.HandleFunc("/api/host", s.handleHostStats)
 

@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import UiStat from '@/components/ui/UiStat.vue';
 import ShardList from '@/components/overview/ShardList.vue';
 import HostResources from '@/components/overview/HostResources.vue';
+import PlayersPanel from '@/components/overview/PlayersPanel.vue';
 import InstallPanel from '@/components/overview/InstallPanel.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import LogConsole from '@/components/overview/LogConsole.vue';
@@ -72,6 +73,7 @@ const serverValue = computed(() => {
 
 const serverSub = computed(() => {
   if (system.installing) return system.progress || '准备中…';
+  if (system.installed && system.external) return '由 Steam 更新';
   return system.installed ? '可检查更新' : '首次启动会自动安装服务器文件';
 });
 
@@ -144,6 +146,7 @@ const serverTone = computed(() => {
       </UiCard>
     </div>
 
+    <PlayersPanel />
     <LogConsole />
   </div>
 </template>

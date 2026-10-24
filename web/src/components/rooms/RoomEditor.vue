@@ -42,9 +42,9 @@ function normalizeShard(s, i) {
     isMaster: !!s.isMaster,
     disabled: !!s.disabled,
     gameId: s.gameId || 0,
-    serverPort: s.serverPort ?? null,
-    masterServerPort: s.masterServerPort ?? null,
-    authenticationPort: s.authenticationPort ?? null,
+    serverPort: s.serverPort || null,
+    masterServerPort: s.masterServerPort || null,
+    authenticationPort: s.authenticationPort || null,
     isNew: false,
   };
 }
@@ -95,6 +95,7 @@ function buildForm() {
 const form = reactive(buildForm());
 const saving = ref(false);
 const saveError = ref('');
+defineExpose({ saving });
 
 const gameModes = computed(() => (props.meta && props.meta.gameModes) || Object.keys(GAME_MODE_LABEL));
 const tickRates = computed(() => (props.meta && props.meta.tickRates) || [15, 30, 60]);
@@ -166,22 +167,21 @@ async function save() {
 </script>
 
 <template>
-  <UiCard>
+  <UiCard class="room-editor">
     <template #title>{{ isNew ? '新建房间' : '编辑房间 · ' + form.name }}</template>
     <template v-if="!isNew" #hint>Cluster_{{ form.id }}</template>
+    <template #actions>
+      <Button :disabled="saving" @click="save">
+        <Icon name="check" size="14" />{{ saving ? '保存中…' : '保存' }}
+      </Button>
+      <Button variant="outline" :disabled="saving" @click="emit('close')">取消</Button>
+    </template>
 
     <Alert v-if="saveError" variant="destructive" class="mb-4">
       <AlertTitle>保存失败</AlertTitle>
       <AlertDescription>{{ saveError }}</AlertDescription>
     </Alert>
 
-    <div v-if="isNew" class="notice" style="margin-bottom: 18px">
-      <Icon name="info" size="16" />
-      <span>
-        端口（游戏端口 / Steam 主端口 / Steam 认证端口 / 分片协调端口）由系统自动分配，
-        避免与已有房间冲突；创建后可在编辑页调整。
-      </span>
-    </div>
     <section class="form-section">
       <h3>基本信息</h3>
       <div class="form-grid">
@@ -277,16 +277,6 @@ async function save() {
     <section class="form-section">
       <h3>世界（分片）</h3>
       <ShardEditor v-model:shards="form.shards" :room-is-new="isNew" />
-      <p class="field-tip">
-        每个世界都是一个独立进程，各占一份 CPU 与内存（空载约 600MB 起）。
-        端口留空表示自动分配；改动后需重启该房间才生效。
-      </p>
-      <p class="field-tip">
-        原版只有洞穴有落水洞入口。新增的地表型世界要自行放置传送门，
-        可在游戏控制台执行
-        <code>c_spawn('migration_portal').components.worldmigrator:SetDestinationWorld(世界ID, true)</code>，
-        世界 ID 见上方各分片。
-      </p>
     </section>
 
     <details class="form-section details">
@@ -308,12 +298,16 @@ async function save() {
         </UiField>
       </div>
     </details>
-
-    <div class="form-actions">
-      <Button :disabled="saving" @click="save">
-        <Icon name="check" size="14" />{{ saving ? '保存中…' : '保存' }}
-      </Button>
-      <Button variant="outline" :disabled="saving" @click="emit('close')">取消</Button>
-    </div>
   </UiCard>
 </template>
+
+<style scoped>
+.room-editor :deep([data-slot="card-header"]) {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: var(--card);
+  border-top-left-radius: inherit;
+  border-top-right-radius: inherit;
+}
+</style>
