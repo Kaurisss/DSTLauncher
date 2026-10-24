@@ -90,3 +90,81 @@ func TestWriteIntoDropsStaleLevelData(t *testing.T) {
 		t.Errorf("世界设置丢失: %+v", ov.Overrides)
 	}
 }
+
+func TestWriteIntoImportsUngeneratedShardDefinitions(t *testing.T) {
+	clusterDir := t.TempDir()
+	writeFile(t, filepath.Join(clusterDir, "cluster.ini"), "[MISC]\ncluster_name = x\n")
+	definitions := map[string]string{
+		"Master":  `return { location="forest", overrides={} }`,
+		"Caves":   `return { location="cave", overrides={} }`,
+		"Island":  `return { id="SURVIVAL_SHIPWRECKED_CLASSIC", location="shipwrecked", overrides={bamboo="default"} }`,
+		"Volcano": `return { id="SURVIVAL_VOLCANO_CLASSIC", location="volcanoworld", overrides={boons="never"} }`,
+	}
+	for name, definition := range definitions {
+		writeFile(t, filepath.Join(clusterDir, name, "server.ini"), "[SHARD]\nname = "+name+"\n")
+		writeFile(t, filepath.Join(clusterDir, name, levelDataOverrideName), definition)
+		if name == "Master" || name == "Caves" {
+			writeFile(t, filepath.Join(clusterDir, name, "save", "shardindex"), name)
+		}
+	}
+	p, err := Parse(clusterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	rm := MergeInto(p, nil)
+	rm.ID = 3
+	rm.Normalize()
+	root := t.TempDir()
+	target := config.ClusterDir(root, "DST", rm.ID)
+	// 覆盖到尚未生成的房间时也要清掉普通地表预设。
+	if err := room.Generate(root, "DST", rm); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := p.WriteInto(root, "DST", rm); err != nil {
+		t.Fatal(err)
+	}
+	if err := room.Generate(root, "DST", rm); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range definitions {
+		got, err := os.ReadFile(worldsettings.LevelDataPath(target, name))
+		if err != nil || string(got) != want {
+			t.Errorf("%s 世界定义未原样保留: %q, err=%v", name, got, err)
+		}
+		if _, err := os.Stat(worldsettings.FilePath(target, name)); !os.IsNotExist(err) {
+			t.Errorf("%s 不应残留 worldgenoverride: %v", name, err)
+		}
+	}
+}
+
+func TestWriteIntoPreservesExistingSaveWithoutSourceSave(t *testing.T) {
+	clusterDir := t.TempDir()
+	writeFile(t, filepath.Join(clusterDir, "cluster.ini"), "[MISC]\ncluster_name = x\n")
+	writeFile(t, filepath.Join(clusterDir, "Master", "server.ini"), "[SHARD]\nis_master = true\n")
+	writeFile(t, filepath.Join(clusterDir, "Master", levelDataOverrideName), `return { location="shipwrecked", overrides={} }`)
+	p, err := Parse(clusterDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	root := t.TempDir()
+	rm := MergeInto(p, nil)
+	rm.ID = 1
+	target := config.ShardDir(root, "DST", rm.ID, "Master")
+	want := map[string]string{
+		filepath.Join("save", "shardindex"): "existing world",
+		levelDataOverrideName:               `return { location="forest", overrides={} }`,
+		worldsettings.OverrideFileName:      `return { override_enabled=true, overrides={day="long"} }`,
+	}
+	for name, content := range want {
+		writeFile(t, filepath.Join(target, name), content)
+	}
+	if _, err := p.WriteInto(root, "DST", rm); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range want {
+		got, err := os.ReadFile(filepath.Join(target, name))
+		if err != nil || string(got) != content {
+			t.Errorf("已有存档的 %s 被修改: %q, err=%v", name, got, err)
+		}
+	}
+}

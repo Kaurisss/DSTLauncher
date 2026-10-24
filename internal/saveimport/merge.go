@@ -69,7 +69,7 @@ func MergeInto(p *Parsed, target *room.Room) *room.Room {
 //
 // 只写三类内容：
 //   - 各分片的 save 世界数据（存档的本体）
-//   - 各分片的世界设置 worldgenoverride.lua（面板据此展示与二次编辑）
+//   - 各分片的世界定义 leveldataoverride.lua 或世界设置 worldgenoverride.lua
 //   - 三份玩家名单（存档里有才覆盖）
 //
 // 刻意不写 cluster.ini / server.ini / cluster_token.txt：
@@ -113,9 +113,14 @@ func (p *Parsed) WriteInto(root, confDir string, r *room.Room) ([]string, error)
 			if err := replaceDir(filepath.Join(p.ClusterDir, s.Dir, "save"), filepath.Join(shardDir, "save")); err != nil {
 				return notes, fmt.Errorf("导入 %s 世界数据失败: %w", s.Name, err)
 			}
-		} else {
+		} else if config.ShardHasSave(shardDir) {
 			notes = append(notes, fmt.Sprintf(
 				"存档里的 %s 没有世界数据（save 目录为空），该分片沿用房间现有存档", s.Name))
+			// 保留已有世界时，定义与设置必须一起保留。
+			continue
+		} else {
+			notes = append(notes, fmt.Sprintf(
+				"存档里的 %s 尚未生成世界，首次启动时将按导入的世界配置生成", s.Name))
 		}
 
 		// 2. 世界定义：leveldataoverride.lua 原样拷过去。
@@ -124,11 +129,7 @@ func (p *Parsed) WriteInto(root, confDir string, r *room.Room) ([]string, error)
 		// 与嵌套表（required_setpieces 等）都在里面；只做有损转换的话这些字段全丢，
 		// 模组世界的维度信息就没了，面板只能退回 forest。
 		//
-		// 整个配置块只在该分片确实换了世界数据时动：没有 save 数据的分片沿用
-		// 房间现有存档，它的世界定义与设置都应该跟着存档一起留着。
-		if !s.HasSave {
-			continue
-		}
+		// 尚未生成世界的分片也需要完整定义，才能在首次启动时生成正确的维度。
 		srcLD := filepath.Join(p.ClusterDir, s.Dir, levelDataOverrideName)
 		dstLD := filepath.Join(shardDir, levelDataOverrideName)
 		if config.FileExists(srcLD) {

@@ -32,8 +32,8 @@ const clusterIniName = "cluster.ini"
 // levelDataOverrideName 是游戏实际使用的世界配置文件。
 //
 // Klei 在服务器源码里写明：leveldataoverride.lua 供游戏使用、会完全覆盖已保存的世界数据，
-// worldgenoverride.lua 才是给用户编辑的。存档里 обычно 只有前者，
-// 因此导入时优先读它，再经面板转换成 worldgenoverride.lua 供二次编辑。
+// worldgenoverride.lua 才是给用户编辑的。导入时优先读取并原样保留前者，
+// 避免转换成 worldgenoverride.lua 时丢失完整世界定义。
 const levelDataOverrideName = "leveldataoverride.lua"
 
 // ShardSave 是一个分片（世界）导入所需的全部信息。
