@@ -347,7 +347,11 @@ func (m *Manager) runFullUpdate(c *Cluster, shard, exePath, workDir string,
 	deadline := time.Now().Add(ModUpdateTimeout)
 	prev := -1
 	for attempt := 1; attempt <= runs; attempt++ {
-		missing, hasCheck := m.missingModCount()
+		missing, hasCheck, err := m.missingModCount()
+		if err != nil {
+			m.setModErr(fmt.Sprintf("读取分片模组配置失败: %v", err))
+			return false
+		}
 		if hasCheck {
 			if missing == 0 {
 				log("全部模组均已下载，更新完成")
@@ -381,7 +385,12 @@ func (m *Manager) runFullUpdate(c *Cluster, shard, exePath, workDir string,
 		}
 	}
 
-	if missing, ok := m.missingModCount(); ok && missing > 0 {
+	missing, ok, err := m.missingModCount()
+	if err != nil {
+		m.setModErr(fmt.Sprintf("读取分片模组配置失败: %v", err))
+		return false
+	}
+	if ok && missing > 0 {
 		m.setModErr(fmt.Sprintf("已连续更新 %d 轮仍有 %d 个未下载，请再次点击「更新模组」继续",
 			maxModRuns, missing))
 	}
@@ -621,18 +630,18 @@ func (m *Manager) ModsUpdating() bool {
 
 // missingModCount 清点当前缺失的工坊模组数量。
 // 第二个返回值表示是否存在可用的清点逻辑。
-func (m *Manager) missingModCount() (int, bool) {
+func (m *Manager) missingModCount() (int, bool, error) {
 	m.mu.RLock()
 	fn := m.modsChecker
 	m.mu.RUnlock()
 	if fn == nil {
-		return 0, false
+		return 0, false, nil
 	}
 	ids, err := fn()
 	if err != nil {
-		return 0, false
+		return 0, true, err
 	}
-	return len(ids), true
+	return len(ids), true, nil
 }
 
 func (m *Manager) isModCanceled() bool {

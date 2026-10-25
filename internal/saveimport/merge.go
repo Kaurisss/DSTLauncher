@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"dst-windows/internal/config"
+	"dst-windows/internal/modmgr"
 	"dst-windows/internal/room"
 	"dst-windows/internal/worldsettings"
 )
@@ -75,8 +76,7 @@ func MergeInto(p *Parsed, target *room.Room) *room.Room {
 // 刻意不写 cluster.ini / server.ini / cluster_token.txt：
 // 前三份由 room.Generate 依据房间配置统一生成，否则会出现两套互相矛盾的事实来源。
 //
-// 模组配置也不在这里写——它必须经 modmgr 以面板的规范格式写回**全部分片**
-// 并重算安装级的下载清单，因此由调用方（Web 层）在拿到目标房间之后处理。
+// 模组配置按分片分别写入；调用方随后重算安装级下载清单。
 //
 // 返回的 notes 是应当提示给用户的说明（跳过的分片、没有数据的存档等），
 // 不是错误。
@@ -106,6 +106,12 @@ func (p *Parsed) WriteInto(root, confDir string, r *room.Room) ([]string, error)
 		shardDir := config.ShardDir(root, confDir, r.ID, s.Name)
 		if err := config.EnsureDirExists(shardDir); err != nil {
 			return notes, fmt.Errorf("创建 %s 分片目录失败: %w", s.Name, err)
+		}
+		if s.Mods != nil {
+			mods := modmgr.NewManager(clusterDir, "", "", []string{s.Name})
+			if err := mods.SaveOverrides(s.Mods); err != nil {
+				return notes, fmt.Errorf("写入 %s 模组配置失败: %w", s.Name, err)
+			}
 		}
 
 		// 1. 世界存档数据：整个 save 目录替换掉

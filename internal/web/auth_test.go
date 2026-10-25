@@ -200,7 +200,7 @@ func TestAuthRejectsCrossOriginRequests(t *testing.T) {
 					if rec.Code != wantStatus {
 						t.Fatalf("status=%d body=%s", rec.Code, rec.Body.String())
 					}
-					saved, err := srv.modsFor(rm).LoadOverrides()
+					saved, err := srv.modsFor(rm, rm.MasterShard()).LoadOverrides()
 					if err != nil {
 						t.Fatal(err)
 					}

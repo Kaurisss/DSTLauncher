@@ -61,10 +61,41 @@ test('没有房间也显示宿主机而非分片内存，桌面与手机无横�
       assert.match(await section.innerText(), /40.00 GB/);
       assert.match(await section.innerText(), /总容量 100.00 GB/);
       assert.equal(await section.getByRole('status').count(), 0);
-      assert.equal(await section.locator('[title]').getAttribute('title'), healthy.diskPath);
+      await section.locator('.stat').filter({ hasText: '存档盘可用空间' }).hover();
+      await page.getByRole('tooltip').waitFor();
+      assert.equal(await page.getByRole('tooltip').innerText(), healthy.diskPath);
+      await page.keyboard.press('Escape');
+      await page.getByRole('tooltip').waitFor({ state: 'hidden' });
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     } finally { await page.close(); }
   }
+});
+
+test('导航和主题使用组件提示，支持键盘焦点、Escape 和动态内容', async () => {
+  const { page } = await openPanel();
+  try {
+    assert.equal(await page.locator('[title]').count(), 0);
+    await page.getByRole('button', { name: '切换导航', exact: true }).hover();
+    await page.getByRole('tooltip', { name: '展开或收起导航', exact: true }).waitFor();
+    await page.keyboard.press('Escape');
+    await page.getByRole('tooltip').waitFor({ state: 'hidden' });
+    await page.mouse.move(0, 0);
+    const theme = page.getByRole('button', { name: '切换主题', exact: true });
+    await page.keyboard.press('Tab');
+    await theme.focus();
+    await page.getByRole('tooltip').waitFor();
+    const before = await page.getByRole('tooltip').innerText();
+    assert.match(before, /当前：.*\s+点击切换为：/);
+    assert.equal(await page.locator('[data-slot="tooltip-content"]').evaluate(element => window.getComputedStyle(element).whiteSpace), 'pre-line');
+    await page.keyboard.press('Enter');
+    await page.getByRole('tooltip').waitFor({ state: 'hidden' });
+    await page.mouse.move(0, 0);
+    await theme.hover();
+    await page.getByRole('tooltip').waitFor();
+    assert.notEqual(await page.getByRole('tooltip').innerText(), before);
+    await page.keyboard.press('Escape');
+    await page.getByRole('tooltip').waitFor({ state: 'hidden' });
+  } finally { await page.close(); }
 });
 
 test('页面切换入场后内容可见，减少动态效果时停用动画', async () => {

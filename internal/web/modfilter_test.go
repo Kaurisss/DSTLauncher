@@ -55,7 +55,7 @@ func TestModListHidesClientOnlyWithoutChangingFilesOrOverrides(t *testing.T) {
 			t.Errorf("误隐藏服务端/未知/待下载模组: %s", id)
 		}
 	}
-	stored, err := mods.LoadOverrides()
+	stored, err := s.modsFor(rm, rm.MasterShard()).LoadOverrides()
 	if err != nil || !stored.Enabled["workshop-101"] {
 		t.Fatal("列表过滤不应改写现有配置", err)
 	}

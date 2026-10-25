@@ -13,6 +13,7 @@ import Icon from '@/components/ui/Icon.vue';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -93,27 +94,31 @@ async function removeShard(index) {
       :class="{ 'is-off': s.disabled }"
     >
       <div class="shard-card-head">
-        <Input
-          v-model.trim="s.name"
-          class="shard-name-input"
-          :disabled="!canRename(s)"
-          :title="canRename(s) ? '英文名，不含空格；保存后不可修改' : '存档目录名，保存后不可修改'"
-          placeholder="世界名"
-        />
+        <Tooltip>
+          <TooltipTrigger as="span" :as-child="canRename(s)" class="shard-name-input inline-flex" :tabindex="!canRename(s) ? 0 : undefined">
+            <Input v-model.trim="s.name" class="w-full disabled:pointer-events-none" :disabled="!canRename(s)" aria-label="世界名" placeholder="世界名" />
+          </TooltipTrigger>
+          <TooltipContent>{{ canRename(s) ? '英文名，不含空格；保存后不可修改' : '存档目录名，保存后不可修改' }}</TooltipContent>
+        </Tooltip>
         <Select
           v-model="s.worldType"
           :disabled="!canRename(s)"
         >
-          <SelectTrigger class="shard-type-select w-32" :title="canRename(s) ? '决定世界生成预设与可用设置项' : '存档类型'">
-            <SelectValue :placeholder="typeLabel(s.worldType)" />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            <SelectGroup>
-              <SelectItem v-for="t in WORLD_TYPES" :key="t.value" :value="t.value">
-                {{ t.label }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
+          <Tooltip>
+            <TooltipTrigger as="span" :as-child="canRename(s)" class="shard-type-select inline-flex" :tabindex="!canRename(s) ? 0 : undefined">
+              <SelectTrigger class="w-full disabled:pointer-events-none" aria-label="世界类型">
+                <SelectValue :placeholder="typeLabel(s.worldType)" />
+              </SelectTrigger>
+            </TooltipTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem v-for="t in WORLD_TYPES" :key="t.value" :value="t.value">
+                  {{ t.label }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+            <TooltipContent>{{ canRename(s) ? '决定世界生成预设与可用设置项' : '存档类型' }}</TooltipContent>
+          </Tooltip>
         </Select>
         <span v-if="s.isMaster" class="pill pill-info">主世界</span>
         <UiSwitch
@@ -122,17 +127,14 @@ async function removeShard(index) {
           label="启用"
           @update:model-value="v => (s.disabled = !v)"
         />
-        <Button
-          v-if="!s.isMaster"
-          variant="destructive"
-          size="sm"
-          class="shard-del"
-          title="从面板移除（存档目录保留）"
-          :disabled="removing"
-          @click="removeShard(i)"
-        >
-          <Icon name="trash" size="14" />
-        </Button>
+        <Tooltip v-if="!s.isMaster">
+          <TooltipTrigger as="span" :as-child="!removing" class="shard-del inline-flex" :tabindex="removing ? 0 : undefined">
+            <Button variant="destructive" size="sm" aria-label="从面板移除（存档目录保留）" :disabled="removing" @click="removeShard(i)">
+              <Icon name="trash" size="14" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>从面板移除（存档目录保留）</TooltipContent>
+        </Tooltip>
       </div>
 
       <div class="shard-ports">

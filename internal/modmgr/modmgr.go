@@ -63,7 +63,7 @@ func NewOverrides() *Overrides {
 // configuration_options 的右括号提前截断，导致参数丢失、并解析出一个
 // 名为 "configuration_options" 的伪配置项。块结构一律用括号配对处理。
 var (
-	modKeyRe   = regexp.MustCompile(`\["([^"]+)"\]\s*=\s*\{`)
+	modKeyRe   = regexp.MustCompile(`\[(?:"([^"]+)"|'([^']+)')\]\s*=\s*\{`)
 	enabledRe  = regexp.MustCompile(`\benabled\s*=\s*(true|false)`)
 	priorityRe = regexp.MustCompile(`\bpriority\s*=\s*(\d+)`)
 )
@@ -75,7 +75,11 @@ func ParseOverrides(content string) *Overrides {
 	clean := stripLuaComments(stripBOM(content))
 
 	for _, loc := range modKeyRe.FindAllStringSubmatchIndex(clean, -1) {
-		id := clean[loc[2]:loc[3]]
+		start, end := loc[2], loc[3]
+		if start < 0 {
+			start, end = loc[4], loc[5]
+		}
+		id := clean[start:end]
 
 		// loc[1] 指向 '{' 之后，回退一格拿到左括号
 		open := loc[1] - 1
@@ -108,6 +112,39 @@ func ParseOverrides(content string) *Overrides {
 		}
 	}
 	return o
+}
+
+// ParseOverridesChecked refuses partial/dynamic files before an edit can discard entries.
+func ParseOverridesChecked(content string) (*Overrides, error) {
+	clean := strings.TrimSpace(stripLuaComments(stripBOM(content)))
+	if clean == "" {
+		return NewOverrides(), nil
+	}
+	if !strings.HasPrefix(clean, "return") {
+		return nil, fmt.Errorf("模组配置必须返回静态表")
+	}
+	body := strings.TrimSpace(strings.TrimPrefix(clean, "return"))
+	end := matchBrace(body, 0)
+	if end < 0 || strings.TrimSpace(strings.TrimSuffix(strings.TrimSpace(body[end+1:]), ";")) != "" {
+		return nil, fmt.Errorf("模组配置括号不完整或包含动态代码")
+	}
+	entries := 0
+	for _, item := range splitLuaTables(body[1:end]) {
+		item = strings.TrimSpace(item)
+		if item == "" {
+			continue
+		}
+		loc := modKeyRe.FindStringIndex(item)
+		if loc == nil || loc[0] != 0 || matchBrace(item, loc[1]-1) != len(item)-1 {
+			return nil, fmt.Errorf("不支持的模组配置条目，未修改原文件")
+		}
+		entries++
+	}
+	o := ParseOverrides(content)
+	if len(o.Order) != entries {
+		return nil, fmt.Errorf("模组配置包含无法完整解析的嵌套条目")
+	}
+	return o, nil
 }
 
 // matchBrace 返回与 s[open] 处 '{' 配对的 '}' 下标，找不到返回 -1。
@@ -440,10 +477,12 @@ func (m *Manager) overridesPaths() []string {
 	return out
 }
 
-// LoadOverrides 加载 overrides 文件（以第一个分片为准）。
-// 正常由本面板写入的文件各分片内容一致，读取任一份即可。
+// LoadOverrides 读取单分片配置；多分片调用必须明确选择或使用 EnabledWorkshopIDs 并集。
 func (m *Manager) LoadOverrides() (*Overrides, error) {
 	paths := m.overridesPaths()
+	if len(paths) > 1 {
+		return nil, fmt.Errorf("请选择要读取模组配置的分片")
+	}
 	if len(paths) == 0 {
 		return NewOverrides(), nil
 	}
@@ -454,11 +493,14 @@ func (m *Manager) LoadOverrides() (*Overrides, error) {
 		}
 		return nil, err
 	}
-	return ParseOverrides(string(data)), nil
+	o, err := ParseOverridesChecked(string(data))
+	if err != nil {
+		return nil, fmt.Errorf("%s: %w", paths[0], err)
+	}
+	return o, nil
 }
 
-// SaveOverrides 保存 overrides 到所有分片。
-// 必须写全部分片：只写 Master 会导致洞穴侧模组配置不一致。
+// SaveOverrides 写入管理器明确指定的分片。交互编辑必须使用单分片管理器。
 //
 // 刻意**不**在这里同步 dedicated_server_mods_setup.lua：
 // 那是整个服务器共享一份的安装级文件，必须写「所有房间启用模组的并集」。
@@ -477,14 +519,40 @@ func (m *Manager) SaveOverrides(o *Overrides) error {
 // 下载清单与非工坊模组无关：ServerModSetup 只认创意工坊 ID。
 func (o *Overrides) EnabledWorkshopIDs() []string {
 	var ids []string
-	for _, id := range o.Order {
-		if !o.Enabled[id] || !strings.HasPrefix(id, "workshop-") {
+	for id, enabled := range o.Enabled {
+		if !enabled || !strings.HasPrefix(id, "workshop-") {
 			continue
 		}
 		ids = append(ids, strings.TrimPrefix(id, "workshop-"))
 	}
 	sort.Strings(ids)
 	return ids
+}
+
+func (m *Manager) forShard(shard string) *Manager {
+	single := *m
+	single.shards = []string{shard}
+	return &single
+}
+
+// EnabledWorkshopIDs 返回所选全部分片的启用模组并集，不合并各分片的配置参数。
+func (m *Manager) EnabledWorkshopIDs() ([]string, error) {
+	seen := map[string]bool{}
+	for _, shard := range m.shards {
+		o, err := m.forShard(shard).LoadOverrides()
+		if err != nil {
+			return nil, fmt.Errorf("读取 %s 模组配置失败: %w", shard, err)
+		}
+		for _, id := range o.EnabledWorkshopIDs() {
+			seen[id] = true
+		}
+	}
+	ids := make([]string, 0, len(seen))
+	for id := range seen {
+		ids = append(ids, id)
+	}
+	sort.Strings(ids)
+	return ids, nil
 }
 
 // WriteSetupLua 重写 dedicated_server_mods_setup.lua。
@@ -517,7 +585,7 @@ func (m *Manager) WriteSetupLua(ids []string) error {
 // 只统计 workshop- 前缀的条目：本地模组（目录名形式）无法下载，
 // 只能由用户手工放进 mods 目录，不能因为它们缺失而拦住启动。
 func (m *Manager) MissingMods() ([]string, error) {
-	o, err := m.LoadOverrides()
+	ids, err := m.EnabledWorkshopIDs()
 	if err != nil {
 		return nil, err
 	}
@@ -527,12 +595,9 @@ func (m *Manager) MissingMods() ([]string, error) {
 	}
 
 	var missing []string
-	for _, id := range o.Order {
-		if !o.Enabled[id] || !strings.HasPrefix(id, "workshop-") {
-			continue
-		}
-		if !installed[id] {
-			missing = append(missing, id)
+	for _, id := range ids {
+		if !installed["workshop-"+id] {
+			missing = append(missing, "workshop-"+id)
 		}
 	}
 	return missing, nil
@@ -1454,6 +1519,15 @@ func (m *Manager) DeleteMod(id string) error {
 	if dir := m.findModDir(id); dir != "" {
 		dirs = append(dirs, dir)
 	}
+	// 先读完配置，读取失败时保留实体文件，避免留下半次删除。
+	overrides := make(map[string]*Overrides, len(m.shards))
+	for _, shard := range m.shards {
+		o, err := m.forShard(shard).LoadOverrides()
+		if err != nil {
+			return err
+		}
+		overrides[shard] = o
+	}
 	// 清理全部已知副本，包括没有 modinfo.lua 的残缺下载目录。
 	for _, dir := range dirs {
 		info, err := os.Stat(dir)
@@ -1471,18 +1545,23 @@ func (m *Manager) DeleteMod(id string) error {
 		}
 	}
 
-	o, err := m.LoadOverrides()
-	if err != nil {
-		return err
-	}
-	for i, existing := range o.Order {
-		if existing == id {
-			o.Order = append(o.Order[:i], o.Order[i+1:]...)
-			break
+	for _, shard := range m.shards {
+		o := overrides[shard]
+		if _, exists := o.Enabled[id]; !exists {
+			continue
+		}
+		for i, existing := range o.Order {
+			if existing == id {
+				o.Order = append(o.Order[:i], o.Order[i+1:]...)
+				break
+			}
+		}
+		delete(o.Enabled, id)
+		delete(o.Config, id)
+		delete(o.Priority, id)
+		if err := m.forShard(shard).SaveOverrides(o); err != nil {
+			return err
 		}
 	}
-	delete(o.Enabled, id)
-	delete(o.Config, id)
-	delete(o.Priority, id)
-	return m.SaveOverrides(o)
+	return nil
 }

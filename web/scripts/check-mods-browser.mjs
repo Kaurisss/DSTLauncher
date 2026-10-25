@@ -37,6 +37,8 @@ async function openMods({
   failDetails = false, running = false, delayDetails = false, delayMods = false, width = 1280,
   schema = [], config = {}, ugcDir = '', serverLocked = false,
   modItems = mods, brokenIcons = [],
+  shardItems = [{ name: 'Master', worldType: 'forest', isMaster: true }],
+  shardMods = null, statusState = null,
   delayToggle = false,
   updateStatuses = [{ running: false, output: [] }],
 } = {}) {
@@ -57,6 +59,7 @@ async function openMods({
     mods: globalThis.structuredClone(modItems), toggleError: '', configError: '', searchError: '',
     workshopResults: details, searchPages: {}, startError: '', statusError: '',
     listDelay: Promise.resolve(),
+    shardMods: globalThis.structuredClone(shardMods), shardDelays: {}, updateDelays: {},
     updates: { checked: 1, updates: [], missing: [], notInstalled: [] },
   };
   state.mods[1].config = config;
@@ -82,38 +85,47 @@ async function openMods({
     }
     if (url.pathname === '/api/rooms') return ok([{
       id: 2, name: '测试房间', key: 'Cluster_2', gameMode: 'survival', maxPlayers: 4,
-      shards: [{ name: 'Master', worldType: 'forest', isMaster: true }],
+      shards: shardItems,
     }]);
-    if (url.pathname === '/api/status') return ok([{ shard: 'Master', state: running ? 'running' : 'stopped' }]);
+    if (url.pathname === '/api/status') return ok([{ shard: 'Master', state: statusState || (running ? 'running' : 'stopped') }]);
     if (url.pathname === '/api/install') return ok({ installed: true });
     if (url.pathname === '/api/server') return ok({
       installed: true, candidates: [], ugcDir, locked: serverLocked, archOptions: ['auto', '64', '32'],
     });
     if (url.pathname === '/api/mods') {
-      const list = globalThis.structuredClone(state.mods);
-      const delay = state.listDelay;
+      const shard = url.searchParams.get('shard') || 'Master';
+      const list = globalThis.structuredClone(state.shardMods?.[shard] || state.mods);
+      const delay = state.shardDelays[shard] || state.listDelay;
       await waitForMods;
       await delay;
       return ok(list);
     }
     if (url.pathname === '/api/mods/delete') {
       state.mods = state.mods.filter(mod => mod.id !== url.searchParams.get('id'));
+      if (state.shardMods) for (const shard in state.shardMods) state.shardMods[shard] = state.shardMods[shard].filter(mod => mod.id !== url.searchParams.get('id'));
       return ok({});
     }
     if (url.pathname === '/api/mods/toggle') {
       await waitForToggle;
       if (state.toggleError) return fail(state.toggleError);
-      const mod = state.mods.find(mod => mod.id === url.searchParams.get('id'));
+      const list = state.shardMods?.[url.searchParams.get('shard')] || state.mods;
+      const mod = list.find(mod => mod.id === url.searchParams.get('id'));
       if (mod) mod.enabled = url.searchParams.get('enabled') === 'true';
       return ok({});
     }
     if (url.pathname === '/api/mods/config') {
       if (state.configError) return fail(state.configError);
-      const mod = state.mods.find(mod => mod.id === url.searchParams.get('id'));
+      const list = state.shardMods?.[url.searchParams.get('shard')] || state.mods;
+      const mod = list.find(mod => mod.id === url.searchParams.get('id'));
+      if (!mod.config) mod.enabled = true;
       (mod.config ||= {})[url.searchParams.get('key')] = JSON.parse(url.searchParams.get('value'));
       return ok({});
     }
-    if (url.pathname === '/api/mods/updates') return ok(state.updates);
+    if (url.pathname === '/api/mods/updates') {
+      const result = globalThis.structuredClone(state.updates);
+      await state.updateDelays[url.searchParams.get('shard')];
+      return ok(result);
+    }
     if (url.pathname === '/api/mods/schema') return ok(schema);
     if (url.pathname === '/api/workshop/details') {
       await waitForDetails;
@@ -144,6 +156,180 @@ async function openMods({
 async function waitForTitle(page) {
   await page.getByRole('link', { name: '工坊模组 <测试>' }).waitFor();
 }
+
+async function chooseSelect(page, label, option) {
+  await page.getByRole('combobox', { name: label, exact: true }).click();
+  await page.getByRole('option', { name: option }).click();
+}
+
+const shardItems = [
+  { name: 'Surface', worldType: 'forest', isMaster: true },
+  { name: 'Below', worldType: 'cave' },
+  { name: 'Dormant', worldType: 'forest', disabled: true },
+];
+const shardMods = {
+  Surface: [{ id: 'local-shared', name: '独立参数测试', installed: true, enabled: true, config: { amount: 1 } }],
+  Below: [{ id: 'local-shared', name: '独立参数测试', installed: true, enabled: false, config: { amount: 9 } }],
+  Dormant: [{ id: 'local-shared', name: '独立参数测试', installed: true, enabled: false, config: { amount: 7 } }],
+};
+
+test('运行中禁用的模组操作仍可悬停和聚焦查看提示，回车不触发删除', async () => {
+  const { page, requests } = await openMods({ running: true });
+  try {
+    const item = page.getByRole('article', { name: '本地测试模组', exact: true });
+    const remove = item.getByRole('button', { name: '删除', exact: true });
+    assert.equal(await remove.isDisabled(), true);
+    const trigger = remove.locator('..');
+    await trigger.hover();
+    await page.getByRole('tooltip', { name: '删除模组', exact: true }).waitFor();
+    await page.keyboard.press('Escape');
+    await page.getByRole('tooltip').waitFor({ state: 'hidden' });
+    await page.mouse.move(0, 0);
+    await page.keyboard.press('Tab');
+    await trigger.focus();
+    await page.getByRole('tooltip', { name: '删除模组', exact: true }).waitFor();
+    await page.keyboard.press('Enter');
+    assert.equal(requests.filter(request => request.path === '/api/mods/delete').length, 0);
+    assert.equal(await page.getByRole('alertdialog').count(), 0);
+    assert.equal(await page.locator('[title]').count(), 0);
+  } finally { await page.close(); }
+});
+
+test('分片独立启用和保存配置，抽屉锁定分片，停用世界仍可编辑', async () => {
+  const { page, requests, state } = await openMods({ shardItems, shardMods,
+    schema: [{ name: 'amount', label: '分片数量', type: 'number', default: 1 }],
+  });
+  try {
+    const select = page.locator('[data-slot="select-trigger"][aria-label="模组分片"]');
+    assert.match(await select.innerText(), /森林 · Surface/);
+    await select.click();
+    await page.getByRole('option', { name: /洞穴 · Below/ }).waitFor();
+    await page.keyboard.press('Escape');
+    await Promise.all([
+      page.waitForResponse(response => new URL(response.url()).pathname === '/api/mods' && new URL(response.url()).searchParams.get('shard') === 'Below'),
+      chooseSelect(page, '模组分片', /Below/),
+    ]);
+    const entry = page.getByRole('article', { name: '独立参数测试' });
+    await entry.getByRole('switch').click();
+    await page.waitForFunction(() => document.querySelector('.mod [role="switch"]')?.getAttribute('aria-checked') === 'true');
+    await entry.getByRole('button', { name: '配置', exact: true }).click();
+    assert.equal(await select.isDisabled(), true);
+    const input = page.getByLabel('分片数量', { exact: true });
+    assert.equal(await input.inputValue(), '9');
+    await input.fill('4');
+    await page.getByRole('button', { name: '保存配置', exact: true }).click();
+    await page.getByText('模组配置已保存，重启后生效', { exact: true }).waitFor();
+    await page.getByRole('button', { name: '关闭配置', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await chooseSelect(page, '模组分片', /Surface/);
+    await entry.getByRole('button', { name: '配置', exact: true }).click();
+    assert.equal(await input.inputValue(), '1');
+    await input.fill('2');
+    await page.getByRole('button', { name: '关闭配置', exact: true }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: '继续编辑', exact: true }).click();
+    assert.equal(await select.isDisabled(), true);
+    assert.equal(await input.inputValue(), '2');
+    await page.getByRole('button', { name: '关闭配置', exact: true }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: '放弃修改', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await chooseSelect(page, '模组分片', /Dormant/);
+    await entry.getByRole('switch').click();
+    await page.waitForFunction(() => document.querySelector('.mod [role="switch"]')?.getAttribute('aria-checked') === 'true');
+    assert.equal(state.shardMods.Surface[0].config.amount, 1);
+    assert.equal(state.shardMods.Below[0].config.amount, 4);
+    assert.equal(state.shardMods.Dormant[0].enabled, true);
+    assert.deepEqual(requests.filter(request => request.path === '/api/mods/config').map(request => request.params.shard), ['Below']);
+    await page.reload();
+    await entry.waitFor();
+    await chooseSelect(page, '模组分片', /Below/);
+    await entry.getByRole('button', { name: '配置', exact: true }).click();
+    assert.equal(await input.inputValue(), '4');
+  } finally { await page.close(); }
+});
+
+test('分片慢列表和更新响应不会覆盖新选择', async () => {
+  const { page, state } = await openMods({ shardItems, shardMods });
+  let releaseList;
+  let releaseUpdate;
+  try {
+    state.shardDelays.Below = new Promise(resolve => { releaseList = resolve; });
+    await Promise.all([
+      page.waitForRequest(request => new URL(request.url()).pathname === '/api/mods' && new URL(request.url()).searchParams.get('shard') === 'Below'),
+      chooseSelect(page, '模组分片', /Below/),
+    ]);
+    await chooseSelect(page, '模组分片', /Surface/);
+    await page.getByRole('article', { name: '独立参数测试' }).waitFor();
+    const oldResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/mods' && new URL(response.url()).searchParams.get('shard') === 'Below');
+    releaseList();
+    await oldResponse;
+    assert.equal(await page.locator('.mod').getByRole('switch').getAttribute('aria-checked'), 'true');
+    state.updateDelays.Surface = new Promise(resolve => { releaseUpdate = resolve; });
+    state.updates = { checked: 1, updates: [{ id: 'local-shared', localTime: 1, remoteTime: 2 }], missing: [], notInstalled: [] };
+    await Promise.all([
+      page.waitForRequest(request => new URL(request.url()).pathname === '/api/mods/updates'),
+      page.getByRole('button', { name: '检查更新', exact: true }).click(),
+    ]);
+    await chooseSelect(page, '模组分片', /Below/);
+    await page.getByRole('article', { name: '独立参数测试' }).waitFor();
+    const updateResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/mods/updates');
+    releaseUpdate();
+    await updateResponse;
+    assert.equal(await page.getByText('有新版本', { exact: true }).count(), 0);
+    assert.equal(await page.locator('.mod').getByRole('switch').getAttribute('aria-checked'), 'false');
+  } finally { releaseList?.(); releaseUpdate?.(); await page.close(); }
+});
+
+test('停止中的房间冻结各分片启用和配置', async () => {
+  const { page } = await openMods({ shardItems, shardMods, statusState: 'stopping', width: 375,
+    schema: [{ name: 'amount', label: '分片数量', type: 'number', default: 1 }],
+  });
+  try {
+    await page.getByText('服务器运行中，模组修改已冻结。', { exact: true }).waitFor();
+    await chooseSelect(page, '模组分片', /Below/);
+    const entry = page.getByRole('article', { name: '独立参数测试' });
+    assert.equal(await entry.getByRole('switch').isDisabled(), true);
+    await entry.getByRole('button', { name: '配置', exact: true }).click();
+    assert.equal(await page.getByLabel('分片数量', { exact: true }).isDisabled(), true);
+    assert.equal(await page.getByRole('button', { name: '保存配置', exact: true }).isDisabled(), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  } finally { await page.close(); }
+});
+
+test('工坊添加后的启用操作只写所选分片', async () => {
+  const { page, state, requests } = await openMods({ shardItems,
+    shardMods: { Surface: globalThis.structuredClone(mods), Below: globalThis.structuredClone(mods) },
+  });
+  try {
+    await chooseSelect(page, '模组分片', /Below/);
+    await page.locator('.mod').nth(1).waitFor();
+    await page.getByRole('button', { name: '添加模组', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: '添加模组', exact: true });
+    await dialog.getByRole('textbox', { name: '搜索创意工坊' }).fill('1207269058');
+    await dialog.getByRole('button', { name: '查询', exact: true }).click();
+    const item = dialog.getByRole('article').filter({ hasText: '已下载的工坊标题' });
+    await Promise.all([
+      page.waitForResponse(response => new URL(response.url()).pathname === '/api/mods/toggle'),
+      item.getByRole('button', { name: '启用', exact: true }).click(),
+    ]);
+    assert.equal(state.shardMods.Surface[1].enabled, false);
+    assert.equal(state.shardMods.Below[1].enabled, true);
+    assert.equal(requests.find(request => request.path === '/api/mods/toggle').params.shard, 'Below');
+  } finally { await page.close(); }
+});
+
+test('保存配置后条目离开禁用筛选时释放分片选择锁', async () => {
+  const { page } = await openMods({ shardItems,
+    shardMods: { Surface: [{ id: 'local-new', name: '未配置模组', enabled: false, installed: true }] },
+    schema: [{ name: 'amount', label: '分片数量', type: 'number', default: 1 }],
+  });
+  try {
+    await chooseSelect(page, '模组状态', /已禁用/);
+    await page.getByRole('button', { name: '配置', exact: true }).click();
+    await page.getByRole('button', { name: '保存配置', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    assert.equal(await page.getByRole('combobox', { name: '模组分片', exact: true }).isDisabled(), false);
+  } finally { await page.close(); }
+});
 
 test('未知默认值保持未设置，保留已有配置和显式空值，手动编辑后才提交', async () => {
   const { page, requests } = await openMods({
@@ -286,7 +472,8 @@ test('封面列表的骨架行与真实条目在桌面、窄屏下保持同高�
     try {
       const measure = selector => page.locator(selector).evaluateAll(items => {
         const rects = items.map(el => el.getBoundingClientRect());
-        return { height: rects[0].height, gap: rects[1].top - rects[0].bottom };
+        // 入场平移会产生浮点舍入误差，保留千分之一像素后再比较。
+        return { height: Number(rects[0].height.toFixed(3)), gap: Number((rects[1].top - rects[0].bottom).toFixed(3)) };
       });
       const skeleton = await measure('.mod-skeleton .mod');
       releaseMods();
@@ -404,12 +591,11 @@ test('本地搜索和状态筛选即时响应开关，刷新后仍保留筛选�
   const { page, requests } = await openMods();
   try {
     await waitForTitle(page);
-    const filter = page.getByRole('combobox', { name: '模组状态' });
-    await filter.selectOption('enabled');
+    await chooseSelect(page, '模组状态', /已启用/);
     assert.equal(await page.locator('.mod').count(), 1);
     await page.locator('.mod').getByRole('switch').click();
     await page.getByText('没有匹配的模组', { exact: true }).waitFor();
-    await filter.selectOption('disabled');
+    await chooseSelect(page, '模组状态', /已禁用/);
     assert.equal(await page.locator('.mod').count(), 4);
     const search = page.getByRole('textbox', { name: '搜索模组', exact: true });
     await search.fill('本地已下载名称');

@@ -9,6 +9,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import Icon from '@/components/ui/Icon.vue';
 import { useLogs } from '@/composables/useLogs.js';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -105,8 +106,13 @@ async function submit() {
       </div>
 
       <div class="log-pane-tools">
-        <label class="log-autoscroll" title="关闭后可以安静地往上翻历史，滚回底部会自动重新打开">
-          <Switch v-model="autoscroll" :aria-label="`${label} 自动滚动`" />
+        <label class="log-autoscroll">
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <Switch v-model="autoscroll" :aria-label="`${label} 自动滚动`" />
+            </TooltipTrigger>
+            <TooltipContent>关闭后可以安静地往上翻历史，滚回底部会自动重新打开</TooltipContent>
+          </Tooltip>
           <span>自动滚动</span>
         </label>
         <Button variant="ghost" size="sm" @click="clear(shard)">清屏</Button>

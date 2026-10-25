@@ -19,18 +19,31 @@ import UiPill from '@/components/ui/UiPill.vue';
 import UiSkeleton from '@/components/ui/UiSkeleton.vue';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ModItem from '@/components/mods/ModItem.vue';
 import WorkshopPanel from '@/components/mods/WorkshopPanel.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { modApi, modUpdateApi, workshopApi } from '@/lib/api.js';
 import { guard, toast } from '@/lib/toast.js';
 import { confirmAction } from '@/lib/confirm.js';
+import { shardLabel } from '@/lib/format.js';
 
 const rooms = useRoomsStore();
+const shard = ref('');
+const shards = computed(() => rooms.current?.shards || []);
+const configOpen = ref(false);
+const busyItems = ref([]);
+function setItemBusy(id, busy) {
+  busyItems.value = busy ? [...new Set([...busyItems.value, id])] : busyItems.value.filter(value => value !== id);
+}
+function labelOf(item) {
+  return `${shardLabel(item.name, rooms.current?.locations?.[item.name] || item.worldType)} · ${item.name}${item.disabled ? '（已停用）' : ''}`;
+}
 
 /** 服务器运行中冻结：模组改动重启后才生效 */
-const frozen = computed(() => rooms.running);
+const frozen = computed(() => rooms.starting || rooms.current?.running
+  || rooms.statuses.some(status => ['running', 'starting', 'stopping'].includes(status.state)));
 
 const mods = ref([]);
 const loading = ref(false);
@@ -95,7 +108,8 @@ const missingCount = computed(() =>
 async function load() {
   const request = ++loadRequest;
   const room = rooms.current;
-  if (!room) {
+  const target = shard.value;
+  if (!room || !target) {
     mods.value = [];
     loadError.value = '';
     return;
@@ -103,8 +117,8 @@ async function load() {
   loading.value = true;
   loadError.value = '';
   try {
-    const list = (await modApi.list(room.id)) || [];
-    if (disposed || request !== loadRequest) return;
+    const list = (await modApi.list(room.id, target)) || [];
+    if (disposed || request !== loadRequest || shard.value !== target || rooms.currentId !== room.id) return;
     mods.value = list;
     loadWorkshopDetails(list.filter(mod => !mod.iconUrl || !mod.name || mod.name === mod.id));
   } catch (err) {
@@ -117,6 +131,7 @@ async function load() {
 /* ---------- 更新检查 ---------- */
 
 const checking = ref(false);
+let checkRequest = 0;
 /** { checked, updates, missing }；null 表示还没查过 */
 const checkResult = ref(null);
 
@@ -135,14 +150,16 @@ async function checkUpdates() {
   const room = rooms.current;
   if (!room || checking.value) return;
   checking.value = true;
+  const target = shard.value;
+  const request = ++checkRequest;
   try {
-    const result = await modUpdateApi.check(room.id);
-    if (!disposed && rooms.currentId === room.id) checkResult.value = result;
+    const result = await modUpdateApi.check(room.id, target);
+    if (!disposed && request === checkRequest && rooms.currentId === room.id && shard.value === target) checkResult.value = result;
     return result;
   } catch (err) {
-    toast('检查更新失败：' + err.message, 'err');
+    if (!disposed && request === checkRequest) toast('检查更新失败：' + err.message, 'err');
   } finally {
-    checking.value = false;
+    if (request === checkRequest) checking.value = false;
   }
 }
 
@@ -241,6 +258,8 @@ function startPoll() {
 // 检查与下载分开：确认后才修改跨房间共享的模组文件。
 async function updateAll() {
   const result = checkResult.value;
+  const target = shard.value;
+  const roomId = rooms.currentId;
   if (!result) return;
   const todo = new Set();
   for (const u of result.updates || []) todo.add(u.id);
@@ -257,7 +276,7 @@ async function updateAll() {
     confirmText: '开始更新',
   })) return;
 
-  await enqueue([...todo]);
+  if (target === shard.value && roomId === rooms.currentId) await enqueue([...todo]);
 }
 
 async function enqueue(ids) {
@@ -307,11 +326,12 @@ function onToggled(id, enabled) {
 
 async function enableOne(id) {
   const room = rooms.current;
+  const target = shard.value;
   if (!room || frozen.value || pendingIds.value.includes(id)) return;
   pendingIds.value = [...pendingIds.value, id];
   try {
-    const { ok } = await guard(() => modApi.toggle(room.id, id, true), { success: '模组已启用' });
-    if (ok && !disposed && room.id === rooms.currentId) await load();
+    const { ok } = await guard(() => modApi.toggle(room.id, id, true, target), { success: '模组已启用' });
+    if (ok && !disposed && room.id === rooms.currentId && shard.value === target) await load();
   } finally {
     pendingIds.value = pendingIds.value.filter(value => value !== id);
   }
@@ -328,7 +348,6 @@ async function stopUpdate() {
 }
 
 onMounted(async () => {
-  await load();
   if (disposed) return;
   // 面板重启后若上次更新还没结束，恢复轮询而不是丢掉进度
   await pollUpdate();
@@ -341,10 +360,22 @@ onUnmounted(() => {
 // 用 current 而不是 currentId 做触发：刷新页面时 currentId 从 localStorage
 // 恢复、值不变，watch 不会触发，列表就一直空着；而 current 要等房间列表
 // 加载完才从 null 变成房间对象，正好在数据就绪时拉一次模组列表
-watch(() => rooms.current, () => {
+watch([() => rooms.current?.id, () => shards.value.map(item => item.name).join('\0')], ([id], [previousId] = []) => {
+  if (id !== previousId || !shards.value.some(item => item.name === shard.value)) {
+    shard.value = (shards.value.find(item => item.isMaster && !item.disabled)
+      || shards.value.find(item => item.isMaster) || shards.value[0])?.name || '';
+  }
+}, { immediate: true });
+watch([() => rooms.current, shard], () => {
+  loadRequest++;
+  checkRequest++;
+  checking.value = false;
   checkResult.value = null;
+  mods.value = [];
+  configOpen.value = false;
+  busyItems.value = [];
   load();
-});
+}, { immediate: true });
 </script>
 
 <template>
@@ -352,6 +383,16 @@ watch(() => rooms.current, () => {
     <UiCard>
       <template #title>模组管理</template>
       <template #actions>
+        <Select v-if="rooms.current" v-model="shard" :disabled="configOpen || busyItems.length > 0 || workshopOpen || queueing || pendingIds.length > 0">
+          <SelectTrigger aria-label="模组分片" class="w-full min-w-0 sm:w-52">
+            <SelectValue placeholder="选择分片" />
+          </SelectTrigger>
+          <SelectContent position="popper">
+            <SelectGroup>
+              <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ labelOf(item) }}</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
         <Button
           variant="outline" size="sm"
           :disabled="!rooms.current || updating || checking || queueing"
@@ -378,7 +419,12 @@ watch(() => rooms.current, () => {
         >
           更新日志
         </Button>
-        <Button variant="ghost" size="icon-sm" :disabled="loading" aria-label="刷新" title="刷新模组列表" @click="load"><Icon name="refresh" size="16" /></Button>
+        <Tooltip>
+          <TooltipTrigger as="span" :as-child="!loading" class="inline-flex" :tabindex="loading ? 0 : undefined">
+            <Button variant="ghost" size="icon-sm" :disabled="loading" aria-label="刷新" @click="load"><Icon name="refresh" size="16" /></Button>
+          </TooltipTrigger>
+          <TooltipContent>刷新模组列表</TooltipContent>
+        </Tooltip>
       </template>
 
       <UiSkeleton v-if="!rooms.loaded" variant="mod" :rows="4" />
@@ -426,20 +472,28 @@ watch(() => rooms.current, () => {
         </p>
         <div v-if="mods.length" class="mb-4 flex flex-wrap items-center gap-3">
           <Input v-model="search" class="min-w-0 flex-1 sm:max-w-sm" aria-label="搜索模组" placeholder="搜索模组名称或 ID" />
-          <NativeSelect v-model="filter" aria-label="模组状态" class="w-full sm:w-40">
-            <NativeSelectOption value="all">全部 {{ mods.length }}</NativeSelectOption>
-            <NativeSelectOption value="enabled">已启用 {{ enabledCount }}</NativeSelectOption>
-            <NativeSelectOption value="disabled">已禁用 {{ mods.length - enabledCount }}</NativeSelectOption>
-            <NativeSelectOption value="missing">未下载 {{ mods.filter(mod => !mod.installed).length }}</NativeSelectOption>
-            <NativeSelectOption value="updates">有更新 {{ updatesCount }}</NativeSelectOption>
-          </NativeSelect>
+          <Select v-model="filter">
+            <SelectTrigger aria-label="模组状态" class="w-full sm:w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem value="all">全部 {{ mods.length }}</SelectItem>
+                <SelectItem value="enabled">已启用 {{ enabledCount }}</SelectItem>
+                <SelectItem value="disabled">已禁用 {{ mods.length - enabledCount }}</SelectItem>
+                <SelectItem value="missing">未下载 {{ mods.filter(mod => !mod.installed).length }}</SelectItem>
+                <SelectItem value="updates">有更新 {{ updatesCount }}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
           <span class="ml-auto text-sm tabular-nums text-muted-foreground">已启用 {{ enabledCount }} / {{ mods.length }}</span>
         </div>
         <template v-if="visibleMods.length">
           <ModItem
             v-for="m in visibleMods"
-            :key="m.id"
+            :key="`${shard}:${m.id}`"
             :mod="m"
+            :shard="shard"
             :update-info="updateMap[m.id] || null"
             :downloading="busyIds.includes(m.id)"
             :updating="updating || queueing"
@@ -447,6 +501,8 @@ watch(() => rooms.current, () => {
             @update="startOne"
             @toggled="enabled => onToggled(m.id, enabled)"
             @cover-needed="loadWorkshopDetails([m])"
+            @config-open="configOpen = $event"
+            @busy="setItemBusy(m.id, $event)"
           />
         </template>
         <div v-else class="grid justify-items-center gap-3 rounded-lg border border-dashed p-10">

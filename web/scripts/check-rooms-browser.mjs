@@ -120,6 +120,35 @@ const uploadButton = page => page.getByRole('button', { name: '上传存档', ex
 const uploadDialog = page => page.getByRole('dialog', { name: '上传存档', exact: true });
 async function pickZip(dialog, file = zip) { await dialog.locator('input[type=file]').setInputFiles(file); }
 
+test('分片编辑的禁用输入与选择框可查看提示，新分片选择类型仍可操作', async () => {
+  const { page, close } = await openRooms();
+  try {
+    await card(page).getByRole('button', { name: '编辑', exact: true }).click();
+    const master = page.locator('.shard-card').first();
+    const input = master.getByRole('textbox', { name: '世界名', exact: true });
+    assert.equal(await input.isDisabled(), true);
+    await input.locator('..').hover();
+    await page.getByRole('tooltip', { name: '存档目录名，保存后不可修改', exact: true }).waitFor();
+    await page.keyboard.press('Escape');
+    await page.getByRole('tooltip').waitFor({ state: 'hidden' });
+    await page.mouse.move(0, 0);
+    await master.getByRole('combobox', { name: '世界类型', exact: true }).locator('..').hover();
+    await page.getByRole('tooltip', { name: '存档类型', exact: true }).waitFor();
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-slot="tooltip-content"]')].some(element => {
+      const rect = element.getBoundingClientRect();
+      return element.textContent.includes('存档类型') && rect.top >= 0 && rect.bottom <= window.innerHeight;
+    }));
+    await page.keyboard.press('Escape');
+    await page.getByRole('button', { name: '添加世界', exact: true }).click();
+    const added = page.locator('.shard-card').last();
+    await added.getByRole('textbox', { name: '世界名', exact: true }).fill('Another');
+    await added.getByRole('combobox', { name: '世界类型', exact: true }).click();
+    await page.getByRole('option', { name: '洞穴型', exact: true }).click();
+    assert.match(await added.getByRole('combobox').innerText(), /洞穴型/);
+    assert.equal(await page.locator('[title]').count(), 0);
+  } finally { await close(); }
+});
+
 test('新建进入独立二级页，返回不保存；保存中禁止返回，成功后回到列表并选择新房间', async () => {
   const { page, state, releaseSave, close } = await openRooms({ delaySave: true });
   try {

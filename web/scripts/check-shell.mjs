@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url';
 import { runInNewContext } from 'node:vm';
 import { setTimeout as wait } from 'node:timers/promises';
 import { createPinia, setActivePinia } from 'pinia';
-import { createSSRApp } from 'vue';
+import { createSSRApp, h } from 'vue';
 import { renderToString } from 'vue/server-renderer';
 import { createServer } from 'vite';
 
@@ -46,6 +46,7 @@ const { useProcessControl } = await vite.ssrLoadModule('/src/composables/useProc
 const { default: Banner } = await vite.ssrLoadModule('/src/components/CurrentRoomBanner.vue');
 const { default: RoomCard } = await vite.ssrLoadModule('/src/components/rooms/RoomCard.vue');
 const { default: ShardList } = await vite.ssrLoadModule('/src/components/overview/ShardList.vue');
+const { TooltipProvider } = await vite.ssrLoadModule('/src/components/ui/tooltip/index.js');
 const logs = useLogs();
 let pinia;
 beforeEach(() => {
@@ -81,7 +82,9 @@ test('分片显示名按存档 location：森林/洞穴/海难/火山，不显�
   }];
   rooms.currentId = 1;
   rooms.statuses = rooms.list[0].shards.map(shard => ({ shard: shard.name, state: 'stopped' }));
-  const list = await renderToString(createSSRApp(ShardList).use(pinia));
+  const list = await renderToString(createSSRApp({
+    render: () => h(TooltipProvider, null, () => h(ShardList)),
+  }).use(pinia));
   for (const text of ['海难', '洞穴', '火山']) assert.ok(list.includes(text), `分片列表缺少 ${text}`);
   assert.ok(!list.includes('>Master<') && !list.includes('>Caves<'), '不应显示目录名');
   const card = await renderToString(createSSRApp(RoomCard, { room: rooms.list[0] }).use(pinia));
@@ -298,7 +301,9 @@ test('只启动一个分片时，其余分片仍保留启动按钮', async () =>
   // 后端只返回有进程记录的分片：只开了 Master
   rooms.statuses = [{ shard: 'Master', state: 'running', pid: 28924, port: 11002 }];
 
-  const html = await renderToString(createSSRApp(ShardList).use(pinia));
+  const html = await renderToString(createSSRApp({
+    render: () => h(TooltipProvider, null, () => h(ShardList)),
+  }).use(pinia));
   const rows = html.match(/class="shard-row"/g) || [];
   assert.equal(rows.length, 4, '每个启用分片都要有一行');
   for (const label of ['森林', '洞穴', '海难', '火山']) {

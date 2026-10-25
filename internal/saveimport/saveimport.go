@@ -59,6 +59,8 @@ type ShardSave struct {
 	HasOverride bool
 	// OverrideSrc 记录世界配置来自哪个文件，用于在界面上说明来源。
 	OverrideSrc string
+	// Mods 为 nil 表示来源未带配置；空 Overrides 表示明确清空此分片。
+	Mods *modmgr.Overrides
 }
 
 // Parsed 是一份上传存档解析后的结果。
@@ -74,10 +76,6 @@ type Parsed struct {
 	Token    string
 	HasToken bool
 
-	// Mods 是存档里带来的模组配置（各分片的 modoverrides.lua）。
-	// 面板的模型是「一个房间一份、所有分片共用」，因此这里只保留一份
-	// （以地表为准），由调用方经 modmgr 写回目标房间的全部分片。
-	Mods    *modmgr.Overrides
 	HasMods bool
 
 	// 三份玩家名单的原文。Has* 表示存档里确实有该文件——

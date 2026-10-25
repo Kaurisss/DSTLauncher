@@ -6,6 +6,7 @@ import {
   Folder01Icon, PackageIcon, ServerStack01Icon, Settings02Icon,
 } from '@hugeicons/core-free-icons';
 import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem,
@@ -66,8 +67,18 @@ function navigate(key) {
     <SidebarSeparator />
     <SidebarFooter class="gap-2 p-4 group-data-[collapsible=icon]:hidden">
       <Badge variant="secondary">日志 {{ connected ? '已连接' : '未连接' }}</Badge>
-      <p v-if="panelVersion" class="truncate text-xs text-muted-foreground" title="面板版本号，重建后可据此确认构建">面板 {{ panelVersion }}</p>
-      <p class="truncate text-xs text-muted-foreground" :title="serverText">{{ serverText }}</p>
+      <Tooltip v-if="panelVersion">
+        <TooltipTrigger as-child>
+          <p class="truncate text-xs text-muted-foreground" tabindex="0">面板 {{ panelVersion }}</p>
+        </TooltipTrigger>
+        <TooltipContent>面板版本号，重建后可据此确认构建</TooltipContent>
+      </Tooltip>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <p class="truncate text-xs text-muted-foreground" tabindex="0">{{ serverText }}</p>
+        </TooltipTrigger>
+        <TooltipContent>{{ serverText }}</TooltipContent>
+      </Tooltip>
     </SidebarFooter>
   </Sidebar>
 </template>

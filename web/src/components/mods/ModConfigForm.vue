@@ -17,6 +17,7 @@ import { toast } from '@/lib/toast.js';
 
 const props = defineProps({
   roomId: { type: Number, required: true },
+  shard: { type: String, required: true },
   mod: { type: Object, required: true },
   /** 服务器运行中冻结：控件只读、禁止保存 */
   disabled: { type: Boolean, default: false },
@@ -98,6 +99,7 @@ async function save() {
     return;
   }
   saving.value = true;
+  const { roomId, shard, mod } = props;
   try {
     for (const o of schema.value) {
       const type = fieldType(o);
@@ -109,7 +111,7 @@ async function save() {
       else if (type === 'boolean') value = raw === true || raw === 'true' ? 'true' : 'false';
       else value = JSON.stringify(raw == null ? '' : String(raw));
 
-      await modApi.setConfig(props.roomId, props.mod.id, o.name, value);
+      await modApi.setConfig(roomId, mod.id, o.name, value, shard);
       initialValues[o.name] = values[o.name];
     }
     toast('模组配置已保存，重启后生效');

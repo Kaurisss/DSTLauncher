@@ -5,6 +5,7 @@ import { computed } from 'vue';
 
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
 import { useProcessControl } from '@/composables/useProcessControl.js';
@@ -76,13 +77,21 @@ function staleTip(s) {
     <div v-for="s in rows" :key="s.shard" class="shard-row">
       <span class="dot" :class="s.state" />
       <span class="shard-name">{{ label(s) }}</span>
-      <span v-if="staleVersion(s)" class="pill pill-warn" :title="staleTip(s)">需重启</span>
+      <Tooltip v-if="staleVersion(s)">
+        <TooltipTrigger as-child><span class="pill pill-warn" tabindex="0">需重启</span></TooltipTrigger>
+        <TooltipContent>{{ staleTip(s) }}</TooltipContent>
+      </Tooltip>
       <span class="shard-meta">{{ meta(s) }}</span>
       <!-- 占用率按「占整机」口径，与任务管理器一致 -->
-      <span v-if="isLive(s)" class="shard-res" title="CPU 按占整机计算（任务管理器口径）">
-        <span>CPU <span class="res-val">{{ cpuText(s) }}</span></span>
-        <span>内存 <span class="res-val">{{ memText(s) }}</span></span>
-      </span>
+      <Tooltip v-if="isLive(s)">
+        <TooltipTrigger as-child>
+          <span class="shard-res" tabindex="0">
+            <span>CPU <span class="res-val">{{ cpuText(s) }}</span></span>
+            <span>内存 <span class="res-val">{{ memText(s) }}</span></span>
+          </span>
+        </TooltipTrigger>
+        <TooltipContent>CPU 按占整机计算（任务管理器口径）</TooltipContent>
+      </Tooltip>
       <span class="shard-actions">
         <template v-if="isLive(s)">
           <Button variant="destructive" size="sm" :disabled="rooms.starting" @click="proc.stop(s.shard)">停止</Button>

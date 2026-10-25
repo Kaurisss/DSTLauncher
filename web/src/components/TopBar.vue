@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { SidebarTrigger } from '@/components/ui/sidebar';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useUiStore } from '@/stores/ui.js';
 import { useTheme } from '@/composables/useTheme.js';
@@ -46,12 +47,12 @@ function onTheme() {
   <header class="sticky top-0 z-20 flex h-14 w-full min-w-0 shrink-0 items-center bg-sidebar text-sidebar-foreground">
     <!-- 左侧：与侧边栏图标列严格对齐的触发按钮区域 -->
     <div class="flex h-14 w-11 sm:w-12 shrink-0 items-center justify-center">
-      <SidebarTrigger
-        aria-controls="app-navigation"
-        aria-label="切换导航"
-        title="展开或收起导航"
-        size="icon"
-      />
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <SidebarTrigger aria-controls="app-navigation" aria-label="切换导航" size="icon" />
+        </TooltipTrigger>
+        <TooltipContent>展开或收起导航</TooltipContent>
+      </Tooltip>
     </div>
 
     <!-- 品牌标识与标题 -->
@@ -72,7 +73,12 @@ function onTheme() {
     <div class="hidden md:flex min-w-0 items-center gap-2 pl-1">
       <Separator orientation="vertical" class="h-4 bg-sidebar-border" />
       <h1 class="shrink-0 text-sm font-medium text-sidebar-foreground">{{ pageTitle }}</h1>
-      <span class="text-xs text-muted-foreground truncate" :title="pageSub">· {{ pageSub }}</span>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <span class="text-xs text-muted-foreground truncate" tabindex="0">· {{ pageSub }}</span>
+        </TooltipTrigger>
+        <TooltipContent>{{ pageSub }}</TooltipContent>
+      </Tooltip>
     </div>
 
     <!-- 右侧：房间 + 主题 -->
@@ -96,10 +102,15 @@ function onTheme() {
           </SelectContent>
         </Select>
       </Field>
-      <Button variant="outline" size="sm" class="shrink-0 px-2 sm:pl-2 sm:pr-2.5 bg-background/80" :title="themeTitle" aria-label="切换主题" @click="onTheme">
-        <HugeiconsIcon :icon="themeIcon" aria-hidden="true" />
-        <span class="hidden sm:inline">{{ theme.label.value }}</span>
-      </Button>
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button variant="outline" size="sm" class="shrink-0 px-2 sm:pl-2 sm:pr-2.5 bg-background/80" aria-label="切换主题" @click="onTheme">
+            <HugeiconsIcon :icon="themeIcon" aria-hidden="true" />
+            <span class="hidden sm:inline">{{ theme.label.value }}</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent class="whitespace-pre-line">{{ themeTitle }}</TooltipContent>
+      </Tooltip>
     </div>
   </header>
 </template>

@@ -5,8 +5,20 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"strings"
 	"testing"
 )
+
+func TestFullModUpdateReportsShardReadFailureBeforeLaunching(t *testing.T) {
+	manager := NewManager(t.TempDir(), t.TempDir(), t.TempDir())
+	manager.SetModsChecker(func() ([]string, error) { return nil, fmt.Errorf("Caves/modoverrides.lua 不可读") })
+	if manager.runFullUpdate(nil, "Master", "unused", "unused", func(string, ...interface{}) {}, func(string) {}) {
+		t.Fatal("配置读取失败不应启动下载或报告完成")
+	}
+	if !strings.Contains(manager.ModsUpdateStatus().Error, "Caves/modoverrides.lua 不可读") {
+		t.Fatal(manager.ModsUpdateStatus())
+	}
+}
 
 func TestWorkshopDirectoryUsedForLoadingAndDownloading(t *testing.T) {
 	manager := NewManager(t.TempDir(), t.TempDir(), t.TempDir())

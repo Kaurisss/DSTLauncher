@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { after, beforeEach, mock, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createPinia, setActivePinia } from 'pinia';
-import { createSSRApp } from 'vue';
+import { createSSRApp, h } from 'vue';
 import { renderToString } from 'vue/server-renderer';
 import { createServer } from 'vite';
 
@@ -27,6 +27,7 @@ const { confirmAction, confirmState, handleCancel, handleConfirm } = await vite.
 const { default: RoomEditor } = await vite.ssrLoadModule('/src/components/rooms/RoomEditor.vue');
 const { default: ShardEditor } = await vite.ssrLoadModule('/src/components/rooms/ShardEditor.vue');
 const { default: RoomAdmins } = await vite.ssrLoadModule('/src/components/rooms/RoomAdmins.vue');
+const { TooltipProvider } = await vite.ssrLoadModule('/src/components/ui/tooltip/index.js');
 
 let pinia;
 beforeEach(() => {
@@ -73,14 +74,16 @@ test('房间编辑表单：保留数字、布尔、空值与字符串修整的�
   };
   rooms.list = [existingRoom];
 
-  const app = createSSRApp(RoomEditor, {
-    room: existingRoom,
-    meta: {
-      gameModes: ['survival', 'endless', 'wilderness'],
-      tickRates: [15, 30, 60],
-      languages: ['zh', 'en'],
-      defaults: { name: '默认名' },
-    },
+  const app = createSSRApp({
+    render: () => h(TooltipProvider, null, () => h(RoomEditor, {
+      room: existingRoom,
+      meta: {
+        gameModes: ['survival', 'endless', 'wilderness'],
+        tickRates: [15, 30, 60],
+        languages: ['zh', 'en'],
+        defaults: { name: '默认名' },
+      },
+    })),
   });
   app.use(pinia);
   const html = await renderToString(app);
@@ -111,9 +114,8 @@ test('分片约束：已有分片不可改名，主分片不可删除与停用',
     { name: 'Master', worldType: 'forest', isMaster: true, disabled: false, gameId: 1 },
     { name: 'Caves', worldType: 'cave', isMaster: false, disabled: true, gameId: 2 },
   ];
-  const app = createSSRApp(ShardEditor, {
-    shards,
-    roomIsNew: false,
+  const app = createSSRApp({
+    render: () => h(TooltipProvider, null, () => h(ShardEditor, { shards, roomIsNew: false })),
   });
   app.use(pinia);
   const html = await renderToString(app);
@@ -121,7 +123,7 @@ test('分片约束：已有分片不可改名，主分片不可删除与停用',
   assert.ok(html.includes('主世界'));
   assert.ok(html.includes('进服落点，不可停用'));
   // 主世界没有删除按钮
-  const trashCount = (html.match(/title="从面板移除（存档目录保留）"/g) || []).length;
+  const trashCount = (html.match(/aria-label="从面板移除（存档目录保留）"/g) || []).length;
   assert.equal(trashCount, 1, '只有非主分片有删除按钮');
 });
 

@@ -177,12 +177,12 @@ export const serverApi = {
 /* ---------- 模组 ---------- */
 
 export const modApi = {
-  list: roomId => request('/api/mods', { params: { room: roomId } }),
-  toggle: (roomId, id, enabled) => request('/api/mods/toggle', {
-    params: { room: roomId, id, enabled },
+  list: (roomId, shard) => request('/api/mods', { params: { room: roomId, shard } }),
+  toggle: (roomId, id, enabled, shard) => request('/api/mods/toggle', {
+    params: { room: roomId, id, enabled, shard },
   }),
-  setConfig: (roomId, id, key, value) => request('/api/mods/config', {
-    params: { room: roomId, id, key, value },
+  setConfig: (roomId, id, key, value, shard) => request('/api/mods/config', {
+    params: { room: roomId, id, key, value, shard },
   }),
   schema: (roomId, id) => request('/api/mods/schema', { params: { room: roomId, id } }),
   remove: (roomId, id) => request('/api/mods/delete', { params: { room: roomId, id } }),
@@ -211,7 +211,7 @@ export const modUpdateApi = {
    * 检查房间启用的工坊模组有没有新版。
    * 返回 { checked, updates: [{id,name,localTime,remoteTime}], missing }
    */
-  check: roomId => request('/api/mods/updates', { params: { room: roomId } }),
+  check: (roomId, shard) => request('/api/mods/updates', { params: { room: roomId, shard } }),
 };
 
 /* ---------- 创意工坊 ---------- */

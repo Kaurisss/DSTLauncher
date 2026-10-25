@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import UiStat from '@/components/ui/UiStat.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { hostApi } from '@/lib/api.js';
 import { fmtSize } from '@/lib/format.js';
 
@@ -62,14 +63,19 @@ onUnmounted(() => {
         icon="cpu"
         :tone="memoryLow ? 'warn' : ''"
       />
-      <UiStat
-        label="存档盘可用空间"
-        :value="disk ? fmtSize(disk.availableBytes) : '—'"
-        :sub="disk ? '总容量 ' + fmtSize(disk.totalBytes) : (errors.length ? '读取失败' : '读取中…')"
-        :title="snapshot?.diskPath"
-        icon="folder"
-        :tone="diskLow ? 'warn' : ''"
-      />
+      <Tooltip :disabled="!snapshot?.diskPath">
+        <TooltipTrigger as-child>
+          <UiStat
+            label="存档盘可用空间"
+            :value="disk ? fmtSize(disk.availableBytes) : '—'"
+            :sub="disk ? '总容量 ' + fmtSize(disk.totalBytes) : (errors.length ? '读取失败' : '读取中…')"
+            :tabindex="snapshot?.diskPath ? 0 : undefined"
+            icon="folder"
+            :tone="diskLow ? 'warn' : ''"
+          />
+        </TooltipTrigger>
+        <TooltipContent class="break-all">{{ snapshot?.diskPath }}</TooltipContent>
+      </Tooltip>
     </div>
     <div v-if="warnings.length || errors.length" role="status" class="grid gap-1 break-words text-sm text-amber-700 dark:text-amber-400">
       <p v-for="message in [...warnings, ...errors]" :key="message">{{ message }}</p>

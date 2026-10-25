@@ -517,24 +517,42 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 服务器以 -skip_update_server_mods 启动，缺模组会直接加载失败；
-	// 提前拦下比让用户去翻日志省事
-	if s.mgr.UgcDir() != "" {
-		if missing, err := s.modsFor(rm).MissingMods(); err == nil && len(missing) > 0 {
-			respond(w, 200, nil, fmt.Errorf(
-				"以下模组尚未下载：%s。请先到「模组」页点击「更新模组」",
-				strings.Join(missing, "、")))
-			return
-		}
-	}
-
 	shard := query(r, "shard")
+	if err := s.checkShardMods(rm, shard); err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
 	if shard == "" {
 		err = s.mgr.Start(rm.Key())
 	} else {
 		err = s.mgr.StartShard(rm.Key(), shard)
 	}
 	respond(w, 200, s.mgr.Status(rm.Key()), err)
+}
+
+// checkShardMods validates the actual start/restart scope before stopping or launching anything.
+func (s *Server) checkShardMods(rm *room.Room, shard string) error {
+	if shard != "" {
+		sh, ok := rm.Shard(shard)
+		if !ok || !sh.Enabled() {
+			return fmt.Errorf("分片不存在或未启用: %s", shard)
+		}
+	}
+	if s.mgr.UgcDir() != "" {
+		mods := s.modsFor(rm)
+		if shard != "" {
+			mods = s.modsFor(rm, shard)
+		}
+		missing, err := mods.MissingMods()
+		if err != nil {
+			return err
+		}
+		if len(missing) > 0 {
+			return fmt.Errorf("以下模组尚未下载：%s。请先到「模组」页下载缺失模组", strings.Join(missing, "、"))
+		}
+	}
+
+	return nil
 }
 
 func (s *Server) handleStop(w http.ResponseWriter, r *http.Request) {
@@ -566,6 +584,10 @@ func (s *Server) handleRestart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// 重启前必须优雅关闭，否则会丢存档
+	if err := s.checkShardMods(rm, query(r, "shard")); err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
 	if shard := query(r, "shard"); shard != "" {
 		if err := s.mgr.StopShard(rm.Key(), shard, 30*time.Second); err != nil {
 			respond(w, 200, s.mgr.Status(rm.Key()), err)
@@ -745,13 +767,25 @@ func (s *Server) handleLogStream(w http.ResponseWriter, r *http.Request) {
 
 // modsFor 按房间构造模组管理器。
 // overrides 写在存档侧（集群目录），模组实体在游戏侧的共享 ugc 目录。
-func (s *Server) modsFor(rm *room.Room) *modmgr.Manager {
+func (s *Server) modsFor(rm *room.Room, shards ...string) *modmgr.Manager {
+	if len(shards) == 0 {
+		shards = rm.ShardNames()
+	}
 	return modmgr.NewManager(
 		rm.ClusterDir(s.rootDir, s.confDir),
 		s.steam.GameDir(),
 		s.mgr.UgcDir(),
-		rm.ShardNames(),
+		shards,
 	)
+}
+
+// modShard accepts disabled shards for offline editing, but never arbitrary filesystem paths.
+func modShard(r *http.Request, rm *room.Room) (string, error) {
+	shard := shardOf(r, rm)
+	if _, ok := rm.Shard(shard); !ok || !filepath.IsLocal(shard) || strings.ContainsAny(shard, `/\:`) || shard != strings.TrimRight(shard, ". ") {
+		return "", fmt.Errorf("分片不存在: %s", shard)
+	}
+	return shard, nil
 }
 
 // SyncModsSetup 供面板启动时重算安装级的模组下载清单。
@@ -780,7 +814,12 @@ func (s *Server) handleModUpdates(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	mods := s.modsFor(rm)
+	shard, err := modShard(r, rm)
+	if err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
+	mods := s.modsFor(rm, shard)
 	o, err := mods.LoadOverrides()
 	if err != nil {
 		respond(w, 200, nil, err)
@@ -997,7 +1036,7 @@ func (s *Server) MissingModIDs() ([]string, error) {
 	for _, rm := range s.rooms.List() {
 		missing, err := s.modsFor(rm).MissingMods()
 		if err != nil {
-			continue
+			return nil, err
 		}
 		for _, id := range missing {
 			seen[id] = true
@@ -1023,12 +1062,12 @@ func (s *Server) syncModsSetup() {
 	}
 	seen := map[string]bool{}
 	for _, rm := range s.rooms.List() {
-		o, err := s.modsFor(rm).LoadOverrides()
+		enabled, err := s.modsFor(rm).EnabledWorkshopIDs()
 		if err != nil {
 			fmt.Printf("[!] 读取房间「%s」的模组配置失败: %v\n", rm.Name, err)
-			continue
+			return
 		}
-		for _, id := range o.EnabledWorkshopIDs() {
+		for _, id := range enabled {
 			seen[id] = true
 		}
 	}
@@ -1049,7 +1088,12 @@ func (s *Server) handleMods(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, nil, err)
 		return
 	}
-	mods := s.modsFor(rm)
+	shard, err := modShard(r, rm)
+	if err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
+	mods := s.modsFor(rm, shard)
 
 	installed, err := mods.InstalledMods()
 	if err != nil {
@@ -1103,12 +1147,27 @@ func (s *Server) handleMods(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleModToggle(w http.ResponseWriter, r *http.Request) {
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
+	if err := s.busyTaskError(""); err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
 	rm, err := s.roomByID(r)
 	if err != nil {
 		respond(w, 200, nil, err)
 		return
 	}
-	if err := s.modsFor(rm).SetEnabled(query(r, "id"), query(r, "enabled") == "true"); err != nil {
+	shard, err := modShard(r, rm)
+	if err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
+	if s.mgr.AnyRunning(rm.Key()) {
+		respond(w, 200, nil, fmt.Errorf("房间正在运行或启停，请先停止全部分片再修改模组"))
+		return
+	}
+	if err := s.modsFor(rm, shard).SetEnabled(query(r, "id"), query(r, "enabled") == "true"); err != nil {
 		respond(w, 200, nil, err)
 		return
 	}
@@ -1117,12 +1176,27 @@ func (s *Server) handleModToggle(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleModConfig(w http.ResponseWriter, r *http.Request) {
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
+	if err := s.busyTaskError(""); err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
 	rm, err := s.roomByID(r)
 	if err != nil {
 		respond(w, 200, nil, err)
 		return
 	}
 	id, key := query(r, "id"), query(r, "key")
+	shard, err := modShard(r, rm)
+	if err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
+	if s.mgr.AnyRunning(rm.Key()) {
+		respond(w, 200, nil, fmt.Errorf("房间正在运行或启停，请先停止全部分片再修改模组"))
+		return
+	}
 	if id == "" || key == "" {
 		respond(w, 200, nil, fmt.Errorf("缺少 id 或 key 参数"))
 		return
@@ -1133,7 +1207,7 @@ func (s *Server) handleModConfig(w http.ResponseWriter, r *http.Request) {
 	if err := json.Unmarshal([]byte(raw), &value); err != nil {
 		value = raw // 解析失败则按字符串处理
 	}
-	if err := s.modsFor(rm).SetConfig(id, key, value); err != nil {
+	if err := s.modsFor(rm, shard).SetConfig(id, key, value); err != nil {
 		respond(w, 200, nil, err)
 		return
 	}
@@ -1167,7 +1241,11 @@ func (s *Server) handleModDelete(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, nil, err)
 		return
 	}
-	if err := s.modsFor(rm).DeleteMod(query(r, "id")); err != nil {
+	shards := make([]string, 0, len(rm.Shards))
+	for _, sh := range rm.Shards {
+		shards = append(shards, sh.Name)
+	}
+	if err := s.modsFor(rm, shards...).DeleteMod(query(r, "id")); err != nil {
 		respond(w, 200, nil, err)
 		return
 	}
@@ -1485,14 +1563,6 @@ func (s *Server) handleSaveUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// 存档自带的模组配置：解析后经面板以规范格式写回全部分片。
-	// 刻意不照抄文件原文——否则面板后续的启用/禁用/改配置会跟存档原文打架。
-	if parsed.HasMods && parsed.Mods != nil {
-		if err := s.modsFor(saved).SaveOverrides(parsed.Mods); err != nil {
-			respond(w, 200, nil, fmt.Errorf("存档已导入，但写入模组配置失败: %w", err))
-			return
-		}
-	}
 	// 下载清单是安装级的，模组或房间变化后必须重算并集
 	s.syncModsSetup()
 
@@ -1500,9 +1570,11 @@ func (s *Server) handleSaveUpload(w http.ResponseWriter, r *http.Request) {
 
 	// 汇总这次导入带了哪些模组、缺哪些，界面上直接告诉用户下一步该干嘛
 	var modsMissing []string
-	if parsed.HasMods && parsed.Mods != nil {
-		if missing, mErr := s.modsFor(saved).MissingMods(); mErr == nil {
-			modsMissing = missing
+	if parsed.HasMods {
+		modsMissing, err = s.modsFor(saved).MissingMods()
+		if err != nil {
+			respond(w, 200, nil, fmt.Errorf("存档已导入，但读取模组失败: %w", err))
+			return
 		}
 	}
 
@@ -1539,16 +1611,20 @@ func buildImportSummary(p *saveimport.Parsed, saved *room.Room, notes []string, 
 		Notes:       notes,
 		ModsMissing: modsMissing,
 	}
-	if p.HasMods && p.Mods != nil {
-		sum.ModsTotal = len(p.Mods.EnabledWorkshopIDs())
-	}
+	modIDs := map[string]bool{}
 	for _, sh := range p.Shards {
+		if target, ok := saved.Shard(sh.Name); ok && target.Enabled() && sh.Mods != nil {
+			for _, id := range sh.Mods.EnabledWorkshopIDs() {
+				modIDs[id] = true
+			}
+		}
 		sum.Shards = append(sum.Shards, sh.Name)
 		if sh.HasOverride {
 			sum.WorldFiles = append(sum.WorldFiles, fmt.Sprintf(
 				"%s ← %s（%d 项）", sh.Name, sh.OverrideSrc, len(sh.Override.Overrides)))
 		}
 	}
+	sum.ModsTotal = len(modIDs)
 	switch {
 	case strings.TrimSpace(p.Token) != "":
 		sum.TokenSource = "存档自带"

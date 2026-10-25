@@ -323,11 +323,11 @@ func (s *Server) saveRoom(ctx context.Context, rm *room.Room) error {
 func (s *Server) pendingMods(rooms []*room.Room) ([]string, error) {
 	ids := map[string]bool{}
 	for _, rm := range rooms {
-		o, err := s.modsFor(rm).LoadOverrides()
+		enabled, err := s.modsFor(rm).EnabledWorkshopIDs()
 		if err != nil {
 			return nil, err
 		}
-		for _, id := range o.EnabledWorkshopIDs() {
+		for _, id := range enabled {
 			ids[strings.TrimPrefix(id, "workshop-")] = true
 		}
 	}

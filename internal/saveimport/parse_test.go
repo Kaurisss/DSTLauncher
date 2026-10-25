@@ -82,7 +82,7 @@ is_master = false
 name = Caves
 `)
 	writeFile(t, filepath.Join(dir, "Caves", "save", "shardindex"), "y")
-	// 两份 modoverrides 故意写得不一致：验证「以地表为准 + 提示不一致」
+	// 两份 modoverrides 故意不同，验证各分片原有配置分别保留。
 	writeFile(t, filepath.Join(dir, "Master", "modoverrides.lua"), `return {
 	["workshop-362175979"] = {
 		enabled = true,
@@ -176,19 +176,19 @@ func TestParseModernFormat(t *testing.T) {
 		t.Error("来自 leveldataoverride 的世界设置应强制 Enabled=true")
 	}
 
-	// 模组配置：以地表为准，且分片间不一致要提示
-	if !p.HasMods || p.Mods == nil {
+	// 分片配置各自保留，地表与洞穴不合并。
+	if !p.HasMods || master.Mods == nil {
 		t.Fatalf("modoverrides.lua 没有被解析出来")
 	}
-	if !p.Mods.Enabled["workshop-362175979"] {
-		t.Errorf("地表启用的模组应为启用: %v", p.Mods.Enabled)
+	if !master.Mods.Enabled["workshop-362175979"] {
+		t.Errorf("地表启用的模组应为启用: %v", master.Mods.Enabled)
 	}
-	if p.Mods.Enabled["workshop-1216718131"] {
-		t.Errorf("地表禁用的模组应为禁用: %v", p.Mods.Enabled)
+	if master.Mods.Enabled["workshop-1216718131"] {
+		t.Errorf("地表禁用的模组应为禁用: %v", master.Mods.Enabled)
 	}
-	// 只保留地表那份，洞穴里那个模组不应混进来
-	if _, leaked := p.Mods.Enabled["workshop-999999999"]; leaked {
-		t.Errorf("洞穴独有的模组不应出现在结果里: %v", p.Mods.Enabled)
+	// 地表配置里不应混入洞穴独有模组。
+	if _, leaked := master.Mods.Enabled["workshop-999999999"]; leaked {
+		t.Errorf("洞穴独有的模组不应出现在地表: %v", master.Mods.Enabled)
 	}
 	inconsistent := false
 	for _, w := range p.Warnings {
@@ -196,11 +196,16 @@ func TestParseModernFormat(t *testing.T) {
 			inconsistent = true
 		}
 	}
-	if !inconsistent {
-		t.Errorf("分片间模组配置不一致应当提示, warnings=%v", p.Warnings)
+	if inconsistent {
+		t.Errorf("独立分片配置不再统一覆盖, warnings=%v", p.Warnings)
 	}
-	if got := p.Mods.EnabledWorkshopIDs(); len(got) != 1 || got[0] != "362175979" {
+	if got := master.Mods.EnabledWorkshopIDs(); len(got) != 1 || got[0] != "362175979" {
 		t.Errorf("EnabledWorkshopIDs = %v, 期望只含 362175979", got)
+	}
+	for _, sh := range p.Shards {
+		if sh.Name == "Caves" && (sh.Mods == nil || !sh.Mods.Enabled["workshop-999999999"]) {
+			t.Fatal("洞穴模组丢失", sh.Mods)
+		}
 	}
 }
 

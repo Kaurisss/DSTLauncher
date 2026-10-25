@@ -12,6 +12,7 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@hugeicons/core-free-icons';
 
 import { iconOf } from '@/lib/worldIcons.js';
 import { Input } from '@/components/ui/input';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 const props = defineProps({
   option: { type: Object, required: true },
@@ -75,7 +76,10 @@ function onInput(value) {
       <div class="opt-row-main">
         <label class="opt-row-label" :for="inputId">
           {{ option.label || option.name }}
-          <span v-if="changed" class="opt-row-dot" title="已修改" />
+          <Tooltip v-if="changed">
+            <TooltipTrigger as-child><span class="opt-row-dot" tabindex="0" aria-label="已修改" /></TooltipTrigger>
+            <TooltipContent>已修改</TooltipContent>
+          </Tooltip>
         </label>
         <Input
           :id="inputId"
@@ -103,7 +107,10 @@ function onInput(value) {
       <div class="opt-row-main">
         <span class="opt-row-label" :id="inputId">
           {{ option.label || option.name }}
-          <span v-if="changed" class="opt-row-dot" title="已修改" />
+          <Tooltip v-if="changed">
+            <TooltipTrigger as-child><span class="opt-row-dot" tabindex="0" aria-label="已修改" /></TooltipTrigger>
+            <TooltipContent>已修改</TooltipContent>
+          </Tooltip>
         </span>
         <span class="opt-row-value">{{ currentLabel }}</span>
       </div>

@@ -1,12 +1,13 @@
 <script setup>
 // 单个模组条目：启用开关、删除、展开配置表单。
 
-import { computed, ref, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
 
 import UiPill from '@/components/ui/UiPill.vue';
 import Icon from '@/components/ui/Icon.vue';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import ModConfigForm from '@/components/mods/ModConfigForm.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -17,13 +18,14 @@ import { fmtUnix } from '@/lib/format.js';
 
 const props = defineProps({
   mod: { type: Object, required: true },
+  shard: { type: String, required: true },
   /** 「检查更新」查到的结果：{ id, name, localTime, remoteTime }，无更新时为 null */
   updateInfo: { type: Object, default: null },
   downloading: { type: Boolean, default: false },
   updating: { type: Boolean, default: false },
 });
 
-const emit = defineEmits(['changed', 'update', 'toggled', 'coverNeeded']);
+const emit = defineEmits(['changed', 'update', 'toggled', 'coverNeeded', 'configOpen', 'busy']);
 
 const rooms = useRoomsStore();
 const expanded = ref(false);
@@ -31,6 +33,12 @@ const configForm = ref(null);
 const toggling = ref(false);
 const removing = ref(false);
 const confirmingClose = ref(false);
+watch(expanded, value => emit('configOpen', value));
+watch([toggling, removing], ([toggle, remove]) => emit('busy', toggle || remove));
+onUnmounted(() => {
+  if (expanded.value) emit('configOpen', false);
+  if (toggling.value || removing.value) emit('busy', false);
+});
 const coverFailed = ref(false);
 const iconFailed = ref(false);
 watch(() => props.mod.previewUrl, () => { coverFailed.value = false; });
@@ -49,7 +57,8 @@ const workshopUrl = computed(() => /^workshop-\d+$/.test(props.mod.id)
   : '');
 
 /** 服务器运行中冻结：模组开关与配置重启后才生效，改了也不生效 */
-const frozen = computed(() => rooms.running);
+const frozen = computed(() => rooms.starting || rooms.current?.running
+  || rooms.statuses.some(status => ['running', 'starting', 'stopping'].includes(status.state)));
 
 // 开关状态用本地副本而不是直接改 props.mod：
 // 一是避免修改父组件数据，二是接口失败时可以回滚显示。
@@ -67,7 +76,7 @@ async function onToggle(next) {
 
   toggling.value = true;
   enabled.value = next; // 先按用户的意图切换，失败再回滚
-  const { ok } = await guard(() => modApi.toggle(room.id, props.mod.id, next));
+  const { ok } = await guard(() => modApi.toggle(room.id, props.mod.id, next, props.shard));
   toggling.value = false;
   if (ok) {
     emit('toggled', next);
@@ -92,7 +101,7 @@ async function remove() {
     if (!await confirmAction(
       `删除模组「${name}」？\n\n` +
       `模组文件与其它房间共享，使用 Steam 工坊目录时也会影响游戏客户端；删除后需要重新下载。` +
-      `只会从当前房间的 modoverrides 中移除启用记录。`,
+      `会从当前房间所有分片的 modoverrides 中移除该模组记录。`,
     )) return;
 
     const { ok } = await guard(() => modApi.remove(room.id, props.mod.id));
@@ -152,27 +161,32 @@ async function setExpanded(open) {
             <Icon v-else name="package" size="28" />
           </div>
           <div class="mod-info">
-            <a
-              v-if="workshopUrl"
-              class="mod-name mod-workshop-link"
-              :href="workshopUrl"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="在 Steam 创意工坊查看（新标签页）"
-            >{{ mod.name || mod.id }}<Icon name="globe" size="14" /></a>
+            <Tooltip v-if="workshopUrl">
+              <TooltipTrigger as-child>
+                <a
+                  class="mod-name mod-workshop-link"
+                  :href="workshopUrl"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >{{ mod.name || mod.id }}<Icon name="globe" size="14" /></a>
+              </TooltipTrigger>
+              <TooltipContent>在 Steam 创意工坊查看（新标签页）</TooltipContent>
+            </Tooltip>
             <span v-else class="mod-name">{{ mod.name || mod.id }}</span>
             <div class="mod-status">
               <span class="mod-id">{{ mod.id }}</span>
-              <span v-if="mod.installed" class="break-all text-xs text-muted-foreground" title="本地 modinfo.lua 的版本号">{{ mod.version ? `版本 ${mod.version}` : '版本未知' }}</span>
+              <Tooltip v-if="mod.installed">
+                <TooltipTrigger as-child>
+                  <span class="break-all text-xs text-muted-foreground" tabindex="0">{{ mod.version ? `版本 ${mod.version}` : '版本未知' }}</span>
+                </TooltipTrigger>
+                <TooltipContent>本地 modinfo.lua 的版本号</TooltipContent>
+              </Tooltip>
               <UiPill v-if="downloading" tone="info">下载中</UiPill>
               <UiPill v-else-if="!mod.installed" tone="warn">未下载</UiPill>
-              <UiPill
-                v-if="updateInfo"
-                tone="warn"
-                :title="`本地 ${fmtUnix(updateInfo.localTime)}，工坊 ${fmtUnix(updateInfo.remoteTime)}`"
-              >
-                有新版本
-              </UiPill>
+              <Tooltip v-if="updateInfo">
+                <TooltipTrigger as-child><UiPill tone="warn" tabindex="0">有新版本</UiPill></TooltipTrigger>
+                <TooltipContent>本地 {{ fmtUnix(updateInfo.localTime) }}，工坊 {{ fmtUnix(updateInfo.remoteTime) }}</TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -190,18 +204,22 @@ async function setExpanded(open) {
           <SheetTrigger v-if="mod.installed" as-child>
             <Button variant="outline" size="sm">配置</Button>
           </SheetTrigger>
-          <Button
-            v-if="mod.id.startsWith('workshop-')"
-            variant="outline" size="sm"
-            :disabled="frozen || downloading || removing"
-            :title="mod.installed ? '重新下载该模组' : '从创意工坊下载该模组'"
-            @click="updateOne"
-          >
-            <Icon name="download" size="14" />{{ downloading ? '下载中…' : mod.installed ? (updateInfo ? '更新' : '重新下载') : '下载' }}
-          </Button>
-          <Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-destructive" aria-label="删除" :title="updating ? '下载进行中，暂时无法删除模组' : '删除模组'" :disabled="frozen || removing || toggling || downloading || updating" @click="remove">
-            <Icon name="trash" :size="16" />
-          </Button>
+          <Tooltip v-if="mod.id.startsWith('workshop-')">
+            <TooltipTrigger as="span" :as-child="!(frozen || downloading || removing)" class="inline-flex" :tabindex="frozen || downloading || removing ? 0 : undefined">
+              <Button variant="outline" size="sm" :disabled="frozen || downloading || removing" @click="updateOne">
+                <Icon name="download" size="14" />{{ downloading ? '下载中…' : mod.installed ? (updateInfo ? '更新' : '重新下载') : '下载' }}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{{ mod.installed ? '重新下载该模组' : '从创意工坊下载该模组' }}</TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger as="span" :as-child="!(frozen || removing || toggling || downloading || updating)" class="inline-flex" :tabindex="frozen || removing || toggling || downloading || updating ? 0 : undefined">
+              <Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-destructive" aria-label="删除" :disabled="frozen || removing || toggling || downloading || updating" @click="remove">
+                <Icon name="trash" :size="16" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{{ updating ? '下载进行中，暂时无法删除模组' : '删除模组' }}</TooltipContent>
+          </Tooltip>
         </div>
       </div>
     </div>
@@ -211,7 +229,7 @@ async function setExpanded(open) {
         <span v-if="frozen" class="text-sm text-amber-700 dark:text-amber-400">服务器运行中，配置只读</span>
       </SheetHeader>
       <Button variant="ghost" size="icon-sm" class="absolute right-3 top-3" aria-label="关闭配置" :disabled="configForm?.saving" @click="setExpanded(false)"><Icon name="x" :size="18" /></Button>
-      <ModConfigForm ref="configForm" :room-id="rooms.currentId" :mod="mod" :disabled="frozen" @saved="emit('changed')" />
+      <ModConfigForm ref="configForm" :room-id="rooms.currentId" :shard="shard" :mod="mod" :disabled="frozen" @saved="emit('changed')" />
     </SheetContent>
   </Sheet>
 </template>

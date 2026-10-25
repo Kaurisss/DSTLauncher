@@ -43,6 +43,9 @@ func Parse(clusterDir string) (*Parsed, error) {
 	p.Shards = make([]ShardSave, 0, len(scans))
 	for _, sc := range scans {
 		p.Shards = append(p.Shards, sc.ShardSave)
+		if sc.Mods != nil {
+			p.HasMods = true
+		}
 		if sc.HasSave {
 			p.HasSave = true
 		}
@@ -64,34 +67,6 @@ func Parse(clusterDir string) (*Parsed, error) {
 	p.AdminList, p.HasAdmin = readText(filepath.Join(clusterDir, "adminlist.txt"))
 	p.BlockList, p.HasBlock = readText(filepath.Join(clusterDir, "blocklist.txt"))
 	p.WhiteList, p.HasWhite = readText(filepath.Join(clusterDir, "whitelist.txt"))
-
-	// 模组配置：存档里每个分片各有一份 modoverrides.lua，而面板的模型是
-	// 「一个房间一份、所有分片共用」。以地表为准；地表没有时退回任意一个
-	// 带配置的分片。各分片内容不一致时提示，避免用户以为两边的模组相同。
-	var modsRaw string
-	var modsFrom []string
-	for _, sc := range scans {
-		if !sc.hasMods {
-			continue
-		}
-		modsFrom = append(modsFrom, sc.Name)
-		if sc.IsMaster || modsRaw == "" {
-			modsRaw = sc.modsRaw
-		}
-	}
-	if len(modsFrom) > 0 {
-		p.Mods = modmgr.ParseOverrides(modsRaw)
-		p.HasMods = true
-		if len(modsFrom) > 1 {
-			base := modsRaw
-			for _, sc := range scans {
-				if sc.hasMods && sc.modsRaw != base {
-					p.warnf("各分片的模组配置不一致，已统一采用地表那份（面板的模组配置全房间共用）")
-					break
-				}
-			}
-		}
-	}
 
 	p.Room = buildRoom(p, maps, scans)
 	return p, nil
@@ -191,9 +166,6 @@ func buildRoom(p *Parsed, maps []map[string]string, scans []shardScan) *room.Roo
 type shardScan struct {
 	ShardSave
 	flat map[string]string
-	// modsRaw 是该分片的 modoverrides.lua 原文；hasMods 表示确实存在且非空。
-	modsRaw string
-	hasMods bool
 }
 
 // scanShards 扫描集群目录下的一级子目录，识别出分片。
@@ -262,9 +234,16 @@ func scanShards(clusterDir string, p *Parsed) ([]shardScan, error) {
 				sc.WorldType = loc
 			}
 		}
-		// 模组配置原样带回去，由 Parse 统一挑选与解析
-		if raw, ok := readText(filepath.Join(dir, "modoverrides.lua")); ok && raw != "" {
-			sc.modsRaw, sc.hasMods = raw, true
+		// 配置缺失时保留目标原文件；明确空文件只清空本分片。
+		data, err := os.ReadFile(filepath.Join(dir, "modoverrides.lua"))
+		if err != nil && !os.IsNotExist(err) {
+			return nil, fmt.Errorf("读取 %s 模组配置失败: %w", sc.Name, err)
+		}
+		if err == nil {
+			sc.Mods, err = modmgr.ParseOverridesChecked(string(data))
+			if err != nil {
+				return nil, fmt.Errorf("解析 %s 模组配置失败: %w", sc.Name, err)
+			}
 		}
 		scans = append(scans, sc)
 	}
