@@ -25,7 +25,7 @@ func TestModIconHTTP(t *testing.T) {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(dir, "modinfo.lua"), []byte("name='本地图片测试'"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "modinfo.lua"), []byte("name='本地图片测试'\nversion='1.2.3'"), 0644); err != nil {
 		t.Fatal(err)
 	}
 	data := make([]byte, 18+256*128*4)
@@ -48,6 +48,9 @@ func TestModIconHTTP(t *testing.T) {
 		t.Fatalf("模组列表：%v", body)
 	}
 	iconURL := items[0].(map[string]interface{})["iconUrl"].(string)
+	if items[0].(map[string]interface{})["version"] != "1.2.3" {
+		t.Fatalf("列表缺少本地版本号: %v", items[0])
+	}
 	request := func(method, path, etag string) *httptest.ResponseRecorder {
 		req := httptest.NewRequest(method, path, nil)
 		if etag != "" {

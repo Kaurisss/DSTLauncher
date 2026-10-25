@@ -24,7 +24,7 @@ after(async () => {
 
 const mods = [
   { id: 'workshop-1185229307', name: 'workshop-1185229307', enabled: true, installed: false },
-  { id: 'workshop-1207269058', name: '本地已下载名称', enabled: false, installed: true },
+  { id: 'workshop-1207269058', name: '本地已下载名称', version: '1.2.3-beta', enabled: false, installed: true },
   { id: 'workshop-1271089343', name: 'workshop-1271089343', enabled: false, installed: false },
   { id: 'local-test', name: '本地测试模组', enabled: false, installed: true },
 ];
@@ -193,6 +193,9 @@ test('未下载模组异步补全工坊名称、封面和安全的新标签页�
     assert.equal(await cover.getAttribute('src'), details[0].previewUrl);
     await page.waitForFunction(() => document.querySelector('.mod img')?.naturalWidth > 0);
     assert.match(await page.locator('.mod').nth(1).innerText(), /已下载的工坊标题/);
+    assert.match(await page.locator('.mod').nth(1).innerText(), /版本 1\.2\.3-beta/);
+    assert.match(await page.locator('.mod').nth(3).innerText(), /版本未知/);
+    assert.doesNotMatch(await page.locator('.mod').first().innerText(), /版本未知/);
     assert.match(await page.locator('.mod').nth(2).innerText(), /workshop-1271089343/);
     assert.equal(await page.locator('.mod').nth(3).getByRole('link').count(), 0, '本地模组无伪造的工坊链接');
     const detailRequests = () => requests.filter(r => r.path === '/api/workshop/details');

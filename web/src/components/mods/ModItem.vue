@@ -163,6 +163,7 @@ async function setExpanded(open) {
             <span v-else class="mod-name">{{ mod.name || mod.id }}</span>
             <div class="mod-status">
               <span class="mod-id">{{ mod.id }}</span>
+              <span v-if="mod.installed" class="break-all text-xs text-muted-foreground" title="本地 modinfo.lua 的版本号">{{ mod.version ? `版本 ${mod.version}` : '版本未知' }}</span>
               <UiPill v-if="downloading" tone="info">下载中</UiPill>
               <UiPill v-else-if="!mod.installed" tone="warn">未下载</UiPill>
               <UiPill

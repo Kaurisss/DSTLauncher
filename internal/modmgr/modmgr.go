@@ -28,6 +28,7 @@ type Mod struct {
 	ID           string                 `json:"id"`         // workshop-1234567890
 	WorkshopID   string                 `json:"workshopId"` // 纯数字 ID
 	Name         string                 `json:"name"`
+	Version      string                 `json:"version,omitempty"`
 	IconURL      string                 `json:"iconUrl,omitempty"`
 	Enabled      bool                   `json:"enabled"`
 	Installed    bool                   `json:"installed"` // 本地是否已下载
@@ -661,7 +662,7 @@ func searchModDir(root, id, num string, maxDepth int) string {
 // modInfoNameRe 匹配顶层的 name = 赋值行（捕获值部分）。
 var modInfoNameRe = regexp.MustCompile(`^name\s*=\s*(.+?)\s*$`)
 
-// ModInfo 读取一个模组的 modinfo.lua 元信息（面板目前只展示名字）。
+// ModInfo 读取一个模组的 modinfo.lua 名称、本地版本与纯客户端标记。
 //
 // modinfo 的写法差异极大，名字解析必须覆盖三种常见形态：
 //
@@ -673,15 +674,15 @@ var modInfoNameRe = regexp.MustCompile(`^name\s*=\s*(.+?)\s*$`)
 // 都有自己的 name 字段，抓到就会把配置项名当成模组名——
 // 棱镜、神话人物等 mod 曾因此被显示成 "Title" / "language_switch"。
 // 所以先摘掉 configuration_options 块，再逐行找顶层的 name 赋值。
-func (m *Manager) ModInfo(id string) (name, desc string) {
+func (m *Manager) ModInfo(id string) (name, version string, clientOnly bool) {
 	dir := m.findModDir(id)
 	if dir == "" {
-		return id, ""
+		return id, "", false
 	}
 
 	data, err := os.ReadFile(filepath.Join(dir, "modinfo.lua"))
 	if err != nil {
-		return id, ""
+		return id, "", false
 	}
 
 	name = extractModInfoName(string(data))
@@ -693,7 +694,64 @@ func (m *Manager) ModInfo(id string) (name, desc string) {
 		// 退回模组 ID，至少保证列表里能对上号
 		name = id
 	}
-	return name, ""
+	return name, extractModInfoVersion(string(data)), extractModInfoLiteral(string(data), "client_only_mod") == "true"
+}
+
+var modInfoTokenRe = regexp.MustCompile(`(?s)--\[=*\[.*?\]=*\]|--[^\r\n]*|\[=*\[.*?\]=*\]|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_][A-Za-z_0-9]*|[0-9]+(?:\.[0-9]+)?|\S`)
+
+func extractModInfoVersion(text string) string {
+	value := extractModInfoLiteral(text, "version")
+	if value == "true" || value == "false" || value == "nil" {
+		return ""
+	}
+	version, _ := evalLiteralExpr(value)
+	return strings.TrimSpace(textutil.Clean(version))
+}
+
+func extractModInfoLiteral(text, field string) string {
+	var tokens []string
+	for _, token := range modInfoTokenRe.FindAllString(stripBOM(text), -1) {
+		if !strings.HasPrefix(token, "--") {
+			tokens = append(tokens, token)
+		}
+	}
+	depth, blocks := 0, 0
+	result := ""
+	for i, token := range tokens {
+		switch token {
+		case "{", "(", "[":
+			depth++
+		case "}", ")", "]":
+			depth--
+		case "function", "if", "do", "repeat":
+			blocks++
+		case "end", "until":
+			if blocks > 0 {
+				blocks--
+			}
+		}
+		if token != field || depth != 0 || blocks != 0 || i+2 >= len(tokens) || tokens[i+1] != "=" {
+			continue
+		}
+		if i > 0 && (tokens[i-1] == "." || tokens[i-1] == ":" || tokens[i-1] == "local") {
+			continue
+		}
+		result = ""
+		value := tokens[i+2]
+		// A literal must end the statement, not be part of a concatenation/operator.
+		if i+3 < len(tokens) {
+			next := tokens[i+3]
+			statement := next == ";" || next == "local" || next == "function" || next == "if" || next == "for" || next == "while" || next == "do" || next == "repeat" || next == "return"
+			if !statement && !(i+4 < len(tokens) && tokens[i+4] == "=") {
+				continue
+			}
+		}
+		if _, ok := evalLiteralExpr(value); ok {
+			result = value
+		}
+	}
+	// shortcut: 动态字段返回未知；需要支持时再扩展静态求值，不执行模组代码。
+	return result
 }
 
 // extractModInfoName 从 modinfo.lua 文本中提取模组名，解析不出返回空串。

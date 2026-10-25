@@ -858,7 +858,7 @@ func (s *Server) handleModUpdates(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 		if it.TimeUpdated > loc.TimeUpdated {
-			name, _ := mods.ModInfo(key)
+			name, _, _ := mods.ModInfo(key)
 			updates = append(updates, modUpdateView{
 				ID:         key,
 				Name:       name,
@@ -1069,7 +1069,10 @@ func (s *Server) handleMods(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		seen[id] = true
-		name, _ := mods.ModInfo(id)
+		name, version, clientOnly := mods.ModInfo(id)
+		if clientOnly {
+			return
+		}
 		iconURL := ""
 		if installed[id] {
 			if version := mods.ModIconVersion(id); version != "" {
@@ -1079,6 +1082,7 @@ func (s *Server) handleMods(w http.ResponseWriter, r *http.Request) {
 		list = append(list, &modmgr.Mod{
 			ID:        id,
 			Name:      name,
+			Version:   version,
 			IconURL:   iconURL,
 			Enabled:   o.Enabled[id],
 			Installed: installed[id],

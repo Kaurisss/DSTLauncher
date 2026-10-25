@@ -17,7 +17,7 @@ func TestSteamWorkshopReadAndMissingMods(t *testing.T) {
 			t.Fatal(err)
 		}
 		if id != "456" {
-			if err := os.WriteFile(filepath.Join(dir, "modinfo.lua"), []byte("name = '中文工坊模组'\n"), 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(dir, "modinfo.lua"), []byte("name = '中文工坊模组'\nversion = '1.2.3-beta'\n"), 0644); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -34,9 +34,12 @@ func TestSteamWorkshopReadAndMissingMods(t *testing.T) {
 	if err != nil || len(installed) != 1 || !installed["workshop-123"] {
 		t.Fatalf("只认完整的 Steam 工坊模组，不认临时或半下载目录: %v, %v", installed, err)
 	}
-	name, _ := manager.ModInfo("workshop-123")
+	name, version, _ := manager.ModInfo("workshop-123")
 	if name != "中文工坊模组" {
 		t.Fatalf("应直接从 Steam 工坊读取元信息: %q", name)
+	}
+	if version != "1.2.3-beta" {
+		t.Fatalf("应读取本地声明的版本: %q", version)
 	}
 	missing, err := manager.MissingMods()
 	if err != nil || len(missing) != 1 || missing[0] != "workshop-456" {
