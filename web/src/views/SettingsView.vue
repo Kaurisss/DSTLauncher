@@ -2,6 +2,7 @@
 import { onMounted, ref } from 'vue';
 
 import InstallPanel from '@/components/overview/InstallPanel.vue';
+import AutomationPanel from '@/components/AutomationPanel.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiField from '@/components/ui/UiField.vue';
 import UiPill from '@/components/ui/UiPill.vue';
@@ -60,6 +61,7 @@ async function saveApiKey() {
 
 <template>
   <div class="stack">
+    <AutomationPanel />
     <UiCard>
       <template #title>访问密码</template>
       <template #actions>

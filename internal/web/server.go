@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"dst-windows/internal/automation"
 	"dst-windows/internal/backup"
 	"dst-windows/internal/config"
 	"dst-windows/internal/modmgr"
@@ -67,7 +68,10 @@ type Server struct {
 	// taskMu 串行化「开服 / 安装更新服务端 / 模组下载」这四类会改动共享状态
 	// （游戏安装目录、共享 ugc 目录）的操作，让「检查是否忙 → 启动」成为原子动作，
 	// 关闭并发请求同时穿过检查的窗口。长任务本身是异步的，这里只锁决策与启动瞬间。
-	taskMu sync.Mutex
+	taskMu        sync.Mutex
+	maintenanceMu sync.RWMutex
+	automation    *automation.Engine
+	automationErr error
 }
 
 // NewServer 创建 HTTP 服务。
@@ -75,7 +79,7 @@ func NewServer(o Options) *Server {
 	if o.Mgr != nil && o.UgcDir != "" {
 		o.Mgr.SetUgcDir(o.UgcDir)
 	}
-	return &Server{
+	s := &Server{
 		mgr:            o.Mgr,
 		rooms:          o.Rooms,
 		steam:          o.Steam,
@@ -88,6 +92,8 @@ func NewServer(o Options) *Server {
 		authSecret:     generateSecret(),
 		authConfigSeen: o.WorkDir != "" && panelcfg.Exists(o.WorkDir),
 	}
+	s.automation, s.automationErr = automation.New(filepath.Join(o.RootDir, "automation.json"))
+	return s
 }
 
 // respond 统一响应格式。
@@ -132,6 +138,8 @@ func (s *Server) Handler() http.Handler {
 
 	// 宿主机资源（独立于房间和分片进程）
 	mux.HandleFunc("/api/host", s.handleHostStats)
+	mux.HandleFunc("/api/automation", s.handleAutomation)
+	mux.HandleFunc("/api/worldstate", s.handleWorldState)
 
 	// 进程控制
 	mux.HandleFunc("/api/status", s.handleStatus)
@@ -191,7 +199,7 @@ func (s *Server) Handler() http.Handler {
 	// 表现为「后端明明更新了，页面行为还是老的」
 	mux.Handle("/", noCacheHTML(http.FileServer(http.FS(s.staticFS))))
 
-	return s.withAuth(mux)
+	return s.withAuth(s.guardMaintenance(mux))
 }
 
 // noCacheHTML 长期缓存带内容哈希的构建资源，HTML 每次校验，固定路径图标缓存一天。

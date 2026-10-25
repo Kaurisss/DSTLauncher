@@ -11,7 +11,7 @@ before(async () => {
   vite = await createServer({ root: fileURLToPath(new URL('..', import.meta.url)), server: { host: '127.0.0.1', port: 0 } });
   await vite.listen();
   origin = vite.resolvedUrls.local[0];
-  browser = await chromium.launch();
+  browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
 });
 after(async () => { await browser?.close(); await vite?.close(); });
 
@@ -63,6 +63,10 @@ test('回档有明确确认；取消不请求，非法次数不可提交，备�
     await dialog.getByLabel('回退存档次数').fill('1.5');
     assert.equal(await dialog.getByRole('button', { name: '确认回档', exact: true }).isDisabled(), true);
     await dialog.getByRole('button', { name: '取消' }).click();
+    await dialog.waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: '回档', exact: true }).click();
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
     assert.equal(requests.length, 0);
     await page.locator('#app-navigation').getByRole('button', { name: '备份', exact: true }).click();
     await page.getByRole('button', { name: '回档', exact: true }).waitFor();
@@ -89,6 +93,8 @@ test('确认只发送一次 POST，等待游戏回执后关闭并阻止重复回
     await dialog.getByRole('button', { name: '确认回档' }).click();
     await dialog.getByRole('button', { name: '正在请求回档…' }).waitFor();
     assert.equal(await dialog.getByRole('button', { name: '正在请求回档…' }).isDisabled(), true);
+    assert.equal(await dialog.getByRole('button', { name: '关闭', exact: true }).isDisabled(), true);
+    assert.equal(await dialog.getByRole('button', { name: '取消', exact: true }).isDisabled(), true);
     await page.keyboard.press('Escape');
     assert.equal(await dialog.isVisible(), true);
     assert.deepEqual(requests, [{ method: 'POST', room: '2', body: { count: 2 } }]);

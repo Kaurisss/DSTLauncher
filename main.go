@@ -255,6 +255,7 @@ func main() {
 	mgr.SetModsChecker(api.MissingModIDs)
 	// 单模组更新要临时改写下载清单再恢复，同样由 web 层提供
 	mgr.SetModsSetupSwap(api.SwapModsSetup)
+	stopAutomation := api.StartAutomation()
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", *bind, *port),
@@ -296,6 +297,7 @@ func main() {
 		fmt.Println("\n正在安全关闭…")
 		// 先阻断新启动与崩溃重启，避免停服途中进程被重新拉起
 		mgr.BeginShutdown()
+		stopAutomation()
 		_ = srv.Close()
 		for _, c := range mgr.Clusters() {
 			if err := mgr.Stop(c.Key(), 30*time.Second); err != nil {

@@ -11,6 +11,7 @@ import HostResources from '@/components/overview/HostResources.vue';
 import PlayersPanel from '@/components/overview/PlayersPanel.vue';
 import InstallPanel from '@/components/overview/InstallPanel.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
+import WorldState from '@/components/overview/WorldState.vue';
 import LogConsole from '@/components/overview/LogConsole.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
@@ -120,6 +121,7 @@ const serverTone = computed(() => {
     </div>
 
     <HostResources />
+    <WorldState />
 
     <!-- 状态区（主）与服务器文件区（辅）按 7:5 分栏：
          分片行要放下「状态 · 运行时长 · PID · 端口 · 重启次数」，

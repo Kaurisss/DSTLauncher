@@ -203,9 +203,11 @@ type Manager struct {
 	// 之间必须原子：并发点击启动会让同一分片起两个进程抢同一个端口。
 	ops chan struct{}
 	// closing 置位后拒绝一切新的启动，包括崩溃自动重启。
-	closing       atomic.Bool
-	rollbackMu    sync.Mutex
-	rollbackUntil map[string]time.Time
+	closing        atomic.Bool
+	recoveryMu     sync.Mutex
+	recoveryPaused bool
+	rollbackMu     sync.Mutex
+	rollbackUntil  map[string]time.Time
 
 	// 模组预更新的状态。单独一把锁：更新可能持续几十分钟，
 	// 不能让它的读写挤在管理分片进程的 mu 上。
@@ -658,6 +660,12 @@ func (m *Manager) restartWithBackoff(p *process) {
 	// 继承重启计数，让连续崩溃的退避时间能真正累加，
 	// 否则每次重启都是新对象、计数归零，退避永远停在第一档
 	prevRestarts := attempt
+	m.recoveryMu.Lock()
+	defer m.recoveryMu.Unlock()
+	if m.recoveryPaused {
+		p.close()
+		return
+	}
 	if err := m.startShard(p.cluster, p.shard); err != nil {
 		m.emit(p.cluster.Key(), p.shard, "crash", fmt.Sprintf("自动重启失败: %v", err))
 		return

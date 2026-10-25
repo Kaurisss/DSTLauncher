@@ -314,3 +314,12 @@ export const configApi = {
 };
 
 export { request };
+
+export const automationApi = {
+  status: () => request('/api/automation'),
+  save: config => request('/api/automation', { method: 'PUT', body: config }),
+};
+
+export const worldStateApi = {
+  get: roomId => request('/api/worldstate', { params: { room: roomId } }),
+};

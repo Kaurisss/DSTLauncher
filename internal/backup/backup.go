@@ -31,6 +31,7 @@ type Manager struct {
 	clusterDir  string // <root>/<confDir>/Cluster_N
 	backupDir   string // <root>/backups/Cluster_N
 	keepCount   int    // 保留最近 N 份，超出自动清理
+	automatic   bool
 }
 
 // NewManager 创建备份管理器。
@@ -88,12 +89,21 @@ func (m *Manager) Create() (*BackupItem, error) {
 		return nil, err
 	}
 
-	name := fmt.Sprintf("%s_%s.zip", m.clusterName, time.Now().Format("20060102_150405"))
+	prefix := m.clusterName
+	if m.automatic {
+		prefix += "_auto"
+	}
+	name := fmt.Sprintf("%s_%s.zip", prefix, time.Now().Format("20060102_150405.000000000"))
 	dst := filepath.Join(m.backupDir, name)
 
-	if err := m.zipDir(src, dst); err != nil {
+	tmp := dst + ".tmp"
+	if err := m.zipDir(src, tmp); err != nil {
 		// 备份失败时清理半成品文件，避免占用磁盘
-		_ = os.Remove(dst)
+		_ = os.Remove(tmp)
+		return nil, err
+	}
+	if err := os.Rename(tmp, dst); err != nil {
+		_ = os.Remove(tmp)
 		return nil, err
 	}
 
@@ -116,6 +126,16 @@ func (m *Manager) Create() (*BackupItem, error) {
 	}
 
 	return item, nil
+}
+
+// CreateAutomatic rotates only automatic backups; manual backups remain untouched.
+func (m *Manager) CreateAutomatic(keep int) (*BackupItem, error) {
+	if keep < 1 || keep > 100 {
+		return nil, fmt.Errorf("自动备份保留份数必须为 1–100")
+	}
+	auto := *m
+	auto.automatic, auto.keepCount = true, keep
+	return auto.Create()
 }
 
 // zipDir 将目录递归压缩为 zip。
@@ -160,7 +180,13 @@ func (m *Manager) zipDir(srcDir, dstPath string) error {
 		return fmt.Errorf("压缩失败: %w", err)
 	}
 
-	return zw.Close()
+	if err := zw.Close(); err != nil {
+		return err
+	}
+	if err := f.Sync(); err != nil {
+		return err
+	}
+	return f.Close()
 }
 
 // List 返回所有备份，按时间倒序。
@@ -202,6 +228,13 @@ func (m *Manager) Clean() error {
 	if err != nil {
 		return err
 	}
+	filtered := items[:0]
+	for _, item := range items {
+		if strings.HasPrefix(item.Name, m.clusterName+"_auto_") == m.automatic {
+			filtered = append(filtered, item)
+		}
+	}
+	items = filtered
 	if len(items) <= m.keepCount {
 		return nil
 	}

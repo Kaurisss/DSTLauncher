@@ -1,9 +1,9 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import {
-  DialogRoot, DialogTrigger, DialogPortal, DialogOverlay, DialogContent,
+  Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter,
   DialogTitle, DialogDescription, DialogClose,
-} from 'reka-ui';
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import UiField from '@/components/ui/UiField.vue';
@@ -52,39 +52,39 @@ function preventWhileBusy(event) {
 </script>
 
 <template>
-  <DialogRoot v-model:open="open">
+  <Dialog v-model:open="open">
     <DialogTrigger as-child>
       <Button variant="outline" size="sm" :disabled="!rooms.current || rooms.rollingBack || remaining > 0">
         {{ rooms.rollingBack ? '正在请求回档…' : remaining > 0 ? `回档中（${remaining}秒）` : '回档' }}
       </Button>
     </DialogTrigger>
-    <DialogPortal>
-      <DialogOverlay class="fixed inset-0 z-50 bg-black/20" />
-      <DialogContent
-        class="fixed left-1/2 top-1/2 z-50 grid w-[calc(100%-2rem)] max-w-md -translate-x-1/2 -translate-y-1/2 gap-4 rounded-xl border bg-popover p-6 text-popover-foreground shadow-lg"
-        @escape-key-down="preventWhileBusy" @interact-outside="preventWhileBusy"
-      >
-        <DialogTitle class="text-lg font-semibold">游戏存档回档</DialogTitle>
-        <DialogDescription class="text-sm text-muted-foreground">
+    <DialogContent
+      class="sm:max-w-md overflow-y-auto"
+      :close-disabled="rooms.rollingBack"
+      @escape-key-down="preventWhileBusy" @interact-outside="preventWhileBusy"
+    >
+      <DialogHeader>
+        <DialogTitle>游戏存档回档</DialogTitle>
+        <DialogDescription>
           回档房间「{{ rooms.current?.name }}」的全部启用世界，各世界将同步重新加载。
         </DialogDescription>
-        <form class="grid gap-4" @submit.prevent="submit">
-          <UiField label="回退存档次数" for-id="rollback-count" block tip="1 表示回到最新存档之前的一个存档点。存档点通常每天产生，手动保存也会产生存档点。">
-            <Input id="rollback-count" v-model="count" type="number" min="1" :max="maxCount || 1" step="1" :disabled="rooms.rollingBack" />
-          </UiField>
-          <p class="text-sm text-destructive">当前未保存进度及目标之后的存档点将被丢弃。建议先到备份页保留一份整房间备份。</p>
-          <p v-if="unavailable" role="status" class="text-sm text-muted-foreground">{{ unavailable }}</p>
-          <p v-else-if="!valid" role="alert" class="text-sm text-destructive">请输入 1–{{ maxCount }} 之间的整数；实际可回退数量由游戏中保留的存档决定。</p>
-          <div class="flex justify-end gap-2">
-            <DialogClose as-child>
-              <Button type="button" variant="outline" :disabled="rooms.rollingBack">取消</Button>
-            </DialogClose>
-            <Button type="submit" variant="destructive" :disabled="!valid || !!unavailable || rooms.rollingBack || remaining > 0">
-              {{ rooms.rollingBack ? '正在请求回档…' : '确认回档' }}
-            </Button>
-          </div>
-        </form>
-      </DialogContent>
-    </DialogPortal>
-  </DialogRoot>
+      </DialogHeader>
+      <form class="grid gap-4" @submit.prevent="submit">
+        <UiField label="回退存档次数" for-id="rollback-count" block tip="1 表示回到最新存档之前的一个存档点。存档点通常每天产生，手动保存也会产生存档点。">
+          <Input id="rollback-count" v-model="count" type="number" min="1" :max="maxCount || 1" step="1" :disabled="rooms.rollingBack" />
+        </UiField>
+        <p class="text-sm text-destructive">当前未保存进度及目标之后的存档点将被丢弃。建议先到备份页保留一份整房间备份。</p>
+        <p v-if="unavailable" role="status" class="text-sm text-muted-foreground">{{ unavailable }}</p>
+        <p v-else-if="!valid" role="alert" class="text-sm text-destructive">请输入 1–{{ maxCount }} 之间的整数；实际可回退数量由游戏中保留的存档决定。</p>
+        <DialogFooter>
+          <DialogClose as-child>
+            <Button type="button" variant="outline" :disabled="rooms.rollingBack">取消</Button>
+          </DialogClose>
+          <Button type="submit" variant="destructive" :disabled="!valid || !!unavailable || rooms.rollingBack || remaining > 0">
+            {{ rooms.rollingBack ? '正在请求回档…' : '确认回档' }}
+          </Button>
+        </DialogFooter>
+      </form>
+    </DialogContent>
+  </Dialog>
 </template>

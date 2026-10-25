@@ -86,7 +86,6 @@ function exportSave(name) {
 <template>
   <UiCard>
     <template #title>存档备份</template>
-    <template #hint>整房间备份（cluster.ini + 全部分片存档），最多保留 10 份</template>
     <template #actions>
       <RollbackDialog />
       <button class="btn btn-sm btn-primary" :disabled="!rooms.current" @click="create">
