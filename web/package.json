@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "node scripts/check-auto-install.mjs && node scripts/check-shell.mjs && node scripts/check-host-browser.mjs && node scripts/check-players-browser.mjs && node scripts/check-room-admin.mjs && node scripts/check-rooms-browser.mjs && node scripts/check-world-icons.mjs && node scripts/check-world-config-browser.mjs && node scripts/check-mods-browser.mjs && node scripts/check-rollback-browser.mjs",
+    "test": "node scripts/check-auto-install.mjs && node scripts/check-shell.mjs && node scripts/check-host-browser.mjs && node scripts/check-players-browser.mjs && node scripts/check-room-admin.mjs && node scripts/check-rooms-browser.mjs && node scripts/check-saves-browser.mjs && node scripts/check-world-icons.mjs && node scripts/check-world-config-browser.mjs && node scripts/check-mods-browser.mjs && node scripts/check-rollback-browser.mjs",
     "preview": "vite preview",
     "lint": "node scripts/check-src.mjs && eslint .",
     "lint:fix": "eslint . --fix"
@@ -16,6 +16,7 @@
     "@fontsource-variable/instrument-sans": "^5.3.0",
     "@hugeicons/core-free-icons": "^4.3.5",
     "@hugeicons/vue": "^1.0.8",
+    "@tanstack/vue-table": "^9.3.1",
     "@vueuse/core": "^15.0.0",
     "class-variance-authority": "^0.7.1",
     "cn": "^0.5.0",

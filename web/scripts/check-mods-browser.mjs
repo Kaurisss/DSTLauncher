@@ -36,6 +36,8 @@ const details = [
 async function openMods({
   failDetails = false, running = false, delayDetails = false, delayMods = false, width = 1280,
   schema = [], config = {}, ugcDir = '', serverLocked = false,
+  modItems = mods, brokenIcons = [],
+  delayToggle = false,
   updateStatuses = [{ running: false, output: [] }],
 } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
@@ -46,11 +48,18 @@ async function openMods({
   });
   let releaseDetails;
   let releaseMods;
+  let releaseToggle;
   const waitForDetails = delayDetails ? new Promise(resolve => { releaseDetails = resolve; }) : Promise.resolve();
   const waitForMods = delayMods ? new Promise(resolve => { releaseMods = resolve; }) : Promise.resolve();
+  const waitForToggle = delayToggle ? new Promise(resolve => { releaseToggle = resolve; }) : Promise.resolve();
   const requests = [];
-  let currentMods = globalThis.structuredClone(mods);
-  currentMods[1].config = config;
+  const state = {
+    mods: globalThis.structuredClone(modItems), toggleError: '', configError: '', searchError: '',
+    workshopResults: details, searchPages: {}, startError: '', statusError: '',
+    listDelay: Promise.resolve(),
+    updates: { checked: 1, updates: [], missing: [], notInstalled: [] },
+  };
+  state.mods[1].config = config;
   let updateStatusIndex = 0;
   await page.route('https://fixtures.invalid/**', route => {
     if (route.request().url().endsWith('broken.png')) return route.fulfill({ status: 404, body: '' });
@@ -61,10 +70,16 @@ async function openMods({
   });
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
-    requests.push({ path: url.pathname, params: Object.fromEntries(url.searchParams), method: route.request().method() });
+    requests.push({ path: url.pathname, params: Object.fromEntries(url.searchParams), method: route.request().method(),
+      body: route.request().headers()['content-type']?.includes('application/json') ? route.request().postDataJSON() : null });
     const ok = data => route.fulfill({
       contentType: 'application/json', body: JSON.stringify({ code: 200, data }),
     });
+    const fail = message => route.fulfill({ json: { code: 500, message } });
+    if (url.pathname === '/api/mods/icon') {
+      if (brokenIcons.includes(url.searchParams.get('id'))) return route.fulfill({ status: 404, body: '' });
+      return route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="80" height="40"><rect width="80" height="40" fill="#397461"/></svg>' });
+    }
     if (url.pathname === '/api/rooms') return ok([{
       id: 2, name: '测试房间', key: 'Cluster_2', gameMode: 'survival', maxPlayers: 4,
       shards: [{ name: 'Master', worldType: 'forest', isMaster: true }],
@@ -75,24 +90,47 @@ async function openMods({
       installed: true, candidates: [], ugcDir, locked: serverLocked, archOptions: ['auto', '64', '32'],
     });
     if (url.pathname === '/api/mods') {
+      const list = globalThis.structuredClone(state.mods);
+      const delay = state.listDelay;
       await waitForMods;
-      return ok(currentMods);
+      await delay;
+      return ok(list);
     }
     if (url.pathname === '/api/mods/delete') {
-      currentMods = currentMods.filter(mod => mod.id !== url.searchParams.get('id'));
+      state.mods = state.mods.filter(mod => mod.id !== url.searchParams.get('id'));
       return ok({});
     }
+    if (url.pathname === '/api/mods/toggle') {
+      await waitForToggle;
+      if (state.toggleError) return fail(state.toggleError);
+      const mod = state.mods.find(mod => mod.id === url.searchParams.get('id'));
+      if (mod) mod.enabled = url.searchParams.get('enabled') === 'true';
+      return ok({});
+    }
+    if (url.pathname === '/api/mods/config') {
+      if (state.configError) return fail(state.configError);
+      const mod = state.mods.find(mod => mod.id === url.searchParams.get('id'));
+      (mod.config ||= {})[url.searchParams.get('key')] = JSON.parse(url.searchParams.get('value'));
+      return ok({});
+    }
+    if (url.pathname === '/api/mods/updates') return ok(state.updates);
     if (url.pathname === '/api/mods/schema') return ok(schema);
     if (url.pathname === '/api/workshop/details') {
       await waitForDetails;
       if (failDetails) return route.fulfill({
         contentType: 'application/json', body: JSON.stringify({ code: 500, message: 'Steam 暂时不可达' }),
       });
-      return ok(details);
+      return ok(url.searchParams.get('input').includes(',') ? details : state.workshopResults);
     }
+    if (url.pathname === '/api/workshop/search') {
+      if (state.searchError) return fail(state.searchError);
+      return ok(state.searchPages[url.searchParams.get('page')] || state.workshopResults);
+    }
+    if (url.pathname === '/api/workshop/key') { state.searchError = ''; return ok({}); }
     if (url.pathname === '/api/mods/update') {
-      if (route.request().method() === 'POST') return ok({ running: true, output: ['开始'] });
+      if (route.request().method() === 'POST') return state.startError ? fail(state.startError) : ok({ running: true, output: ['开始'] });
       if (route.request().method() === 'DELETE') return ok({});
+      if (state.statusError) return fail(state.statusError);
       return ok(updateStatuses[Math.min(updateStatusIndex++, updateStatuses.length - 1)]);
     }
     if (url.pathname === '/api/logs/stream') return route.fulfill({ contentType: 'text/event-stream', body: '' });
@@ -100,7 +138,7 @@ async function openMods({
   });
   await page.goto(origin);
   await page.locator(delayMods ? '.mod-skeleton' : '.mod-entry-head').first().waitFor();
-  return { page, requests, releaseDetails, releaseMods };
+  return { page, requests, releaseDetails, releaseMods, releaseToggle, state };
 }
 
 async function waitForTitle(page) {
@@ -231,7 +269,7 @@ test('封面加载失败保留占位图，运行中冻结修改但标题仍可�
     await page.waitForFunction(() => !document.querySelectorAll('.mod')[1].querySelector('img'));
     assert.equal(await broken.locator('.mod-cover svg').count(), 1);
     assert.equal(await broken.getByRole('switch').isDisabled(), true);
-    assert.equal(await broken.getByRole('button', { name: '更新', exact: true }).isDisabled(), true);
+    assert.equal(await broken.getByRole('button', { name: '重新下载', exact: true }).isDisabled(), true);
     assert.equal(await broken.getByRole('button', { name: '删除', exact: true }).isDisabled(), true);
     assert.equal(await broken.getByRole('link').getAttribute('target'), '_blank');
   } finally {
@@ -287,7 +325,7 @@ test('更新任务结束仍缺文件时，即使只有两行输出也应警告�
   }
 });
 
-test('更新终端在模态框显示，关闭不停止轮询，可重开并中止任务', async () => {
+test('下载留在后台，日志按需打开，关闭后继续轮询，可重开并中止任务', async () => {
   const { page, requests } = await openMods({
     updateStatuses: [
       { running: false, output: [] },
@@ -298,6 +336,10 @@ test('更新终端在模态框显示，关闭不停止轮询，可重开并中�
     await page.waitForLoadState('networkidle');
     await page.locator('.mod').first().getByRole('button', { name: '下载', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '模组更新', exact: true });
+    await page.getByRole('button', { name: '查看进度', exact: true }).waitFor();
+    assert.equal(await dialog.count(), 0, '下载不抢占当前操作');
+    assert.equal(await page.locator('.mod').nth(1).getByRole('button', { name: '删除', exact: true }).isDisabled(), true, '共享文件更新期间禁用删除');
+    await page.getByRole('button', { name: '查看进度', exact: true }).click();
     await dialog.waitFor();
     await dialog.getByText('25%', { exact: true }).waitFor();
     assert.match(await dialog.locator('pre').innerText(), /正在处理模组/);
@@ -353,4 +395,296 @@ test('工坊查询失败保留本地名称、ID 和操作，刷新可以重试',
   } finally {
     await page.close();
   }
+});
+
+test('本地搜索和状态筛选即时响应开关，刷新后仍保留筛选和已保存的状态', async () => {
+  const { page, requests } = await openMods();
+  try {
+    await waitForTitle(page);
+    const filter = page.getByRole('combobox', { name: '模组状态' });
+    await filter.selectOption('enabled');
+    assert.equal(await page.locator('.mod').count(), 1);
+    await page.locator('.mod').getByRole('switch').click();
+    await page.getByText('没有匹配的模组', { exact: true }).waitFor();
+    await filter.selectOption('disabled');
+    assert.equal(await page.locator('.mod').count(), 4);
+    const search = page.getByRole('textbox', { name: '搜索模组', exact: true });
+    await search.fill('本地已下载名称');
+    await page.locator('.mod').getByRole('link', { name: '已下载的工坊标题', exact: true }).waitFor();
+    assert.equal(await page.locator('.mod').count(), 1);
+    await search.fill('local-test');
+    assert.equal(await page.locator('.mod').count(), 1);
+    await page.getByRole('button', { name: '刷新', exact: true }).click();
+    await page.locator('.mod').getByText('本地测试模组', { exact: true }).waitFor();
+    assert.equal(await search.inputValue(), 'local-test');
+    await search.fill('不存在的模组');
+    await page.getByRole('button', { name: '清除筛选', exact: true }).click();
+    assert.equal(await page.locator('.mod').count(), 4);
+    assert.equal(requests.filter(r => r.path === '/api/mods/toggle').length, 1);
+  } finally { await page.close(); }
+});
+
+test('开关提交中禁止重复点击，失败恢复原状态，重试后正确保存', async () => {
+  const { page, requests, state, releaseToggle } = await openMods({ delayToggle: true });
+  try {
+    await waitForTitle(page);
+    state.toggleError = '无法保存启用状态';
+    const toggle = page.locator('.mod').first().getByRole('switch');
+    await toggle.click();
+    assert.equal(await toggle.isDisabled(), true);
+    await toggle.evaluate(el => el.click());
+    releaseToggle();
+    await page.getByText('无法保存启用状态', { exact: true }).waitFor();
+    assert.equal(await toggle.getAttribute('aria-checked'), 'true');
+    assert.equal(requests.filter(r => r.path === '/api/mods/toggle').length, 1);
+    state.toggleError = '';
+    await toggle.click();
+    await page.waitForFunction(() => document.querySelector('.mod [role=switch]').getAttribute('aria-checked') === 'false');
+    assert.equal(state.mods[0].enabled, false);
+  } finally { releaseToggle(); await page.close(); }
+});
+
+test('刷新慢响应晚于开关保存返回时，不会覆盖刚保存的启用状态', async () => {
+  const { page, state } = await openMods();
+  let release;
+  try {
+    await waitForTitle(page);
+    state.listDelay = new Promise(resolve => { release = resolve; });
+    const read = page.waitForRequest(request => new URL(request.url()).pathname === '/api/mods');
+    await page.getByRole('button', { name: '刷新', exact: true }).click();
+    await read;
+    state.listDelay = Promise.resolve();
+    const fresh = page.waitForResponse(response => new URL(response.url()).pathname === '/api/mods');
+    const toggle = page.locator('.mod').first().getByRole('switch');
+    await toggle.click();
+    await fresh;
+    const old = page.waitForResponse(response => new URL(response.url()).pathname === '/api/mods');
+    release();
+    await old;
+    assert.equal(await toggle.getAttribute('aria-checked'), 'false');
+    assert.equal(state.mods[0].enabled, false);
+  } finally { release?.(); await page.close(); }
+});
+
+test('配置侧栏保护未保存修改，撤销还原，保存失败保留草稿，成功后重新打开仍为新值', async () => {
+  const { page, state, requests } = await openMods({
+    schema: [{ name: 'text', label: '测试配置', default: '初始值' }, { name: 'count', label: '数量', type: 'number', default: 1, min: 1, max: 5 }],
+  });
+  try {
+    await waitForTitle(page);
+    const configure = page.locator('.mod').nth(1).getByRole('button', { name: '配置', exact: true });
+    await configure.click();
+    const field = page.getByRole('textbox', { name: '测试配置', exact: true });
+    await field.fill('保留草稿');
+    await page.getByRole('button', { name: '关闭配置', exact: true }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: '继续编辑', exact: true }).click();
+    assert.equal(await field.inputValue(), '保留草稿');
+    await page.getByRole('button', { name: '撤销修改', exact: true }).click();
+    assert.equal(await field.inputValue(), '初始值');
+    await field.fill('新的配置');
+    const count = page.getByRole('spinbutton', { name: '数量', exact: true });
+    await count.fill('99');
+    await page.getByRole('button', { name: '保存配置', exact: true }).click();
+    assert.equal(requests.filter(r => r.path === '/api/mods/config').length, 0, '无效范围不能提交');
+    await count.fill('2');
+    state.configError = '配置写入失败';
+    await page.getByRole('button', { name: '保存配置', exact: true }).click();
+    await page.getByText('配置写入失败', { exact: true }).waitFor();
+    assert.equal(await field.inputValue(), '新的配置');
+    state.configError = '';
+    await page.getByRole('button', { name: '保存配置', exact: true }).click();
+    await page.getByText('未保存', { exact: true }).waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: '关闭配置', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await configure.click();
+    await field.waitFor();
+    assert.equal(await field.inputValue(), '新的配置');
+    assert.equal(await count.inputValue(), '2');
+    await field.fill('放弃这次编辑');
+    await page.getByRole('button', { name: '关闭配置', exact: true }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: '放弃修改', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+  } finally { await page.close(); }
+});
+
+test('添加窗口按 ID 下载不抢焦点或重复排队，下载后可直接启用，关闭再打开保留查询', async () => {
+  const { page, state, requests } = await openMods({ updateStatuses: [
+    { running: false, output: [] }, { running: true, progress: '20%', output: ['开始下载'] },
+    { running: false, output: ['开始', '下载完成', '结束'] },
+  ] });
+  try {
+    state.workshopResults = [{ id: '55555555', title: '新测试模组', installed: false }];
+    await page.getByRole('button', { name: '添加模组', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: '添加模组', exact: true });
+    const input = dialog.getByRole('textbox', { name: '搜索创意工坊' });
+    await input.fill('55555555');
+    await input.press('Enter');
+    await dialog.getByRole('link', { name: '新测试模组', exact: true }).waitFor();
+    await dialog.getByRole('button', { name: '下载', exact: true }).click();
+    const queued = dialog.getByRole('button', { name: '已加入队列', exact: true });
+    await queued.waitFor();
+    assert.equal(await queued.isDisabled(), true);
+    assert.equal(await page.getByRole('dialog', { name: '模组更新', exact: true }).count(), 0);
+    assert.equal(requests.filter(r => r.path === '/api/mods/update' && r.method === 'POST').length, 1);
+    state.mods.push({ id: 'workshop-55555555', name: '新测试模组', enabled: false, installed: true });
+    await dialog.getByRole('button', { name: '启用', exact: true }).click();
+    await dialog.getByRole('button', { name: '已启用', exact: true }).waitFor();
+    assert.equal(state.mods.find(mod => mod.id === 'workshop-55555555').enabled, true);
+    await dialog.getByRole('button', { name: '完成', exact: true }).click();
+    await dialog.waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => document.activeElement?.textContent.trim() === '添加模组');
+    await page.getByRole('button', { name: '添加模组', exact: true }).click();
+    await dialog.getByRole('link', { name: '新测试模组', exact: true }).waitFor();
+    assert.equal(await input.inputValue(), '55555555');
+  } finally { await page.close(); }
+});
+
+test('关键词缺少 Key 时就地配置并重试，结果可翻页且翻页不提交尚未搜索的新关键词', async () => {
+  const { page, state, requests } = await openMods();
+  try {
+    state.searchError = '关键词搜索需要 Steam Web API Key';
+    state.searchPages = {
+      1: Array.from({ length: 20 }, (_, i) => ({ id: String(90000000 + i), title: `搜索结果 ${i + 1}` })),
+      2: [{ id: '90000020', title: '第二页结果' }],
+    };
+    await page.getByRole('button', { name: '添加模组', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: '添加模组', exact: true });
+    const input = dialog.getByRole('textbox', { name: '搜索创意工坊' });
+    await input.fill('背包');
+    await input.press('Enter');
+    const key = dialog.getByLabel('Steam Web API Key', { exact: true });
+    await key.waitFor();
+    assert.equal(await key.getAttribute('type'), 'password');
+    assert.equal(requests.some(r => r.path === '/api/workshop/key'), false, '不把现有密钥读到页面');
+    await key.fill('0123456789abcdef0123456789abcdef');
+    await dialog.getByRole('button', { name: '保存', exact: true }).click();
+    await dialog.getByRole('link', { name: '搜索结果 1', exact: true }).waitFor();
+    await dialog.getByRole('button', { name: '下一页', exact: true }).click();
+    await dialog.getByRole('link', { name: '第二页结果', exact: true }).waitFor();
+    await input.fill('还没提交的新关键词');
+    await dialog.getByRole('button', { name: '上一页', exact: true }).click();
+    await dialog.getByRole('link', { name: '搜索结果 1', exact: true }).waitFor();
+    const searches = requests.filter(r => r.path === '/api/workshop/search');
+    assert.deepEqual(searches.map(r => r.params.page), ['1', '1', '2', '1']);
+    assert.equal(searches.every(r => r.params.q === '背包'), true);
+  } finally { await page.close(); }
+});
+
+test('检查更新只报告结果，用户确认更新后才下载，提交失败可以重试', async () => {
+  const { page, state, requests } = await openMods({ updateStatuses: [
+    { running: false, output: [] }, { running: true, progress: '10%', output: ['开始'] },
+  ] });
+  try {
+    state.updates.updates = [{ id: mods[1].id, name: '已下载的工坊标题', localTime: 1, remoteTime: 2 }];
+    await page.getByRole('button', { name: '检查更新', exact: true }).click();
+    await page.getByText('1 个模组有新版本', { exact: true }).waitFor();
+    assert.equal(requests.some(r => r.path === '/api/mods/update' && r.method === 'POST'), false);
+    await page.getByRole('button', { name: '更新全部', exact: true }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: '取消', exact: true }).click();
+    assert.equal(requests.some(r => r.path === '/api/mods/update' && r.method === 'POST'), false);
+    state.startError = '下载服务暂不可用';
+    const item = page.locator('.mod').first();
+    await item.getByRole('button', { name: '下载', exact: true }).click();
+    await page.getByText('下载服务暂不可用', { exact: true }).waitFor();
+    assert.equal(await item.getByRole('button', { name: '下载', exact: true }).isEnabled(), true);
+    state.startError = '';
+    await page.getByRole('button', { name: '更新全部', exact: true }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: '开始更新', exact: true }).click();
+    await page.getByRole('button', { name: '查看进度', exact: true }).waitFor();
+    assert.equal(requests.filter(r => r.path === '/api/mods/update' && r.method === 'POST').at(-1).params.id, mods[1].id);
+    assert.equal(await page.getByRole('dialog', { name: '模组更新', exact: true }).count(), 0);
+  } finally { await page.close(); }
+});
+
+test('手机上的添加与配置窗口不溢出，运行中的配置可查看且只读', async () => {
+  const { page } = await openMods({ width: 375, running: true,
+    schema: Array.from({ length: 12 }, (_, i) => ({ name: `option_${i}`, label: `选项 ${i}`, default: 'value' })),
+  });
+  try {
+    await waitForTitle(page);
+    await page.locator('.mod').nth(1).getByRole('button', { name: '配置', exact: true }).click();
+    await page.getByLabel('选项 0', { exact: true }).waitFor();
+    assert.equal(await page.getByLabel('选项 0', { exact: true }).isDisabled(), true);
+    const save = page.getByRole('button', { name: '保存配置', exact: true });
+    assert.equal(await save.isDisabled(), true);
+    const box = await save.boundingBox();
+    assert.ok(box.y >= 0 && box.y + box.height <= 900, '保存栏始终可见');
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    await page.getByRole('button', { name: '关闭配置', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ state: 'hidden' });
+    await page.getByRole('button', { name: '添加模组', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: '添加模组', exact: true });
+    await dialog.getByRole('textbox', { name: '搜索创意工坊' }).fill('1185229307');
+    await dialog.getByRole('button', { name: '查询', exact: true }).click();
+    await dialog.getByRole('link').first().waitFor();
+    assert.equal(await dialog.getByRole('button', { name: '下载', exact: true }).isDisabled(), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    const bounds = await dialog.boundingBox();
+    assert.ok(bounds.x >= 0 && bounds.x + bounds.width <= 375 && bounds.y >= 0 && bounds.y + bounds.height <= 900);
+  } finally { await page.close(); }
+});
+
+test('进度请求失败显示状态未知，重试恢复真实进度，关闭日志后焦点返回入口', async () => {
+  const { page, state } = await openMods({ updateStatuses: [
+    { running: false, output: [] }, { running: true, progress: '50%', output: ['恢复后的下载输出'] },
+  ] });
+  try {
+    await page.waitForLoadState('networkidle');
+    state.statusError = '进度接口暂不可用';
+    await page.locator('.mod').first().getByRole('button', { name: '下载', exact: true }).click();
+    await page.getByText('无法读取更新进度：进度接口暂不可用', { exact: true }).waitFor();
+    await page.getByRole('button', { name: '更新日志', exact: true }).click();
+    const dialog = page.getByRole('dialog', { name: '模组更新', exact: true });
+    await dialog.getByText('进度暂不可用', { exact: true }).waitFor();
+    state.statusError = '';
+    await dialog.getByRole('button', { name: '重试', exact: true }).click();
+    await dialog.getByText('50%', { exact: true }).waitFor();
+    assert.match(await dialog.locator('pre').innerText(), /恢复后的下载输出/);
+    await dialog.getByRole('button', { name: '关闭', exact: true }).click();
+    await page.waitForFunction(() => document.activeElement?.textContent.trim() === '更新日志');
+  } finally { await page.close(); }
+});
+
+test('Steam 不可达时已安装模组直接显示本地图标，无需访问工坊详情', async () => {
+  const modItems = mods.map((mod, i) => ({ ...mod, name: `本地模组 ${i}`, installed: true, iconUrl: `/api/mods/icon?room=2&id=${mod.id}` }));
+  const { page, requests } = await openMods({ failDetails: true, modItems });
+  try {
+    await page.waitForFunction(() => {
+      const images = [...document.querySelectorAll('.mod-cover img')];
+      return images.length === 4 && images.every(img => img.complete && img.naturalWidth > 0);
+    });
+    const images = page.locator('.mod-cover img');
+    assert.equal(await images.count(), 4);
+    for (const image of await images.all()) {
+      assert.match(await image.getAttribute('src'), /^\/api\/mods\/icon\?/);
+      assert.equal(await image.evaluate(el => el.naturalWidth / el.naturalHeight), 2);
+    }
+    assert.equal(requests.filter(r => r.path === '/api/mods/icon').length, 4);
+    assert.equal(requests.some(r => r.path === '/api/workshop/details'), false);
+  } finally { await page.close(); }
+});
+
+test('本地图标不可用时回退到工坊封面，两者都失败时显示占位且不重复请求本地图标', async () => {
+  const modItems = mods.map(mod => ({ ...mod, installed: true, iconUrl: `/api/mods/icon?room=2&id=${mod.id}` }));
+  const brokenIcons = [mods[0].id, mods[1].id];
+  const { page, requests, state } = await openMods({ modItems, brokenIcons });
+  try {
+    await waitForTitle(page);
+    await page.waitForFunction(() => {
+      const first = document.querySelector('.mod .mod-cover img');
+      const second = document.querySelectorAll('.mod')[1].querySelector('.mod-cover img');
+      return first?.getAttribute('src') === 'https://fixtures.invalid/cover.svg' && first.complete && first.naturalWidth > 0 && !second;
+    });
+    assert.equal(await page.locator('.mod').nth(1).locator('.mod-cover svg').count(), 1);
+    assert.equal(requests.filter(r => r.path === '/api/mods/icon' && r.params.id === mods[0].id).length, 1);
+    assert.match(await page.locator('.mod').nth(2).locator('.mod-cover img').getAttribute('src'), /^\/api\/mods\/icon\?/);
+    brokenIcons.length = 0;
+    state.mods[0].iconUrl += '&v=updated';
+    await page.getByRole('button', { name: '刷新', exact: true }).click();
+    await page.waitForFunction(() => {
+      const image = document.querySelector('.mod .mod-cover img');
+      return image?.getAttribute('src')?.endsWith('&v=updated') && image.complete && image.naturalWidth > 0;
+    });
+    assert.equal(requests.filter(r => r.path === '/api/mods/icon' && r.params.id === mods[0].id).length, 2);
+  } finally { await page.close(); }
 });

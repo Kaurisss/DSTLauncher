@@ -5,11 +5,24 @@
 // 只有孤儿能在这里删——房间还在的存档必须先到「房间」页删房间，
 // 否则就太容易把正在玩的存档误删了。
 
-import { computed, onMounted, ref } from 'vue';
+import { computed, h, onMounted, ref } from 'vue';
+import {
+  createFilteredRowModel, createPaginatedRowModel, createSortedRowModel,
+  filterFn_includesString, FlexRender, globalFilteringFeature,
+  rowPaginationFeature, rowSortingFeature, sortFn_alphanumeric, sortFn_basic,
+  tableFeatures, useTable,
+} from '@tanstack/vue-table';
 
 import UiCard from '@/components/ui/UiCard.vue';
-import UiEmpty from '@/components/ui/UiEmpty.vue';
-import UiSkeleton from '@/components/ui/UiSkeleton.vue';
+import Icon from '@/components/ui/Icon.vue';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table, TableBody, TableCaption, TableCell, TableEmpty,
+  TableHead, TableHeader, TableRow,
+} from '@/components/ui/table';
 import { savesApi } from '@/lib/api.js';
 import { guard, toast } from '@/lib/toast.js';
 import { confirmAction } from '@/lib/confirm.js';
@@ -23,6 +36,57 @@ const loadError = ref('');
 const totalSize = computed(() => items.value.reduce((n, x) => n + (x.size || 0), 0));
 const orphans = computed(() => items.value.filter(x => !x.roomExists));
 const orphanSize = computed(() => orphans.value.reduce((n, x) => n + (x.size || 0), 0));
+
+const columns = [
+  {
+    accessorKey: 'cluster', header: '存档目录', sortFn: 'alphanumeric',
+    cell: ({ row }) => h('div', { class: 'flex items-center gap-2' }, [
+      h('code', {}, row.original.cluster),
+      row.original.running ? h(Badge, { variant: 'secondary' }, () => '运行中') : null,
+    ]),
+  },
+  {
+    id: 'room', header: '房间',
+    accessorFn: item => item.roomExists ? item.roomName : '房间已删除',
+    cell: ({ row, getValue }) => h('span', {
+      class: row.original.roomExists ? '' : 'text-amber-700 dark:text-amber-400',
+    }, getValue()),
+  },
+  { id: 'shards', header: '分片', accessorFn: item => item.hasSave ? shardNames(item) : '未生成世界' },
+  { accessorKey: 'size', header: '大小', enableGlobalFilter: false, cell: ({ getValue }) => fmtSize(getValue()) },
+  {
+    id: 'modTime', header: '最后修改', enableGlobalFilter: false,
+    accessorFn: item => new Date(item.modTime).getTime(),
+    cell: ({ row }) => fmtTime(row.original.modTime),
+  },
+  {
+    id: 'actions', header: '操作', enableSorting: false,
+    cell: ({ row }) => h(Button, {
+      variant: 'destructive', size: 'sm',
+      disabled: row.original.roomExists || row.original.running,
+      title: row.original.roomExists ? '房间还在，请先在房间页删除房间'
+        : (row.original.running ? '正在运行，请先停服' : '永久删除这份存档'),
+      onClick: () => remove(row.original),
+    }, () => '删除'),
+  },
+];
+
+const table = useTable({
+  features: tableFeatures({
+    globalFilteringFeature, rowSortingFeature, rowPaginationFeature,
+    filteredRowModel: createFilteredRowModel(),
+    sortedRowModel: createSortedRowModel(),
+    paginatedRowModel: createPaginatedRowModel(),
+    filterFns: { includesString: filterFn_includesString },
+    sortFns: { basic: sortFn_basic, alphanumeric: sortFn_alphanumeric },
+  }),
+  get data() { return items.value; },
+  columns,
+  getRowId: item => item.cluster,
+  defaultColumn: { sortFn: 'basic' },
+  globalFilterFn: 'includesString',
+  initialState: { pagination: { pageIndex: 0, pageSize: 10 } },
+});
 
 async function load() {
   loading.value = true;
@@ -75,71 +139,87 @@ async function remove(item) {
 <template>
   <UiCard>
     <template #title>存档管理</template>
-    <template #hint>磁盘上的全部存档目录</template>
     <template #actions>
-      <button class="btn btn-sm" @click="load">刷新</button>
+      <Button variant="outline" size="sm" :disabled="loading" @click="load">刷新</Button>
     </template>
 
-    <div class="save-summary">
-      <span>共 <b>{{ items.length }}</b> 个存档</span>
-      <span>占用 <b>{{ fmtSize(totalSize) }}</b></span>
-      <span v-if="orphans.length">
-        孤儿存档 <b>{{ orphans.length }}</b> 个 · <b>{{ fmtSize(orphanSize) }}</b>
-      </span>
-    </div>
+    <div class="grid min-w-0 gap-4">
+      <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
+        <span>共 <b class="font-medium text-foreground">{{ items.length }}</b> 个存档</span>
+        <span>占用 <b class="font-medium text-foreground">{{ fmtSize(totalSize) }}</b></span>
+        <span v-if="orphans.length">孤儿存档 {{ orphans.length }} 个 · {{ fmtSize(orphanSize) }}</span>
+      </div>
+      <code v-if="root" class="break-all text-xs text-muted-foreground">{{ root }}</code>
 
-    <p v-if="root" class="field-tip" style="margin-bottom: 14px">
-      存档根目录：<code>{{ root }}</code>。删除房间不会删这里的文件，
-      没有房间认领的存档只能在本页清理。
-    </p>
+      <Input
+        class="w-full sm:max-w-sm"
+        aria-label="搜索存档"
+        placeholder="搜索存档、房间或分片"
+        :model-value="table.atoms.globalFilter.get() ?? ''"
+        @update:model-value="table.setGlobalFilter"
+      />
 
-    <!-- 列宽按真实存档表的实测比例（1071px 下六列各 14/16/30/12/19%，末列自适应） -->
-    <UiSkeleton v-if="loading" variant="table" :rows="4" :cols="['14%', '16%', '30%', '12%', '19%', 'auto']" />
-    <UiEmpty v-else-if="loadError" icon="alert" :text="'读取失败：' + loadError" />
-    <UiEmpty v-else-if="!items.length" icon="folder" text="磁盘上还没有任何存档" />
-
-    <div v-else class="table-wrap">
-      <table class="table">
-        <thead>
-          <tr>
-            <th>存档目录</th>
-            <th>房间</th>
-            <th>分片</th>
-            <th>大小</th>
-            <th>最后修改</th>
-            <th class="right">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="s in items" :key="s.cluster">
-            <td>
-              <code>{{ s.cluster }}</code>
-              <span v-if="s.running" class="pill pill-info" style="margin-left: 6px">运行中</span>
-            </td>
-            <td>
-              <template v-if="s.roomExists">{{ s.roomName }}</template>
-              <span v-else class="save-orphan">房间已删除</span>
-            </td>
-            <td>
-              <span v-if="!s.hasSave" class="field-tip">未生成世界</span>
-              <template v-else>{{ shardNames(s) }}</template>
-            </td>
-            <td class="num">{{ fmtSize(s.size) }}</td>
-            <td>{{ fmtTime(s.modTime) }}</td>
-            <td class="right">
-              <button
-                class="btn btn-sm btn-danger"
-                :disabled="s.roomExists || s.running"
-                :title="s.roomExists ? '房间还在，请先在房间页删除房间'
-                  : (s.running ? '正在运行，请先停服' : '永久删除这份存档')"
-                @click="remove(s)"
+      <div class="min-w-0 overflow-hidden rounded-md border" :aria-busy="loading">
+        <Table class="min-w-[760px]">
+          <TableCaption class="sr-only">存档列表</TableCaption>
+          <TableHeader>
+            <TableRow v-for="group in table.getHeaderGroups()" :key="group.id">
+              <TableHead
+                v-for="header in group.headers"
+                :key="header.id"
+                :class="header.column.id === 'actions' ? 'text-right' : ''"
+                :aria-sort="header.column.getIsSorted() === 'asc' ? 'ascending'
+                  : header.column.getIsSorted() === 'desc' ? 'descending' : undefined"
               >
-                删除
-              </button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+                <Button
+                  v-if="header.column.getCanSort()"
+                  variant="ghost" size="sm" class="-ml-2"
+                  @click="header.column.toggleSorting()"
+                >
+                  <FlexRender :header="header" />
+                  <span aria-hidden="true">{{ header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕' }}</span>
+                </Button>
+                <FlexRender v-else :header="header" />
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            <template v-if="loading">
+              <TableRow v-for="row in 4" :key="row" aria-hidden="true">
+                <TableCell v-for="column in columns" :key="column.id || column.accessorKey" class="h-12">
+                  <Skeleton class="h-4 w-full" />
+                </TableCell>
+              </TableRow>
+            </template>
+            <TableEmpty v-else-if="loadError" :colspan="columns.length">
+              <span role="alert" class="text-destructive">读取失败：{{ loadError }}</span>
+            </TableEmpty>
+            <template v-else-if="table.getRowModel().rows.length">
+              <TableRow v-for="row in table.getRowModel().rows" :key="row.id">
+                <TableCell
+                  v-for="cell in row.getAllCells()" :key="cell.id"
+                  :class="cell.column.id === 'actions' ? 'text-right' : cell.column.id === 'size' ? 'font-mono tabular-nums' : ''"
+                >
+                  <FlexRender :cell="cell" />
+                </TableCell>
+              </TableRow>
+            </template>
+            <TableEmpty v-else :colspan="columns.length">
+              {{ items.length ? '没有匹配的存档' : '磁盘上还没有任何存档' }}
+            </TableEmpty>
+          </TableBody>
+        </Table>
+      </div>
+
+      <nav v-if="!loading && !loadError && items.length" aria-label="存档分页" class="flex flex-wrap items-center justify-end gap-2">
+        <span class="mr-2 text-sm text-muted-foreground" aria-live="polite">第 {{ table.atoms.pagination.get().pageIndex + 1 }} / {{ Math.max(1, table.getPageCount()) }} 页</span>
+        <Button variant="outline" size="sm" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
+          <Icon name="chevron" class="rotate-180" :size="14" />上一页
+        </Button>
+        <Button variant="outline" size="sm" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
+          下一页<Icon name="chevron" :size="14" />
+        </Button>
+      </nav>
     </div>
   </UiCard>
 </template>

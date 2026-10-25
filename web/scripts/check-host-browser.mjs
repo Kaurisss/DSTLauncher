@@ -67,6 +67,94 @@ test('没有房间也显示宿主机而非分片内存，桌面与手机无横�
   }
 });
 
+test('页面切换入场后内容可见，减少动态效果时停用动画', async () => {
+  const { page } = await openPanel();
+  try {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    await page.evaluate(() => {
+      window.pageEntries = 0;
+      document.addEventListener('animationstart', event => {
+        if (event.target.parentElement?.classList.contains('page-view')) window.pageEntries++;
+      });
+    });
+    const nav = page.locator('#app-navigation');
+    await nav.getByRole('button', { name: '房间', exact: true }).click();
+    await page.waitForFunction(() => window.pageEntries > 0);
+    await nav.getByRole('button', { name: '概览', exact: true }).click();
+    await page.getByRole('region', { name: '宿主机资源' }).waitFor();
+    await page.waitForFunction(() => window.pageEntries > 1);
+    const content = page.locator('.page-view > *').first();
+    await content.evaluate(async element => {
+      await Promise.all(element.getAnimations().map(animation => animation.finished));
+    });
+    assert.equal(await content.evaluate(element => window.getComputedStyle(element).opacity), '1');
+    assert.equal(await content.evaluate(element => window.getComputedStyle(element).transform), 'none');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await nav.getByRole('button', { name: '房间', exact: true }).click();
+    await page.getByRole('region', { name: '宿主机资源' }).waitFor({ state: 'hidden' });
+    assert.equal(await content.evaluate(element => window.getComputedStyle(element).animationName), 'none');
+  } finally { await page.close(); }
+});
+
+test('折叠导航只重排一次正文，图标不跳动，快速反向切换可恢复', async () => {
+  const { page } = await openPanel();
+  try {
+    await page.emulateMedia({ reducedMotion: 'no-preference' });
+    for (const expanded of [false, true]) {
+      const result = await page.evaluate(async () => {
+        const panel = document.querySelector('#page-content');
+        const view = panel.firstElementChild.firstElementChild;
+        const icon = document.querySelector('#app-navigation svg');
+        const top = icon.getBoundingClientRect().top;
+        const widths = [];
+        const positions = [];
+        document.querySelector('[data-sidebar="trigger"]').click();
+        for (let frame = 0; frame < 24; frame++) {
+          await new Promise(window.requestAnimationFrame);
+          widths.push(panel.getBoundingClientRect().width);
+          positions.push(panel.getBoundingClientRect().left);
+        }
+        return {
+          widths, positions, top, finalTop: icon.getBoundingClientRect().top,
+          sameView: view === panel.firstElementChild.firstElementChild,
+          edge: document.querySelector('[data-slot="sidebar-container"]').getBoundingClientRect().right,
+        };
+      });
+      assert.ok(Math.max(...result.widths) - Math.min(...result.widths) < 1, '正文宽度不随动画逐帧改变');
+      assert.ok(Math.max(...result.positions) - Math.min(...result.positions) > 10, '正文仍有平滑位移动画');
+      assert.equal(result.top, result.finalTop, '导航图标保持原来的垂直位置');
+      assert.equal(result.sameView, true, '展开收起不重建业务页面');
+      assert.ok(Math.abs(result.positions.at(-1) - result.edge) < 1, '动画结束后正文与侧栏边界对齐');
+      assert.equal(await page.getByRole('button', { name: '切换导航', exact: true }).getAttribute('aria-expanded'), String(expanded));
+    }
+    await page.evaluate(async () => {
+      const trigger = document.querySelector('[data-sidebar="trigger"]');
+      trigger.click();
+      await new Promise(resolve => window.setTimeout(resolve, 60));
+      trigger.click();
+    });
+    await page.waitForFunction(() => document.querySelector('#page-content').getAnimations().length === 0);
+    assert.equal(await page.getByRole('button', { name: '切换导航', exact: true }).getAttribute('aria-expanded'), 'true');
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await page.getByRole('button', { name: '切换导航', exact: true }).click();
+    assert.equal(await page.locator('#page-content').evaluate(element => element.getAnimations().length), 0);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  } finally { await page.close(); }
+});
+
+test('移动端导航仍使用抽屉，选页后关闭且不平移正文', async () => {
+  const { page } = await openPanel({ width: 375 });
+  try {
+    await page.getByRole('button', { name: '切换导航', exact: true }).click();
+    const drawer = page.locator('[data-mobile="true"]');
+    await drawer.waitFor({ state: 'visible' });
+    await drawer.getByRole('button', { name: '房间', exact: true }).click();
+    await drawer.waitFor({ state: 'hidden' });
+    assert.equal(await page.locator('#page-content').evaluate(element => window.getComputedStyle(element).transform), 'none');
+    assert.equal(await page.getByRole('button', { name: '切换导航', exact: true }).getAttribute('aria-expanded'), 'false');
+  } finally { await page.close(); }
+});
+
 test('高内存及低磁盘有文字预警，零可用空间显示真实零值', async () => {
   for (const availableBytes of [0, 9 * GB]) {
     const { page, section } = await openPanel({ data: {

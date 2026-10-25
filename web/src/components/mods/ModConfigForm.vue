@@ -7,6 +7,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import UiSkeleton from '@/components/ui/UiSkeleton.vue';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
@@ -20,13 +21,20 @@ const props = defineProps({
   /** 服务器运行中冻结：控件只读、禁止保存 */
   disabled: { type: Boolean, default: false },
 });
+const emit = defineEmits(['saved']);
 
 const schema = ref([]);
 const values = reactive({});
-const initialValues = {};
+const initialValues = reactive({});
 const loading = ref(true);
 const loadError = ref('');
 const saving = ref(false);
+const dirty = computed(() => schema.value.some(o => values[o.name] !== initialValues[o.name]));
+defineExpose({ dirty, saving });
+
+function reset() {
+  for (const o of schema.value) values[o.name] = initialValues[o.name];
+}
 
 /** 配置项的类型：有 options 就是下拉框，否则看 type */
 function fieldType(option) {
@@ -84,6 +92,7 @@ onMounted(async () => {
 const hasOptions = computed(() => schema.value.length > 0);
 
 async function save() {
+  if (saving.value) return;
   if (props.disabled) {
     toast('服务器运行中，请先关闭服务器再修改配置', 'warn');
     return;
@@ -101,8 +110,10 @@ async function save() {
       else value = JSON.stringify(raw == null ? '' : String(raw));
 
       await modApi.setConfig(props.roomId, props.mod.id, o.name, value);
+      initialValues[o.name] = values[o.name];
     }
     toast('模组配置已保存，重启后生效');
+    emit('saved');
   } catch (err) {
     toast(err.message, 'err');
   } finally {
@@ -112,78 +123,79 @@ async function save() {
 </script>
 
 <template>
-  <UiSkeleton v-if="loading" variant="form" :rows="3" />
+  <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="save">
+    <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+      <UiSkeleton v-if="loading" variant="form" :rows="3" />
 
-  <p v-else-if="loadError" class="field-tip">读取配置项失败：{{ loadError }}</p>
+      <p v-else-if="loadError" class="text-sm text-destructive" role="alert">读取配置项失败：{{ loadError }}</p>
 
-  <p v-else-if="!hasOptions" class="field-tip">该模组没有可配置项。</p>
+      <p v-else-if="!hasOptions" class="field-tip">该模组没有可配置项。</p>
 
-  <template v-else>
-    <p class="field-tip" style="margin-bottom: 10px">修改后需重启服务器生效</p>
+      <template v-else>
+        <div v-for="o in schema" :key="o.name" class="opt">
+          <label :for="`opt_${mod.id}_${o.name}`">{{ o.label || o.name }}</label>
 
-    <div v-for="o in schema" :key="o.name" class="opt">
-      <label :for="`opt_${mod.id}_${o.name}`">{{ o.label || o.name }}</label>
+          <Select
+            v-if="fieldType(o) === 'select'"
+            :model-value="values[o.name] !== undefined ? String(values[o.name]) : ''"
+            :disabled="disabled || saving"
+            @update:model-value="(v) => values[o.name] = v"
+          >
+            <SelectTrigger :id="`opt_${mod.id}_${o.name}`" class="min-w-36">
+              <SelectValue :placeholder="String(values[o.name] ?? '请选择')" />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem v-for="op in choiceList(o)" :key="op.data" :value="op.data">
+                  {{ op.label }}
+                </SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
 
-      <Select
-        v-if="fieldType(o) === 'select'"
-        :model-value="values[o.name] !== undefined ? String(values[o.name]) : ''"
-        :disabled="disabled"
-        @update:model-value="(v) => values[o.name] = v"
-      >
-        <SelectTrigger :id="`opt_${mod.id}_${o.name}`" class="min-w-36">
-          <SelectValue :placeholder="String(values[o.name] ?? '请选择')" />
-        </SelectTrigger>
-        <SelectContent position="popper">
-          <SelectGroup>
-            <SelectItem v-for="op in choiceList(o)" :key="op.data" :value="op.data">
-              {{ op.label }}
-            </SelectItem>
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+          <Select
+            v-else-if="fieldType(o) === 'boolean'"
+            :model-value="values[o.name] === true ? 'true' : (values[o.name] === false ? 'false' : '')"
+            :disabled="disabled || saving"
+            @update:model-value="(v) => values[o.name] = (v === 'true')"
+          >
+            <SelectTrigger :id="`opt_${mod.id}_${o.name}`" class="min-w-36">
+              <SelectValue :placeholder="String(values[o.name] ?? '请选择')" />
+            </SelectTrigger>
+            <SelectContent position="popper">
+              <SelectGroup>
+                <SelectItem value="true">开启</SelectItem>
+                <SelectItem value="false">关闭</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
 
-      <Select
-        v-else-if="fieldType(o) === 'boolean'"
-        :model-value="values[o.name] === true ? 'true' : (values[o.name] === false ? 'false' : '')"
-        :disabled="disabled"
-        @update:model-value="(v) => values[o.name] = (v === 'true')"
-      >
-        <SelectTrigger :id="`opt_${mod.id}_${o.name}`" class="min-w-36">
-          <SelectValue :placeholder="String(values[o.name] ?? '请选择')" />
-        </SelectTrigger>
-        <SelectContent position="popper">
-          <SelectGroup>
-            <SelectItem value="true">开启</SelectItem>
-            <SelectItem value="false">关闭</SelectItem>
-          </SelectGroup>
-        </SelectContent>
-      </Select>
+          <Input
+            v-else-if="fieldType(o) === 'number'"
+            :id="`opt_${mod.id}_${o.name}`"
+            v-model="values[o.name]"
+            type="number"
+            :disabled="disabled || saving"
+            :min="o.min !== undefined && o.min !== '' ? o.min : undefined"
+            :max="o.max !== undefined && o.max !== '' ? o.max : undefined"
+          />
 
-      <Input
-        v-else-if="fieldType(o) === 'number'"
-        :id="`opt_${mod.id}_${o.name}`"
-        v-model="values[o.name]"
-        type="number"
-        :disabled="disabled"
-        :min="o.min !== undefined && o.min !== '' ? o.min : undefined"
-        :max="o.max !== undefined && o.max !== '' ? o.max : undefined"
-      />
+          <Input
+            v-else
+            :id="`opt_${mod.id}_${o.name}`"
+            v-model="values[o.name]"
+            type="text"
+            :disabled="disabled || saving"
+          />
 
-      <Input
-        v-else
-        :id="`opt_${mod.id}_${o.name}`"
-        v-model="values[o.name]"
-        type="text"
-        :disabled="disabled"
-      />
-
-      <div v-if="o.description" class="opt-desc">{{ o.description }}</div>
+          <div v-if="o.description" class="opt-desc">{{ o.description }}</div>
+        </div>
+      </template>
     </div>
-
-    <div style="margin-top: 12px">
-      <button class="btn btn-sm btn-primary" :disabled="saving || disabled" @click="save">
-        {{ saving ? '保存中…' : '保存配置' }}
-      </button>
+    <div v-if="!loading && !loadError && hasOptions" class="flex shrink-0 items-center justify-end gap-2 border-t bg-background p-4">
+      <span v-if="dirty" role="status" class="mr-auto text-sm text-amber-700 dark:text-amber-400">未保存</span>
+      <Button type="button" variant="ghost" :disabled="!dirty || saving || disabled" @click="reset">撤销修改</Button>
+      <Button type="submit" :disabled="saving || disabled">{{ saving ? '保存中…' : '保存配置' }}</Button>
     </div>
-  </template>
+  </form>
 </template>

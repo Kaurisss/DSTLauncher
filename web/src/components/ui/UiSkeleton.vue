@@ -1,7 +1,7 @@
 <script setup>
 // 骨架屏：直接复用真实内容的 CSS 类（.mod / .table / .opt / .file-body），
 // 内边距、行高、圆角、行距都由真实样式决定，避免两处尺寸各改各的。
-// 模组封面固定 72px，条目高度随操作区换行；通用列表行 56.5px，表头 34px、
+// 模组封面固定 56px，条目高度随操作区换行；通用列表行 56.5px，表头 34px、
 // 表格行 52px，配置表单行 32px 高 / 行距 43px，文件预览体 313px 高。
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -12,7 +12,7 @@ defineProps({
    * 骨架结构类型：
    * - 'default' | 'text': 通用文本行
    * - 'list': 通用列表项（复用 .mod，实测 56.3px 高、行距 10px）
-   * - 'mod': 模组封面列表（72px 封面 + 名称/状态/ID，窄屏操作区换行）
+   * - 'mod': 模组封面列表（56px 封面 + 名称/ID/状态，窄屏操作区换行）
    * - 'table': 备份/存档表格（复用 .table，实测表头 34px + 每行 52px）
    * - 'code' | 'editor': 配置文件/代码预览块（复用 .file-card/.file-body，实测 313px 高/卡）
    * - 'card': 房间卡片（实测 343x375px 卡片）
@@ -28,19 +28,18 @@ const widthOf = i => WIDTHS[(i - 1) % WIDTHS.length];
 </script>
 
 <template>
-  <!-- 与 ModItem 一样由 72px 封面撑高，640px 以下操作区独占一行。 -->
+  <!-- 与 ModItem 一样由 56px 封面撑高，640px 以下操作区独占一行。 -->
   <div v-if="variant === 'mod'" class="mod-skeleton" aria-hidden="true">
     <div v-for="i in rows" :key="i" class="mod">
       <div class="flex flex-wrap items-center gap-4">
         <div class="flex min-w-0 flex-[1_1_280px] items-center gap-3.5 max-[640px]:basis-full">
-          <Skeleton class="size-[72px] shrink-0 rounded-lg bg-border" />
+          <Skeleton class="size-14 shrink-0 rounded-lg bg-border" />
           <div class="min-w-0 flex-1">
             <Skeleton class="h-[21px] w-52 max-w-full bg-border" />
-            <div class="my-[5px] flex gap-1.5">
-              <Skeleton class="h-[22px] w-[55px] rounded-full bg-border" />
+            <div class="mt-[5px] flex items-center gap-1.5">
+              <Skeleton class="h-[17px] w-28 bg-border" />
               <Skeleton class="h-[22px] w-[55px] rounded-full bg-border" />
             </div>
-            <Skeleton class="h-[17px] w-36 max-w-full bg-border" />
           </div>
         </div>
         <div class="ml-auto flex flex-wrap items-center gap-1.5 max-[640px]:w-full max-[640px]:justify-end">

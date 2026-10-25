@@ -1,5 +1,6 @@
 <script setup>
 import { computed } from 'vue';
+import iconUrl from '@/assets/icon.png';
 import { HugeiconsIcon } from '@hugeicons/vue';
 import { ComputerIcon, Moon02Icon, Sun03Icon } from '@hugeicons/core-free-icons';
 
@@ -56,13 +57,14 @@ function onTheme() {
     <!-- 品牌标识与标题 -->
     <div class="flex min-w-0 items-center gap-2 pr-2 sm:gap-2.5 sm:pr-3">
       <img
-        src="/icon.png"
+        :src="iconUrl"
         alt="DST"
+        width="32"
+        height="32"
         class="size-7 sm:size-8 shrink-0 rounded-lg object-cover shadow-xs"
       />
       <div class="min-w-0">
         <p class="truncate text-sm font-semibold leading-tight text-sidebar-foreground">DST 开服控制台</p>
-        <p class="text-xs text-muted-foreground leading-tight hidden sm:block">专用服务器管理</p>
       </div>
     </div>
 

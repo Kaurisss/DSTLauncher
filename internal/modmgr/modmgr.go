@@ -28,6 +28,7 @@ type Mod struct {
 	ID           string                 `json:"id"`         // workshop-1234567890
 	WorkshopID   string                 `json:"workshopId"` // 纯数字 ID
 	Name         string                 `json:"name"`
+	IconURL      string                 `json:"iconUrl,omitempty"`
 	Enabled      bool                   `json:"enabled"`
 	Installed    bool                   `json:"installed"` // 本地是否已下载
 	Config       map[string]interface{} `json:"config"`    // mod_config 配置项

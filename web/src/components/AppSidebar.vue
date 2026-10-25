@@ -8,7 +8,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
-  SidebarGroupLabel, SidebarMenu, SidebarMenuButton, SidebarMenuItem,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem,
   SidebarSeparator, useSidebar,
 } from '@/components/ui/sidebar';
 import { useUiStore } from '@/stores/ui.js';
@@ -42,12 +42,12 @@ function navigate(key) {
   <Sidebar collapsible="icon" class="top-14 h-[calc(100svh-3.5rem)]">
     <SidebarContent>
       <SidebarGroup>
-        <SidebarGroupLabel class="group-data-[collapsible=icon]:hidden">管理</SidebarGroupLabel>
         <SidebarGroupContent>
           <nav id="app-navigation" aria-label="主导航">
             <SidebarMenu>
               <SidebarMenuItem v-for="tab in ui.tabs" :key="tab.key">
                 <SidebarMenuButton
+                  class="transition-colors"
                   :is-active="ui.activeTab === tab.key"
                   :aria-current="ui.activeTab === tab.key ? 'page' : undefined"
                   :tooltip="tab.label"
@@ -66,8 +66,8 @@ function navigate(key) {
     <SidebarSeparator />
     <SidebarFooter class="gap-2 p-4 group-data-[collapsible=icon]:hidden">
       <Badge variant="secondary">日志 {{ connected ? '已连接' : '未连接' }}</Badge>
-      <p v-if="panelVersion" class="break-all text-xs text-muted-foreground" title="面板版本号，重建后可据此确认构建">面板 {{ panelVersion }}</p>
-      <p class="text-xs text-muted-foreground">{{ serverText }}</p>
+      <p v-if="panelVersion" class="truncate text-xs text-muted-foreground" title="面板版本号，重建后可据此确认构建">面板 {{ panelVersion }}</p>
+      <p class="truncate text-xs text-muted-foreground" :title="serverText">{{ serverText }}</p>
     </SidebarFooter>
   </Sidebar>
 </template>

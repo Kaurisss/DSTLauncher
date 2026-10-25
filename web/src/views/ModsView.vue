@@ -17,11 +17,15 @@ import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiPill from '@/components/ui/UiPill.vue';
 import UiSkeleton from '@/components/ui/UiSkeleton.vue';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import ModItem from '@/components/mods/ModItem.vue';
 import WorkshopPanel from '@/components/mods/WorkshopPanel.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { modApi, modUpdateApi, workshopApi } from '@/lib/api.js';
 import { guard, toast } from '@/lib/toast.js';
+import { confirmAction } from '@/lib/confirm.js';
 
 const rooms = useRoomsStore();
 
@@ -34,6 +38,20 @@ const loadError = ref('');
 const workshopDetails = ref({});
 const workshopError = ref('');
 const pendingDetails = new Set();
+const search = ref('');
+const filter = ref('all');
+const enabledCount = computed(() => mods.value.filter(mod => mod.enabled).length);
+const visibleMods = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  return displayMods.value.filter(mod => {
+    if (query && !(mod.searchText || `${mod.name} ${mod.id}`).toLowerCase().includes(query)) return false;
+    if (filter.value === 'enabled') return mod.enabled;
+    if (filter.value === 'disabled') return !mod.enabled;
+    if (filter.value === 'missing') return !mod.installed;
+    if (filter.value === 'updates') return !!updateMap.value[mod.id];
+    return true;
+  });
+});
 let loadRequest = 0;
 
 const hasCJK = s => /[\u4e00-\u9fff]/.test(s || '');
@@ -45,6 +63,7 @@ const displayMods = computed(() => mods.value.map(mod => {
   return {
     ...mod,
     name: (preferLocal ? mod.name : detail.title) || mod.name,
+    searchText: `${mod.name} ${detail.title || ''} ${mod.id}`,
     previewUrl: detail.previewUrl || '',
   };
 }));
@@ -87,7 +106,7 @@ async function load() {
     const list = (await modApi.list(room.id)) || [];
     if (disposed || request !== loadRequest) return;
     mods.value = list;
-    loadWorkshopDetails(list);
+    loadWorkshopDetails(list.filter(mod => !mod.iconUrl || !mod.name || mod.name === mod.id));
   } catch (err) {
     if (!disposed && request === loadRequest) loadError.value = err.message;
   } finally {
@@ -110,16 +129,29 @@ const updateMap = computed(() => {
   return map;
 });
 
-const updateNames = computed(() =>
-  ((checkResult.value && checkResult.value.updates) || [])
-    .map(u => u.name || u.id)
-    .join('、'));
+const updatesCount = computed(() => (checkResult.value?.updates || []).length);
+
+async function checkUpdates() {
+  const room = rooms.current;
+  if (!room || checking.value) return;
+  checking.value = true;
+  try {
+    const result = await modUpdateApi.check(room.id);
+    if (!disposed && rooms.currentId === room.id) checkResult.value = result;
+    return result;
+  } catch (err) {
+    toast('检查更新失败：' + err.message, 'err');
+  } finally {
+    checking.value = false;
+  }
+}
 
 /* ---------- 模组预更新 ---------- */
 
 const updating = ref(false);
 const updateOpen = ref(false);
 const updateLogButton = ref(null);
+const addModButton = ref(null);
 /** 创意工坊面板的展开状态 */
 const workshopOpen = ref(false);
 const progress = ref('');
@@ -127,88 +159,89 @@ const updateError = ref('');
 const output = ref([]);
 /** 排队等待下载的模组数量（后端串行消化，不并行） */
 const queuedCount = ref(0);
-/** 当前正在下载的创意工坊模组 ID（供结果列表做内联提示） */
-const downloadingId = ref('');
+/** 当前页面提交过的下载任务，避免重复加入同一会话。 */
+const queuedIds = ref([]);
+const pendingIds = ref([]);
+const busyIds = computed(() => [...queuedIds.value, ...pendingIds.value]);
+const queueing = ref(false);
+const stopping = ref(false);
+const pollError = ref('');
 let pollTimer = null;
+let polling = false;
 let disposed = false;
 
 function restoreUpdateFocus() {
-  nextTick(() => updateLogButton.value?.focus());
+  nextTick(() => updateLogButton.value?.$el?.focus());
+}
+
+function restoreWorkshopFocus() {
+  nextTick(() => addModButton.value?.$el?.focus());
 }
 
 function stopPoll() {
   if (pollTimer) {
-    clearInterval(pollTimer);
+    clearTimeout(pollTimer);
     pollTimer = null;
   }
 }
 
 async function pollUpdate() {
-  let st;
+  if (polling || disposed) return;
+  polling = true;
   try {
-    st = await modUpdateApi.status();
-  } catch (_) {
-    return // 轮询失败不打断，下一轮再试
-  }
-  if (disposed) return;
-  const wasUpdating = updating.value;
-  updating.value = !!st.running;
-  progress.value = st.progress || '';
-  updateError.value = st.error || '';
-  output.value = st.output || [];
-  queuedCount.value = st.queued || 0;
-  if (st.running && !wasUpdating) updateOpen.value = true;
-
-  if (!st.running) {
-    stopPoll();
-    downloadingId.value = '';
-    if (!wasUpdating) return; // 初次查询空闲状态不代表刚完成更新
-    // 更新结束后按实际结果汇报，绝不把「没下载到东西」说成成功——
-    // 引擎可能在任何阶段静默退出且退出码为 0，只有清点结果才算数
-    await load();
-    const missing = mods.value.filter(m => m.enabled && !m.installed).length;
-    const nothingTodo = st.output && st.output.length <= 2;
-    if (st.error) toast('模组更新失败：' + st.error, 'err');
-    else if (missing > 0) {
-      toast(`更新结束，但仍有 ${missing} 个模组未下载，请查看更新日志后重试`, 'warn');
-    } else if (nothingTodo) {
-      toast('全部模组均已在本地，无需更新');
-    } else {
-      toast('模组更新完成');
+    let st;
+    try {
+      st = await modUpdateApi.status();
+    } catch (err) {
+      if (!disposed) pollError.value = err.message;
+      return;
     }
+    if (disposed) return;
+    pollError.value = '';
+    const wasUpdating = updating.value;
+    updating.value = !!st.running;
+    progress.value = st.progress || '';
+    updateError.value = st.error || '';
+    output.value = st.output || [];
+    queuedCount.value = st.queued || 0;
+
+    if (!st.running) {
+      stopPoll();
+      queuedIds.value = [];
+      if (!wasUpdating) return; // 初次查询空闲状态不代表刚完成更新
+      // 引擎可能退出码为 0 却没下载成功，以本地文件清点结果为准。
+      await load();
+      checkResult.value = null;
+      const missing = mods.value.filter(m => m.enabled && !m.installed).length;
+      const nothingTodo = st.output && st.output.length <= 2;
+      if (st.error) toast('模组更新失败：' + st.error, 'err');
+      else if (missing > 0) {
+        updateError.value = `仍有 ${missing} 个已启用模组未下载`;
+        toast(`更新结束，但仍有 ${missing} 个模组未下载，请查看更新日志后重试`, 'warn');
+      } else if (nothingTodo) {
+        toast('全部模组均已在本地，无需更新');
+      } else {
+        toast('模组更新完成');
+      }
+    }
+  } finally {
+    polling = false;
   }
 }
 
 function startPoll() {
   if (disposed) return;
   stopPoll();
-  pollTimer = setInterval(pollUpdate, 2000);
+  pollTimer = setTimeout(async () => {
+    await pollUpdate();
+    if (!disposed && updating.value) startPoll();
+  }, 2000);
 }
 
-/**
- * 一键更新：先检查已启用的模组，再把需要处理的加入下载队列。
- *
- * 需要处理的有两类：
- *   - 本地有旧版（acf 记录的版本时间落后于工坊）→ 删旧文件重下
- *   - 已启用但本地根本没有 → 直接下载
- * 逐个发单模组请求，后端会串行排队，不会多个引擎进程抢写共享目录。
- */
+// 检查与下载分开：确认后才修改跨房间共享的模组文件。
 async function updateAll() {
-  const room = rooms.current;
-  if (!room || updating.value || checking.value) return;
-
-  checking.value = true;
-  let result;
-  try {
-    result = await modUpdateApi.check(room.id);
-    checkResult.value = result;
-  } catch (err) {
-    toast('检查更新失败：' + err.message, 'err');
-    return;
-  } finally {
-    checking.value = false;
-  }
-
+  const result = checkResult.value;
+  if (!result) return;
   const todo = new Set();
   for (const u of result.updates || []) todo.add(u.id);
   for (const id of result.notInstalled || []) todo.add(id);
@@ -218,46 +251,80 @@ async function updateAll() {
     return;
   }
 
-  let queued = 0;
-  for (const id of todo) {
-    try {
-      await modUpdateApi.start(room.id, null, id);
-      queued += 1;
-    } catch (err) {
-      toast(`${id} 加入更新队列失败：${err.message}`, 'err');
-    }
-  }
-  if (!queued) return;
+  if (!await confirmAction({
+    title: `更新 ${todo.size} 个模组？`,
+    description: '模组文件由所有房间及 Steam 客户端共享，请先退出游戏并暂停 Steam 的模组更新。',
+    confirmText: '开始更新',
+  })) return;
 
-  toast(`已开始更新 ${queued} 个模组`);
-  updating.value = true;
-  downloadingId.value = '';
-  startPoll();
-  updateOpen.value = true;
-  pollUpdate();
+  await enqueue([...todo]);
 }
 
-/** 单模组更新：下载中有会话在跑时后端会排队，这里不做 updating 拦截 */
-async function startOne(mod) {
+async function enqueue(ids) {
   const room = rooms.current;
-  if (!room) return;
-  const { ok, data } = await guard(() => modUpdateApi.start(room.id, null, mod.id));
-  if (!ok) return;
-  // POST 返回当前会话状态：queued > 0 说明这次点击进入了队列而不是立即开跑
-  if (data && data.queued > 0) {
-    toast(`${mod.name || mod.id} 已加入下载队列（第 ${data.queued} 位），完成当前任务后自动开始`);
-  } else {
-    toast(`已开始下载 ${mod.name || mod.id}`);
+  if (!room || frozen.value || queueing.value) return;
+  queueing.value = true;
+  let added = 0;
+  try {
+    for (const id of ids) {
+      if (disposed || rooms.currentId !== room.id || frozen.value) break;
+      if (queuedIds.value.includes(id)) continue;
+      queuedIds.value = [...queuedIds.value, id];
+      const { ok } = await guard(() => modUpdateApi.start(room.id, null, id));
+      if (ok) added++;
+      else queuedIds.value = queuedIds.value.filter(value => value !== id);
+    }
+    if (added && !disposed) {
+      toast(`${added} 个模组已加入下载队列`);
+      updating.value = true;
+      startPoll();
+      pollUpdate();
+    }
+  } finally {
+    queueing.value = false;
   }
-  updating.value = true;
-  downloadingId.value = mod.id;
-  startPoll();
-  updateOpen.value = true;
-  pollUpdate();
+}
+
+async function startOne(mod) {
+  const id = /^\d+$/.test(mod.id) ? `workshop-${mod.id}` : mod.id;
+  if (frozen.value || queueing.value || busyIds.value.includes(id)) return;
+  pendingIds.value = [...pendingIds.value, id];
+  try {
+    if (mod.installed && !await confirmAction(
+      `重新下载模组「${mod.name || id}」？\n\n`
+      + '模组文件与其它房间及 Steam 客户端共享。将先备份本地文件，下载失败时恢复；请先退出游戏并暂停 Steam 的模组更新。',
+    )) return;
+    await enqueue([id]);
+  } finally {
+    pendingIds.value = pendingIds.value.filter(value => value !== id);
+  }
+}
+
+function onToggled(id, enabled) {
+  const mod = mods.value.find(item => item.id === id);
+  if (mod) mod.enabled = enabled;
+}
+
+async function enableOne(id) {
+  const room = rooms.current;
+  if (!room || frozen.value || pendingIds.value.includes(id)) return;
+  pendingIds.value = [...pendingIds.value, id];
+  try {
+    const { ok } = await guard(() => modApi.toggle(room.id, id, true), { success: '模组已启用' });
+    if (ok && !disposed && room.id === rooms.currentId) await load();
+  } finally {
+    pendingIds.value = pendingIds.value.filter(value => value !== id);
+  }
 }
 
 async function stopUpdate() {
-  await guard(() => modUpdateApi.stop(), { success: '已请求中止更新' });
+  if (stopping.value) return;
+  stopping.value = true;
+  try {
+    await guard(() => modUpdateApi.stop(), { success: '已请求中止更新' });
+  } finally {
+    stopping.value = false;
+  }
 }
 
 onMounted(async () => {
@@ -284,36 +351,34 @@ watch(() => rooms.current, () => {
   <DialogRoot v-model:open="updateOpen">
     <UiCard>
       <template #title>模组管理</template>
-      <template #hint>启用/禁用后需重启服务器才生效；模组实体跨房间共享</template>
       <template #actions>
-        <button
-          class="btn btn-sm btn-primary"
-          :disabled="frozen || !rooms.current || updating || checking"
-          title="先检查已启用的模组，再把有新版本、未下载的模组下载下来"
-          @click="updateAll"
+        <Button
+          variant="outline" size="sm"
+          :disabled="!rooms.current || updating || checking || queueing"
+          @click="checkUpdates"
         >
-          <Icon name="download" size="14" />{{ updating ? '更新中…' : (checking ? '检查中…' : '更新模组') }}
-        </button>
-        <button
-          class="btn btn-sm transition-none"
-          :class="{ 'btn-primary': workshopOpen }"
+          <Icon name="refresh" size="14" />{{ checking ? '检查中…' : '检查更新' }}
+        </Button>
+        <Button
+          ref="addModButton"
+          size="sm"
           :disabled="!rooms.current"
-          :aria-expanded="workshopOpen"
-          @click="workshopOpen = !workshopOpen"
+          aria-haspopup="dialog"
+          @click="workshopOpen = true"
         >
-          <Icon name="globe" size="14" />创意工坊
-        </button>
-        <button
-          v-if="updating || output.length || updateError"
+          <Icon name="plus" size="14" />添加模组
+        </Button>
+        <Button
+          v-if="updating || output.length || updateError || pollError"
           ref="updateLogButton"
-          class="btn btn-sm"
+          variant="outline" size="sm"
           aria-haspopup="dialog"
           :aria-expanded="updateOpen"
           @click="updateOpen = true"
         >
           更新日志
-        </button>
-        <button class="btn btn-sm" @click="load">刷新</button>
+        </Button>
+        <Button variant="ghost" size="icon-sm" :disabled="loading" aria-label="刷新" title="刷新模组列表" @click="load"><Icon name="refresh" size="16" /></Button>
       </template>
 
       <UiSkeleton v-if="!rooms.loaded" variant="mod" :rows="4" />
@@ -325,37 +390,21 @@ watch(() => rooms.current, () => {
       <UiEmpty v-else-if="loadError" icon="alert" :text="'读取模组失败：' + loadError" />
 
       <template v-else>
-        <div v-if="frozen" class="notice" style="margin-bottom: 14px">
+        <div v-if="frozen" class="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm" role="status">
           <Icon name="info" size="16" />
-          <span>
-            服务器运行中，模组修改已冻结。请先在「总览」页
-            <strong>关闭服务器</strong>后再启用/禁用模组、修改配置或更新模组。
-          </span>
+          <span>服务器运行中，模组修改已冻结。</span>
         </div>
-        <p v-else-if="missingCount" class="field-tip" style="margin-bottom: 14px">
-          有 {{ missingCount }} 个已启用的模组尚未下载，
-          点右上角<strong>「更新模组」</strong>补齐后再启动服务器（启动时会做检查）。
-        </p>
+        <div v-else-if="missingCount" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+          <Icon name="download" size="16" />
+          <span>{{ missingCount }} 个已启用模组未下载</span>
+          <Button class="ml-auto" variant="outline" size="sm" :disabled="queueing || updating" @click="enqueue(mods.filter(mod => mod.enabled && !mod.installed).map(mod => mod.id))">下载缺失</Button>
+        </div>
 
         <!-- 检查结果：明确指出是哪个模组旧了，客户端只会笼统提示「有旧版本 mod」 -->
-        <div v-if="checkResult" class="notice" style="margin-bottom: 14px">
-          <Icon name="info" size="16" />
-          <span v-if="checkResult.updates.length">
-            已检查 {{ checkResult.checked }} 个工坊模组，
-            <strong>{{ checkResult.updates.length }} 个有新版本</strong>：{{ updateNames }}。
-            已加入更新队列，结果见「更新日志」。
-          </span>
-          <span v-else>
-            已检查 {{ checkResult.checked }} 个工坊模组，全部是最新版。
-          </span>
+        <div v-if="checkResult" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3 text-sm" role="status">
+          <span>{{ updatesCount ? `${updatesCount} 个模组有新版本` : '没有可更新的模组' }}</span>
+          <Button v-if="updatesCount" class="ml-auto" size="sm" :disabled="frozen || updating || queueing" @click="updateAll">更新全部</Button>
         </div>
-        <p
-          v-if="checkResult && (checkResult.notInstalled || []).length"
-          class="field-tip"
-          style="margin-bottom: 14px"
-        >
-          另有 {{ (checkResult.notInstalled || []).length }} 个已启用但未下载的模组，已一并加入队列。
-        </p>
         <p
           v-if="checkResult && (checkResult.missing || []).length"
           class="field-tip"
@@ -364,54 +413,74 @@ watch(() => rooms.current, () => {
           工坊查不到以下模组（可能已下架或 ID 有误）：{{ (checkResult.missing || []).join('、') }}
         </p>
 
-        <!-- 创意工坊：搜索 / ID 查询，下载走统一更新会话 -->
-        <WorkshopPanel
-          v-if="workshopOpen"
-          :downloading-id="downloadingId"
-          :progress="progress"
-          @download="startOne"
-        />
+        <div v-if="updating || updateError || pollError" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3 text-sm" role="status">
+          <Icon :name="updateError || pollError ? 'alert' : 'download'" size="16" />
+          <span class="min-w-0 flex-1 break-words">{{ pollError ? '无法读取更新进度：' + pollError : updateError || progress || '正在下载模组…' }}</span>
+          <span v-if="updating && queuedCount" class="text-muted-foreground">排队 {{ queuedCount }} 个</span>
+          <Button v-if="pollError" variant="outline" size="sm" @click="pollUpdate">重试</Button>
+          <Button variant="outline" size="sm" @click="updateOpen = true">查看进度</Button>
+        </div>
 
         <p v-if="workshopError" class="field-tip mb-3" role="status">
           创意工坊信息暂未加载：{{ workshopError }}。当前显示本地名称或 ID，可点击「刷新」重试。
         </p>
-        <template v-if="mods.length">
+        <div v-if="mods.length" class="mb-4 flex flex-wrap items-center gap-3">
+          <Input v-model="search" class="min-w-0 flex-1 sm:max-w-sm" aria-label="搜索模组" placeholder="搜索模组名称或 ID" />
+          <NativeSelect v-model="filter" aria-label="模组状态" class="w-full sm:w-40">
+            <NativeSelectOption value="all">全部 {{ mods.length }}</NativeSelectOption>
+            <NativeSelectOption value="enabled">已启用 {{ enabledCount }}</NativeSelectOption>
+            <NativeSelectOption value="disabled">已禁用 {{ mods.length - enabledCount }}</NativeSelectOption>
+            <NativeSelectOption value="missing">未下载 {{ mods.filter(mod => !mod.installed).length }}</NativeSelectOption>
+            <NativeSelectOption value="updates">有更新 {{ updatesCount }}</NativeSelectOption>
+          </NativeSelect>
+          <span class="ml-auto text-sm tabular-nums text-muted-foreground">已启用 {{ enabledCount }} / {{ mods.length }}</span>
+        </div>
+        <template v-if="visibleMods.length">
           <ModItem
-            v-for="m in displayMods"
+            v-for="m in visibleMods"
             :key="m.id"
             :mod="m"
             :update-info="updateMap[m.id] || null"
+            :downloading="busyIds.includes(m.id)"
+            :updating="updating || queueing"
             @changed="load"
             @update="startOne"
+            @toggled="enabled => onToggled(m.id, enabled)"
+            @cover-needed="loadWorkshopDetails([m])"
           />
         </template>
-        <UiEmpty
-          v-else-if="!updating"
-          icon="package"
-          text="还没有模组。展开上方「创意工坊」搜索或粘贴 ID 下载，下载完成后会出现在这里。"
-        />
+        <div v-else class="grid justify-items-center gap-3 rounded-lg border border-dashed p-10">
+          <UiEmpty icon="package" :text="mods.length ? '没有匹配的模组' : '还没有模组'" />
+          <Button v-if="mods.length" variant="outline" size="sm" @click="search = ''; filter = 'all'">清除筛选</Button>
+          <Button v-else size="sm" @click="workshopOpen = true">添加模组</Button>
+        </div>
       </template>
     </UiCard>
+
+    <WorkshopPanel
+      v-model:open="workshopOpen"
+      :mods="mods" :busy-ids="busyIds" :disabled="frozen || queueing"
+      @download="startOne" @enable="enableOne" @closed="restoreWorkshopFocus"
+    />
 
     <DialogPortal>
       <DialogOverlay class="fixed inset-0 z-50 bg-black/20" />
       <DialogContent class="mod-update-dialog" @close-auto-focus.prevent="restoreUpdateFocus">
         <div class="flex flex-wrap items-center gap-2">
           <DialogTitle class="text-lg font-semibold">模组更新</DialogTitle>
-          <UiPill :tone="updating ? 'info' : (updateError ? 'danger' : 'ok')" role="status">
-            {{ updating ? (progress || '进行中') : (updateError ? '失败' : '完成') }}
+          <UiPill :tone="pollError ? 'warn' : updating ? 'info' : (updateError ? 'danger' : 'ok')" role="status">
+            {{ pollError ? '进度暂不可用' : updating ? (progress || '进行中') : (updateError ? '失败' : '完成') }}
           </UiPill>
         </div>
-        <DialogDescription class="text-sm text-muted-foreground">
-          模组文件由所有房间共享。关闭窗口不会中止更新，可通过「更新日志」重新查看。
-        </DialogDescription>
+        <DialogDescription class="sr-only">模组下载任务的进度与日志</DialogDescription>
         <p v-if="queuedCount" class="field-tip">队列中还有 {{ queuedCount }} 个待下载</p>
-        <p v-if="updateError" class="text-sm text-destructive" role="alert">{{ updateError }}</p>
-        <pre class="mod-update-log mod-terminal" tabindex="0" role="region" aria-label="模组更新输出">{{ output.join('\n') || '正在等待更新输出…' }}</pre>
+        <p v-if="updateError || pollError" class="text-sm text-destructive" role="alert">{{ pollError ? '无法读取更新进度：' + pollError : updateError }}</p>
+        <pre class="mod-update-log mod-terminal" tabindex="0" role="region" aria-label="模组更新输出">{{ output.join('\n') || (updating ? '正在等待更新输出…' : '暂无更新输出') }}</pre>
         <div class="flex justify-end gap-2">
-          <button v-if="updating" class="btn btn-danger" @click="stopUpdate">中止</button>
+          <Button v-if="pollError" variant="outline" @click="pollUpdate">重试</Button>
+          <Button v-if="updating" variant="destructive" :disabled="stopping" @click="stopUpdate">{{ stopping ? '正在中止…' : '中止' }}</Button>
           <DialogClose as-child>
-            <button class="btn">关闭</button>
+            <Button variant="outline">关闭</Button>
           </DialogClose>
         </div>
       </DialogContent>

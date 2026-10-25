@@ -4,7 +4,9 @@
 // 各视图自己负责加载「进入时」的数据；这里只管与时间相关的部分：
 // 状态轮询、房间列表刷新、日志 SSE 连接。
 
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+
+import iconUrl from '@/assets/icon.png';
 
 import AppSidebar from '@/components/AppSidebar.vue';
 import TopBar from '@/components/TopBar.vue';
@@ -15,13 +17,6 @@ import { Input } from '@/components/ui/input';
 import { SidebarProvider } from '@/components/ui/sidebar';
 
 import OverviewView from '@/views/OverviewView.vue';
-import RoomsView from '@/views/RoomsView.vue';
-import WorldView from '@/views/WorldView.vue';
-import ModsView from '@/views/ModsView.vue';
-import BackupsView from '@/views/BackupsView.vue';
-import SavesView from '@/views/SavesView.vue';
-import ConfigView from '@/views/ConfigView.vue';
-import SettingsView from '@/views/SettingsView.vue';
 
 import { onUnauthorized } from '@/lib/api.js';
 import { useAuthStore } from '@/stores/auth.js';
@@ -33,13 +28,13 @@ import { guard } from '@/lib/toast.js';
 /** 标签 key -> 视图组件。加新页面时在这里登记一行。 */
 const VIEWS = {
   overview: OverviewView,
-  rooms: RoomsView,
-  world: WorldView,
-  mods: ModsView,
-  backups: BackupsView,
-  saves: SavesView,
-  config: ConfigView,
-  settings: SettingsView,
+  rooms: defineAsyncComponent(() => import('@/views/RoomsView.vue')),
+  world: defineAsyncComponent(() => import('@/views/WorldView.vue')),
+  mods: defineAsyncComponent(() => import('@/views/ModsView.vue')),
+  backups: defineAsyncComponent(() => import('@/views/BackupsView.vue')),
+  saves: defineAsyncComponent(() => import('@/views/SavesView.vue')),
+  config: defineAsyncComponent(() => import('@/views/ConfigView.vue')),
+  settings: defineAsyncComponent(() => import('@/views/SettingsView.vue')),
 };
 
 /** 兜底：万一 activeTab 与 VIEWS 不一致，也不会渲染出空白页。 */
@@ -56,6 +51,23 @@ const logs = useLogs();
 const loginPwd = ref('');
 const loggingIn = ref(false);
 const loginError = ref('');
+const pageContent = ref(null);
+let sidebarAnimation;
+
+async function animateSidebarChange() {
+  const panel = pageContent.value;
+  if (!panel) return;
+  const left = panel.getBoundingClientRect().left;
+  sidebarAnimation?.cancel();
+  await nextTick();
+  if (!panel.isConnected || !window.matchMedia('(min-width: 768px) and (prefers-reduced-motion: no-preference)').matches) return;
+  // 只重排一次正文；中断时从当前可见位置继续，不逐帧改变内容宽度。
+  const offset = left - panel.getBoundingClientRect().left;
+  sidebarAnimation = panel.animate(
+    [{ transform: `translateX(${offset}px)` }, { transform: 'translateX(0)' }],
+    { duration: 180, easing: 'cubic-bezier(0.2, 0, 0, 1)' },
+  );
+}
 
 let statusTimer = null;
 let roomsTimer = null;
@@ -122,6 +134,7 @@ onMounted(async () => {
 
 onUnmounted(() => {
   disposed = true;
+  sidebarAnimation?.cancel();
   clearInterval(statusTimer);
   clearInterval(roomsTimer);
   logs.disconnect();
@@ -132,10 +145,9 @@ onUnmounted(() => {
   <div v-if="!auth.authenticated" class="flex min-h-svh items-center justify-center bg-sidebar p-4 text-sidebar-foreground">
     <form class="grid w-full max-w-sm gap-4 rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm" @submit.prevent="submitLogin">
       <div class="flex items-center gap-3">
-        <img src="/icon.png" alt="DST" class="size-10 shrink-0 rounded-lg object-cover shadow-xs" />
+        <img :src="iconUrl" alt="DST" width="40" height="40" class="size-10 shrink-0 rounded-lg object-cover shadow-xs" />
         <div>
           <h1 class="text-base font-semibold leading-tight">DST 开服控制台</h1>
-          <p class="text-xs text-muted-foreground">请输入访问密码解锁面板</p>
         </div>
       </div>
       <Input
@@ -152,7 +164,7 @@ onUnmounted(() => {
     </form>
   </div>
 
-  <SidebarProvider v-else class="flex h-svh max-h-svh flex-col overflow-hidden bg-sidebar">
+  <SidebarProvider v-else class="flex h-svh max-h-svh flex-col overflow-hidden bg-sidebar" @update:open="animateSidebarChange">
     <a href="#page-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:p-3 focus:text-foreground focus:shadow-md">跳到内容</a>
     <TopBar />
 
@@ -161,11 +173,12 @@ onUnmounted(() => {
 
       <main
         id="page-content"
+        ref="pageContent"
         tabindex="-1"
         class="flex-1 min-w-0 md:rounded-tl-xl bg-background md:border-t md:border-l border-border shadow-xs flex flex-col overflow-y-auto"
         style="scrollbar-gutter: stable"
       >
-        <div class="w-full max-w-[2400px] min-w-0 p-4 md:p-6">
+        <div class="page-view w-full max-w-[2400px] min-w-0 p-4 md:p-6">
           <!-- 不延迟旧视图卸载，快速导航和换房始终只保留一个业务实例。 -->
           <component :is="currentView" :key="viewKey" />
         </div>
@@ -176,3 +189,17 @@ onUnmounted(() => {
   <ToastHost />
   <ConfirmHost />
 </template>
+
+<style scoped>
+/* 在实际内容挂载后入场，兼容异步视图和多根节点，不延迟旧实例卸载。 */
+@media (prefers-reduced-motion: no-preference) {
+  .page-view > :deep(*) {
+    animation: page-enter 180ms ease-out;
+  }
+}
+
+@keyframes page-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+</style>

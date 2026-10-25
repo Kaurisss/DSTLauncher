@@ -1,175 +1,140 @@
 <script setup>
-// 创意工坊面板：按关键词搜索 / 按 ID 链接查询，结果可直接下载。
-//
-// 网络现实：创意工坊网页在境内不可直连，搜索依赖 Steam Web API（可达）。
-// 其中按 ID/链接查详情免 key，关键词搜索需要免费的 Web API Key——
-// 所以查询入口合并成一个输入框：内容像 ID/链接就走详情，否则走搜索；
-// 搜索没配 key 时给出明确指引并就地提供 key 设置。
-//
-// 下载不在本组件：emit('download', mod) 交给父组件走统一的
-// 单模组更新会话（复用轮询与输出面板）。
-
 import { computed, ref } from 'vue';
-
 import Icon from '@/components/ui/Icon.vue';
-import UiPill from '@/components/ui/UiPill.vue';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { workshopApi } from '@/lib/api.js';
-import { guard, toast } from '@/lib/toast.js';
+import { fmtSize } from '@/lib/format.js';
 
-defineProps({
-  /** 当前正在下载的模组 ID：结果列表里做内联提示 */
-  downloadingId: { type: String, default: '' },
-  /** 下载进度百分比（引擎不打印时为空串，只显示「下载中」） */
-  progress: { type: String, default: '' },
+const props = defineProps({
+  open: { type: Boolean, default: false },
+  mods: { type: Array, default: () => [] },
+  busyIds: { type: Array, default: () => [] },
+  disabled: { type: Boolean, default: false },
 });
-
-const emit = defineEmits(['download']);
-
+const emit = defineEmits(['update:open', 'download', 'enable', 'closed']);
 const keyword = ref('');
 const searching = ref(false);
 const results = ref([]);
 const searched = ref(false);
-
-/** 判断输入是不是「ID / 链接」形态（纯数字、workshop-数字、含 id= 的链接） */
-const looksLikeId = computed(() => {
-  const v = keyword.value.trim();
-  return v !== '' && (/^\d{4,15}$/.test(v) || /^workshop-\d+$/.test(v) || /id=\d+/.test(v));
-});
-
-/* ---------- API Key 设置 ---------- */
-
+const error = ref('');
+const page = ref(1);
+const queried = ref('');
+const idQuery = ref(false);
 const showKeyForm = ref(false);
 const apiKeyInput = ref('');
-const keyLoaded = ref(false);
 const savingKey = ref(false);
+const keyError = ref('');
+const keySaved = ref(false);
+const currentMods = computed(() => new Map(props.mods.map(mod => [mod.id.replace(/^workshop-/, ''), mod])));
+const looksLikeId = computed(() => /^(?:\d[\d\s,]*|workshop-\d+)$|[?&]id=\d+/.test(keyword.value.trim()));
 
-async function toggleKeyForm() {
-  showKeyForm.value = !showKeyForm.value;
-  if (showKeyForm.value && !keyLoaded.value) {
-    const { ok, data } = await guard(() => workshopApi.getKey());
-    if (ok) {
-      apiKeyInput.value = data.steamApiKey || '';
-      keyLoaded.value = true;
-    }
+async function saveKey() {
+  if (savingKey.value) return;
+  savingKey.value = true;
+  keyError.value = '';
+  try {
+    await workshopApi.saveKey(apiKeyInput.value.trim());
+    apiKeyInput.value = '';
+    showKeyForm.value = false;
+    keySaved.value = true;
+    if (keyword.value.trim() && /key/i.test(error.value)) await query();
+  } catch (err) {
+    keyError.value = err.message;
+  } finally {
+    savingKey.value = false;
   }
 }
 
-async function saveKey() {
-  savingKey.value = true;
-  const { ok } = await guard(
-    () => workshopApi.saveKey(apiKeyInput.value.trim()),
-    { success: apiKeyInput.value.trim() ? 'API Key 已保存' : 'API Key 已清空' },
-  );
-  savingKey.value = false;
-  if (ok) showKeyForm.value = false;
-}
-
-/* ---------- 查询 ---------- */
-
-function formatSize(item) {
-  if (!item.fileSize) return '';
-  const mb = item.fileSize / 1048576;
-  return mb >= 1 ? mb.toFixed(1) + ' MB' : Math.max(1, Math.round(item.fileSize / 1024)) + ' KB';
-}
-
-async function query() {
-  const v = keyword.value.trim();
-  if (!v || searching.value) return;
+async function query(nextPage) {
+  const fresh = nextPage === undefined;
+  const targetPage = nextPage ?? 1;
+  const value = fresh ? keyword.value.trim() : queried.value;
+  if (!value || searching.value) return;
   searching.value = true;
+  error.value = '';
   try {
-    if (looksLikeId.value) {
-      // ID / 链接模式
-      results.value = await workshopApi.details(v);
-    } else {
-      results.value = await workshopApi.search(v);
-    }
+    const byId = fresh ? looksLikeId.value : idQuery.value;
+    const list = byId ? await workshopApi.details(value) : await workshopApi.search(value, targetPage);
+    results.value = list || [];
+    queried.value = value;
+    idQuery.value = byId;
+    page.value = targetPage;
     searched.value = true;
   } catch (err) {
-    toast(err.message, 'err');
+    error.value = err.message;
+    if (!looksLikeId.value && /key/i.test(err.message)) showKeyForm.value = true;
   } finally {
     searching.value = false;
   }
 }
-
-/** 提取纯 id（下载接口要 workshop-<数字> 格式，交给父组件拼装）。
- *  下载中有会话在跑也没关系：后端会排队串行下载 */
-function download(item) {
-  emit('download', { id: item.id, name: item.title, installed: item.installed });
-}
 </script>
 
 <template>
-  <div class="workshop">
-    <div class="workshop-input">
-      <Input
-        v-model="keyword"
-        placeholder="搜索关键词，或粘贴模组 ID / 创意工坊链接"
-        @keyup.enter="query"
-      />
-      <button class="btn btn-sm btn-primary" :disabled="searching || !keyword.trim()" @click="query">
-        <Icon name="globe" size="14" />{{ searching ? '查询中…' : (looksLikeId ? '查询' : '搜索') }}
-      </button>
-    </div>
-
-    <p v-if="!looksLikeId" class="field-tip">
-      关键词搜索需要免费的
-      <button class="link-btn" type="button" @click="toggleKeyForm">Steam Web API Key</button>
-      （已配置则忽略本提示）；粘贴 ID 或链接查询无需任何配置。
-    </p>
-
-    <div v-if="showKeyForm" class="workshop-key">
-      <Input
-        v-model="apiKeyInput"
-        type="text"
-        placeholder="Steam Web API Key（32 位十六进制，可留空清除）"
-      />
-      <button class="btn btn-sm" :disabled="savingKey" @click="saveKey">
-        {{ savingKey ? '保存中…' : '保存' }}
-      </button>
-    </div>
-
-    <UiPill v-if="searching" tone="info">查询中…</UiPill>
-
-    <div v-else-if="results.length" class="workshop-list">
-      <div v-for="item in results" :key="item.id" class="workshop-item">
-        <img
-          v-if="item.previewUrl"
-          class="workshop-thumb"
-          :src="item.previewUrl"
-          loading="lazy"
-          alt=""
-          @error="$event.target.style.display = 'none'"
-        >
-        <div class="workshop-info">
-          <div class="workshop-title">
-            <a
-              :href="`https://steamcommunity.com/sharedfiles/filedetails/?id=${item.id}`"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-foreground underline-offset-4 hover:text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring"
-              title="在 Steam 创意工坊查看（新标签页）"
-            >{{ item.title || item.id }}</a>
-            <UiPill v-if="item.id === downloadingId" tone="info">
-              下载中{{ progress ? ' ' + progress : '…' }}
-            </UiPill>
-            <UiPill v-else-if="item.installed" tone="ok">已下载</UiPill>
-          </div>
-          <p v-if="item.shortDesc" class="workshop-desc">{{ item.shortDesc }}</p>
-          <div class="workshop-meta">
-            <span class="mod-id">workshop-{{ item.id }}</span>
-            <span v-if="formatSize(item)">{{ formatSize(item) }}</span>
-            <span v-for="t in (item.tags || []).filter(t => !t.startsWith('all_clients') && !t.startsWith('version'))"
-                  :key="t" class="workshop-tag">{{ t }}</span>
-          </div>
+  <Dialog :open="open" @update:open="emit('update:open', $event)">
+    <DialogContent class="flex min-h-0 flex-col overflow-hidden p-0 sm:max-w-3xl" :aria-describedby="undefined" @close-auto-focus.prevent="emit('closed')">
+      <DialogHeader class="shrink-0 border-b p-4 pr-14 sm:p-6">
+        <DialogTitle>添加模组</DialogTitle>
+      </DialogHeader>
+      <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:px-6">
+        <form class="flex gap-2" @submit.prevent="query()">
+          <Input v-model="keyword" class="min-w-0 flex-1" aria-label="搜索创意工坊" placeholder="模组名称、ID 或创意工坊链接" />
+          <Button type="submit" :disabled="searching || !keyword.trim()">{{ searching ? '查询中…' : looksLikeId ? '查询' : '搜索' }}</Button>
+        </form>
+        <div class="my-3 flex items-center justify-between gap-2">
+          <Button variant="ghost" size="sm" :aria-expanded="showKeyForm" @click="showKeyForm = !showKeyForm">Steam API Key</Button>
+          <span v-if="keySaved" role="status" class="text-sm text-muted-foreground">API Key 已保存</span>
         </div>
-        <button class="btn btn-sm" :title="item.installed ? '删除本地文件并重新下载（强制刷新）' : '从创意工坊下载'"
-                @click="download(item)">
-          <Icon name="download" size="14" />{{ item.installed ? '重新下载' : '下载' }}
-        </button>
+        <form v-if="showKeyForm" class="mb-4 grid gap-2 rounded-lg border bg-muted/30 p-3" @submit.prevent="saveKey">
+          <Label for="workshop-api-key">Steam Web API Key</Label>
+          <div class="flex gap-2">
+            <Input id="workshop-api-key" v-model="apiKeyInput" type="password" autocomplete="off" class="min-w-0 flex-1" placeholder="输入新的 API Key，留空可清除" />
+            <Button variant="outline" type="submit" :disabled="savingKey">{{ savingKey ? '保存中…' : '保存' }}</Button>
+          </div>
+          <p v-if="keyError" role="alert" class="text-sm text-destructive">{{ keyError }}</p>
+        </form>
+        <p v-if="error" role="alert" class="mb-4 break-words text-sm text-destructive">{{ error }}</p>
+        <div v-if="searching" role="status" class="py-8 text-center text-sm text-muted-foreground">正在查询创意工坊…</div>
+        <div v-else-if="results.length && !error" class="grid gap-3">
+          <article v-for="item in results" :key="item.id" class="workshop-item flex min-w-0 items-center gap-3 rounded-lg border bg-background p-3">
+            <div class="grid size-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted" aria-hidden="true">
+              <img v-if="item.previewUrl" :src="item.previewUrl" class="size-full object-cover" loading="lazy" decoding="async" alt="" @error="$event.target.style.display = 'none'" />
+              <Icon v-else name="package" :size="24" />
+            </div>
+            <div class="min-w-0 flex-1">
+              <a :href="`https://steamcommunity.com/sharedfiles/filedetails/?id=${item.id}`" target="_blank" rel="noopener noreferrer" class="break-words text-sm font-medium text-foreground underline-offset-4 hover:underline">{{ item.title || item.id }}</a>
+              <p v-if="item.shortDesc" class="mt-1 line-clamp-2 break-words text-xs text-muted-foreground">{{ item.shortDesc }}</p>
+              <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                <code>{{ item.id }}</code>
+                <span v-if="item.fileSize">{{ fmtSize(item.fileSize) }}</span>
+                <Badge v-if="currentMods.get(item.id)?.enabled" variant="secondary">已启用</Badge>
+              </div>
+            </div>
+            <Button
+              v-if="currentMods.get(item.id)?.installed || item.installed"
+              variant="outline" size="sm"
+              :disabled="disabled || busyIds.includes('workshop-' + item.id) || currentMods.get(item.id)?.enabled"
+              @click="emit('enable', 'workshop-' + item.id)"
+            >
+              {{ currentMods.get(item.id)?.enabled ? '已启用' : '启用' }}
+            </Button>
+            <Button v-else size="sm" :disabled="disabled || busyIds.includes('workshop-' + item.id)" @click="emit('download', { id: 'workshop-' + item.id, name: item.title, installed: false })">
+              {{ busyIds.includes('workshop-' + item.id) ? '已加入队列' : '下载' }}
+            </Button>
+          </article>
+        </div>
+        <div v-else-if="searched && !error" class="py-10 text-center text-sm text-muted-foreground">没有查到结果</div>
+        <div v-else-if="!error" class="grid justify-items-center gap-3 py-10 text-muted-foreground" aria-hidden="true"><Icon name="package" :size="32" /></div>
+        <nav v-if="searched && !idQuery && !error && (page > 1 || results.length === 20)" aria-label="工坊分页" class="mt-4 flex items-center justify-end gap-2">
+          <span class="mr-2 text-sm text-muted-foreground">第 {{ page }} 页</span>
+          <Button variant="outline" size="sm" :disabled="searching || page === 1" @click="query(page - 1)">上一页</Button>
+          <Button variant="outline" size="sm" :disabled="searching || results.length < 20" @click="query(page + 1)">下一页</Button>
+        </nav>
       </div>
-    </div>
-
-    <p v-else-if="searched && !results.length" class="field-tip">没有查到结果，换个关键词试试</p>
-  </div>
+      <div class="flex shrink-0 justify-end border-t p-4 sm:px-6"><Button variant="outline" @click="emit('update:open', false)">完成</Button></div>
+    </DialogContent>
+  </Dialog>
 </template>

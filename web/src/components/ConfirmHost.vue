@@ -17,7 +17,7 @@ import { confirmState, handleCancel, handleConfirm } from '@/lib/confirm.js';
     <AlertDialogContent>
       <AlertDialogHeader>
         <AlertDialogTitle>{{ confirmState.title }}</AlertDialogTitle>
-        <AlertDialogDescription v-if="confirmState.description" class="whitespace-pre-line text-sm text-muted-foreground">
+        <AlertDialogDescription class="whitespace-pre-line text-sm text-muted-foreground" :class="{ 'sr-only': !confirmState.description }">
           {{ confirmState.description }}
         </AlertDialogDescription>
       </AlertDialogHeader>

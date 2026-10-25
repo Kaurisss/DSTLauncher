@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -146,6 +147,7 @@ func (s *Server) Handler() http.Handler {
 
 	// 模组
 	mux.HandleFunc("/api/mods", s.handleMods)
+	mux.HandleFunc("/api/mods/icon", s.handleModIcon)
 	mux.HandleFunc("/api/mods/toggle", s.handleModToggle)
 	mux.HandleFunc("/api/mods/config", s.handleModConfig)
 	mux.HandleFunc("/api/mods/schema", s.handleModSchema)
@@ -192,19 +194,19 @@ func (s *Server) Handler() http.Handler {
 	return s.withAuth(mux)
 }
 
-// noCacheHTML 对 HTML 文档响应禁用缓存，其余静态资源改用强缓存。
-//
-// go:embed 里的文件没有修改时间，http.FileServer 因此不会发 Last-Modified/ETag，
-// 浏览器只能每次都重新拉。世界配置页一次要 180+ 张图标（约 1.5MB），
-// 全部重下是这页刷新慢的主因。图标与 assets/ 都是随二进制发布的固定内容，
-// 直接用 max-age 强缓存；index.html 保持 no-cache，新版发布不会卡在旧壳上。
+// noCacheHTML 长期缓存带内容哈希的构建资源，HTML 每次校验，固定路径图标缓存一天。
 func noCacheHTML(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" || strings.HasSuffix(r.URL.Path, ".html") {
-			w.Header().Set("Cache-Control", "no-cache, must-revalidate")
-		} else {
-			w.Header().Set("Cache-Control", "public, max-age=86400")
+		var cache string
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/"), strings.HasSuffix(r.URL.Path, ".html"):
+			cache = "no-cache, must-revalidate"
+		case strings.HasPrefix(r.URL.Path, "/assets/"):
+			cache = "public, max-age=31536000, immutable"
+		default:
+			cache = "public, max-age=86400"
 		}
+		w.Header().Set("Cache-Control", cache)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -1060,9 +1062,16 @@ func (s *Server) handleMods(w http.ResponseWriter, r *http.Request) {
 		}
 		seen[id] = true
 		name, _ := mods.ModInfo(id)
+		iconURL := ""
+		if installed[id] {
+			if version := mods.ModIconVersion(id); version != "" {
+				iconURL = "/api/mods/icon?" + url.Values{"room": {strconv.Itoa(rm.ID)}, "id": {id}, "v": {version}}.Encode()
+			}
+		}
 		list = append(list, &modmgr.Mod{
 			ID:        id,
 			Name:      name,
+			IconURL:   iconURL,
 			Enabled:   o.Enabled[id],
 			Installed: installed[id],
 			Config:    o.Config[id],
