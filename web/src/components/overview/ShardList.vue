@@ -1,9 +1,12 @@
 <script setup>
 // 分片状态列表与启停按钮。
 
-import { computed } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import UiEmpty from '@/components/ui/UiEmpty.vue';
+import WorldState from '@/components/overview/WorldState.vue';
+import { Badge } from '@/components/ui/badge';
+import { worldStateApi } from '@/lib/api.js';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -14,6 +17,23 @@ import { STATE_LABEL, fmtSize, shardLabel } from '@/lib/format.js';
 const rooms = useRoomsStore();
 const system = useSystemStore();
 const proc = useProcessControl();
+const snapshots = ref([]);
+const snapshotError = ref('');
+const loadingSnapshots = ref(false);
+let timer;
+let generation = 0;
+
+onMounted(() => {
+  watch(() => rooms.current?.id, id => {
+    generation++;
+    clearTimeout(timer);
+    snapshots.value = [];
+    snapshotError.value = '';
+    loadingSnapshots.value = !!id;
+    if (id) refreshSnapshots(id, generation);
+  }, { immediate: true });
+});
+onUnmounted(() => { generation++; clearTimeout(timer); });
 
 // 后端只返回「有进程记录」的分片（已启动过、被停止过都算），
 // 从未启动过的分片没有记录。
@@ -23,8 +43,11 @@ const proc = useProcessControl();
 // 按房间启用中的分片列表对齐，缺的分片补成 stopped 占位行。
 const rows = computed(() => {
   const byShard = new Map(rooms.statuses.map(s => [s.shard, s]));
-  return rooms.shards.map(name =>
-    byShard.get(name) || { shard: name, state: 'stopped', placeholder: true });
+  const byWorld = new Map(snapshots.value.map(item => [item.shard, item]));
+  return rooms.shards.map(name => ({
+    ...(byShard.get(name) || { shard: name, state: 'stopped', placeholder: true }),
+    snapshot: byWorld.get(name),
+  }));
 });
 
 const isLive = s => s.state === 'running' || s.state === 'starting';
@@ -34,9 +57,7 @@ function label(s) {
 }
 
 function meta(s) {
-  if (s.placeholder) return '未启动';
   return [
-    STATE_LABEL[s.state] || s.state,
     s.uptime,
     s.pid ? 'PID ' + s.pid : '',
     s.port ? '端口 ' + s.port : '',
@@ -68,32 +89,51 @@ function staleVersion(s) {
 function staleTip(s) {
   return `该分片启动于版本 ${s.version}，当前安装版本是 ${system.version}。重启后才会使用新版本。`;
 }
+
+async function refreshSnapshots(id, requestGeneration) {
+  try {
+    const data = await worldStateApi.get(id);
+    if (requestGeneration !== generation) return;
+    snapshots.value = data || [];
+    snapshotError.value = '';
+  } catch (err) {
+    if (requestGeneration !== generation) return;
+    snapshots.value = [];
+    snapshotError.value = err.message;
+  } finally {
+    if (requestGeneration === generation) {
+      loadingSnapshots.value = false;
+      timer = setTimeout(() => refreshSnapshots(id, requestGeneration), 15000);
+    }
+  }
+}
 </script>
 
 <template>
   <UiEmpty v-if="!rooms.current" icon="server" text="请先在「房间」页新建一个房间" />
 
-  <template v-else>
-    <div v-for="s in rows" :key="s.shard" class="shard-row">
-      <div class="shard-main">
-        <span class="dot" :class="s.state" />
-        <span class="shard-name">{{ label(s) }}</span>
-        <Tooltip v-if="staleVersion(s)">
-          <TooltipTrigger as-child><span class="pill pill-warn" tabindex="0">需重启</span></TooltipTrigger>
-          <TooltipContent>{{ staleTip(s) }}</TooltipContent>
-        </Tooltip>
-        <span class="shard-meta">{{ meta(s) }}</span>
+  <section v-else aria-label="分片状态" class="divide-y divide-border">
+    <div v-for="s in rows" :key="s.shard" class="shard-row" :aria-label="label(s)">
+      <div class="min-w-0 space-y-1.5">
+        <div class="shard-main">
+          <span class="dot" :class="s.state" aria-hidden="true" />
+          <span class="shard-name">{{ label(s) }}</span>
+          <Tooltip :disabled="!meta(s) && !isLive(s)">
+            <TooltipTrigger as-child>
+              <Badge variant="secondary" :tabindex="meta(s) || isLive(s) ? 0 : undefined">{{ s.placeholder ? '未启动' : STATE_LABEL[s.state] || s.state }}</Badge>
+            </TooltipTrigger>
+            <TooltipContent>
+              <p v-if="meta(s)">{{ meta(s) }}</p>
+              <p v-if="isLive(s)" class="tabular-nums">CPU（占整机）{{ cpuText(s) }} · 内存 {{ memText(s) }}</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip v-if="staleVersion(s)">
+            <TooltipTrigger as-child><span class="pill pill-warn" tabindex="0">需重启</span></TooltipTrigger>
+            <TooltipContent>{{ staleTip(s) }}</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
-      <!-- 占用率按「占整机」口径，与任务管理器一致 -->
-      <Tooltip v-if="isLive(s)">
-        <TooltipTrigger as-child>
-          <span class="shard-res" tabindex="0">
-            <span>CPU <span class="res-val">{{ cpuText(s) }}</span></span>
-            <span>内存 <span class="res-val">{{ memText(s) }}</span></span>
-          </span>
-        </TooltipTrigger>
-        <TooltipContent>CPU 按占整机计算（任务管理器口径）</TooltipContent>
-      </Tooltip>
+      <WorldState class="shard-world" :snapshot="s.snapshot" :loading="loadingSnapshots" :error="snapshotError" />
       <span class="shard-actions">
         <template v-if="isLive(s)">
           <Button variant="destructive" size="sm" :disabled="rooms.starting" @click="proc.stop(s.shard)">停止</Button>
@@ -104,5 +144,5 @@ function staleTip(s) {
         </Button>
       </span>
     </div>
-  </template>
+  </section>
 </template>

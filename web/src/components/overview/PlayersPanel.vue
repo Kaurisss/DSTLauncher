@@ -144,8 +144,8 @@ function preventWhileBusy(event) {
 </script>
 
 <template>
-  <section aria-label="在线玩家" class="flex min-w-0 flex-1 flex-col">
-    <UiCard class="flex-1">
+  <section aria-label="在线玩家" class="min-w-0">
+    <UiCard>
       <template #title>在线玩家</template>
       <template #actions>
         <Button variant="outline" size="sm" :disabled="!canQuery || loading || busy" @click="load">
@@ -167,11 +167,11 @@ function preventWhileBusy(event) {
       </div>
       <p v-if="actionError && !teleportOpen" role="alert" class="mb-3 break-words text-sm text-destructive">{{ actionError }}</p>
 
-      <div v-if="players.length" class="grid gap-2.5">
+      <div v-if="players.length" class="max-h-80 divide-y divide-border overflow-y-auto">
         <article
           v-for="player in players" :key="`${player.shard}:${player.userid}`"
           :aria-label="`${player.name || player.userid} ${player.userid} ${labelOf(player.shard)}`"
-          class="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-border/80 bg-muted/20 px-3 py-2.5"
+          class="flex min-w-0 flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
         >
           <div class="min-w-0 flex-1 basis-48">
             <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">

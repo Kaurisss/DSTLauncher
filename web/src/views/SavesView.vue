@@ -149,7 +149,7 @@ async function remove(item) {
         <span>占用 <b class="font-medium text-foreground">{{ fmtSize(totalSize) }}</b></span>
         <span v-if="orphans.length">孤儿存档 {{ orphans.length }} 个 · {{ fmtSize(orphanSize) }}</span>
       </div>
-      <code v-if="root" class="break-all text-xs text-muted-foreground">{{ root }}</code>
+      <code v-if="root" class="break-all bg-transparent p-0 text-xs text-muted-foreground">{{ root }}</code>
 
       <Input
         class="w-full sm:max-w-sm"

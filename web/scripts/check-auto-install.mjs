@@ -18,7 +18,6 @@ const { useRoomsStore } = await vite.ssrLoadModule('/src/stores/rooms.js');
 const { useSystemStore } = await vite.ssrLoadModule('/src/stores/system.js');
 const { installApi, procApi } = await vite.ssrLoadModule('/src/lib/api.js');
 const { default: InstallPanel } = await vite.ssrLoadModule('/src/components/overview/InstallPanel.vue');
-const { default: OverviewView } = await vite.ssrLoadModule('/src/views/OverviewView.vue');
 const { default: UiCard } = await vite.ssrLoadModule('/src/components/ui/UiCard.vue');
 const { TooltipProvider } = await vite.ssrLoadModule('/src/components/ui/tooltip/index.js');
 const { guard } = await vite.ssrLoadModule('/src/lib/toast.js');
@@ -48,18 +47,18 @@ test('未探测到已有安装时仍显示安装入口，不因空候选列表�
   }
 });
 
-test('概览版本提示区分外部 Steam 安装和面板托管安装', async () => {
+test('设置中的服务器面板区分外部 Steam 安装和面板托管安装', async () => {
   const system = useSystemStore(pinia);
   system.installed = true;
   system.version = '759671';
   for (const external of [true, false]) {
     system.external = external;
     const html = await renderToString(createSSRApp({
-      render: () => h(TooltipProvider, null, () => h(OverviewView)),
+      render: () => h(TooltipProvider, null, () => h(InstallPanel)),
     }).use(pinia));
     assert.ok(html.includes('759671'));
-    assert.ok(html.includes(external ? '由 Steam 更新' : '可检查更新'));
-    assert.ok(!html.includes(external ? '可检查更新' : '由 Steam 更新'));
+    assert.ok(html.includes(external ? '更新请在 Steam 中更新' : '检查更新'));
+    assert.ok(!html.includes(external ? '检查更新' : '更新请在 Steam 中更新'));
   }
 });
 

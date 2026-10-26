@@ -1,16 +1,10 @@
 <script setup>
-// 单个分片的日志面板：独立缓冲区、独立滚动位置、独立命令输入。
-//
-// 因为 Master 与 Caves 是两个独立进程，所以在哪个面板里敲命令，
-// 就发给哪个分片——不需要再选一次目标。
+// KeepAlive 保留各分片的命令草稿、滚动位置和自动滚动开关。
+import { computed, onActivated, ref, watch } from 'vue';
+import { TabsContent } from 'reka-ui';
 
-import { computed, onMounted, ref, watch } from 'vue';
-
-import { Switch } from '@/components/ui/switch';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import Icon from '@/components/ui/Icon.vue';
 import { useLogs } from '@/composables/useLogs.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard } from '@/lib/toast.js';
@@ -22,13 +16,12 @@ const props = defineProps({
 });
 
 const rooms = useRoomsStore();
-const { channels, clear, appendCmd } = useLogs();
+const { channels, appendCmd } = useLogs();
 
 /** 通道尚未建立时的占位。必须是稳定引用，否则 computed 会反复触发。 */
-const FALLBACK = { lines: [], connected: false };
+const FALLBACK = { lines: [] };
 const state = computed(() => channels[props.shard] || FALLBACK);
 const lines = computed(() => state.value.lines);
-const connected = computed(() => !!state.value.connected);
 
 /** 分片显示名：按存档 location 优先，与玩家列表、世界配置页一致。 */
 const label = computed(() => shardLabel(props.shard, rooms.current?.locations?.[props.shard]));
@@ -43,11 +36,14 @@ const box = ref(null);
 const input = ref('');
 /** 是否自动跟随最新日志。关掉后可以安静地往上翻历史。 */
 const autoscroll = ref(true);
+const scrollTop = ref(0);
+defineExpose({ autoscroll });
 
 function onScroll() {
   // 用户手动滚到底部时重新打开跟随，省得再去点开关
   const el = box.value;
-  if (!el) return;
+  if (!el?.isConnected) return;
+  scrollTop.value = el.scrollTop;
   if (el.scrollTop + el.clientHeight >= el.scrollHeight - 30 && !autoscroll.value) {
     autoscroll.value = true;
   }
@@ -63,21 +59,21 @@ function onScroll() {
  */
 let scrollQueued = false;
 
-function scrollToEnd() {
+function restoreScroll() {
   if (scrollQueued) return;
   scrollQueued = true;
   requestAnimationFrame(() => {
     scrollQueued = false;
     const el = box.value;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el?.isConnected) el.scrollTop = autoscroll.value ? el.scrollHeight : scrollTop.value;
   });
 }
 
 watch(lines, () => {
-  if (autoscroll.value) scrollToEnd();
+  if (autoscroll.value) restoreScroll();
 });
 
-onMounted(scrollToEnd);
+onActivated(restoreScroll);
 
 async function submit() {
   const cmd = input.value.trim();
@@ -88,37 +84,13 @@ async function submit() {
     appendCmd(props.shard, cmd);
     input.value = '';
     autoscroll.value = true;
-    scrollToEnd();
+    restoreScroll();
   }
 }
 </script>
 
 <template>
-  <section class="log-pane" :aria-label="`${label}（${shard}）日志`">
-    <header class="log-pane-head">
-      <div class="log-pane-title">
-        <Icon name="terminal" :size="15" />
-        <span class="log-pane-name">{{ label }}</span>
-        <span class="log-pane-sub">{{ shard }}</span>
-        <span class="log-connection" :class="connected ? 'is-connected' : ''">
-          {{ connected ? '已连接' : '重连中' }}
-        </span>
-      </div>
-
-      <div class="log-pane-tools">
-        <label class="log-autoscroll">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <Switch v-model="autoscroll" :aria-label="`${label} 自动滚动`" />
-            </TooltipTrigger>
-            <TooltipContent>关闭后可以安静地往上翻历史，滚回底部会自动重新打开</TooltipContent>
-          </Tooltip>
-          <span>自动滚动</span>
-        </label>
-        <Button variant="ghost" size="sm" @click="clear(shard)">清屏</Button>
-      </div>
-    </header>
-
+  <TabsContent :value="shard" force-mount class="min-w-0 outline-none">
     <div
       ref="box"
       class="console"
@@ -129,7 +101,6 @@ async function submit() {
     >
       <div v-if="!lines.length" class="console-empty">
         <p>暂无 {{ label }} 的日志输出。</p>
-        <p>启动该分片后，这里的输出会实时刷新。</p>
       </div>
       <div v-for="l in lines" :key="l.id" class="log-line" :class="'k-' + l.kind">
         <span class="log-text">{{ l.text }}</span>
@@ -148,5 +119,5 @@ async function submit() {
       />
       <Button type="submit" size="sm" :disabled="!running">执行</Button>
     </form>
-  </section>
+  </TabsContent>
 </template>

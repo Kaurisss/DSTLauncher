@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import UiStat from '@/components/ui/UiStat.vue';
+import { Progress } from '@/components/ui/progress';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { hostApi } from '@/lib/api.js';
 import { fmtSize } from '@/lib/format.js';
@@ -58,23 +59,18 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section aria-label="宿主机资源" class="grid gap-3">
-    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2" :class="container ? 'xl:grid-cols-3' : ''">
+  <section aria-label="宿主机资源" class="grid min-w-0 content-start gap-3">
+    <div class="stat-row">
+      <slot />
       <UiStat
         label="宿主机内存"
         :value="memory ? ((memoryUsed / memory.totalBytes) * 100).toFixed(1) + '%' : '—'"
         :sub="memory ? '已用 ' + fmtSize(memoryUsed) + ' / ' + fmtSize(memory.totalBytes) : (errors.length ? '读取失败' : '读取中…')"
         icon="cpu"
         :tone="memoryLow ? 'warn' : ''"
-      />
-      <UiStat
-        v-if="container"
-        label="容器内存配额"
-        :value="fmtSize(container.availableBytes)"
-        :sub="'剩余可用 / 限额 ' + fmtSize(container.totalBytes)"
-        icon="cpu"
-        :tone="containerLow ? 'warn' : ''"
-      />
+      >
+        <Progress v-if="memory" class="mt-2 h-1" :model-value="memoryUsed / memory.totalBytes * 100" aria-label="宿主机内存使用率" />
+      </UiStat>
       <Tooltip :disabled="!snapshot?.diskPath">
         <TooltipTrigger as-child>
           <UiStat
@@ -84,10 +80,18 @@ onUnmounted(() => {
             :tabindex="snapshot?.diskPath ? 0 : undefined"
             icon="folder"
             :tone="diskLow ? 'warn' : ''"
-          />
+          >
+            <Progress v-if="disk" class="mt-2 h-1" :model-value="(disk.totalBytes - disk.availableBytes) / disk.totalBytes * 100" aria-label="存档盘已用空间" />
+          </UiStat>
         </TooltipTrigger>
         <TooltipContent class="break-all">{{ snapshot?.diskPath }}</TooltipContent>
       </Tooltip>
+    </div>
+    <div v-if="container" class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+      <span>容器内存配额</span>
+      <strong class="font-medium text-foreground">{{ fmtSize(container.availableBytes) }}</strong>
+      <span>剩余可用 / 限额 {{ fmtSize(container.totalBytes) }}</span>
+      <Progress class="h-1 w-24" :model-value="(container.totalBytes - container.availableBytes) / container.totalBytes * 100" aria-label="容器内存使用率" />
     </div>
     <div v-if="warnings.length || errors.length" role="status" class="grid gap-1 break-words rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
       <p v-for="message in [...warnings, ...errors]" :key="message">{{ message }}</p>

@@ -224,7 +224,8 @@ test('部分分片失败单独显示，查询失败不显示假空列表，手�
   try {
     await row(section, 'KU_A').waitFor();
     await section.getByText('洞穴：世界尚未加载完成，请稍后刷新', { exact: true }).waitFor();
-    await page.getByRole('region', { name: '洞穴（Caves）日志' }).waitFor();
+    await page.getByRole('tab', { name: /洞穴 Caves/ }).click();
+    await page.getByRole('tabpanel', { name: /洞穴 Caves/ }).waitFor();
     state.failure = true;
     await section.getByRole('button', { name: '刷新玩家', exact: true }).click();
     await section.getByRole('alert').filter({ hasText: '玩家查询暂时失败' }).waitFor();

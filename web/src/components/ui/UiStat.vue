@@ -15,10 +15,11 @@ defineProps({
 <template>
   <div class="stat" :class="tone ? 'is-' + tone : ''">
     <span class="stat-icon"><Icon :name="icon" /></span>
-    <div class="stat-body">
+    <div class="stat-body flex-1">
       <div class="stat-label">{{ label }}</div>
       <div class="stat-value">{{ value }}</div>
       <div v-if="sub" class="stat-sub">{{ sub }}</div>
+      <slot />
     </div>
   </div>
 </template>

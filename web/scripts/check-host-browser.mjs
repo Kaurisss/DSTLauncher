@@ -26,11 +26,15 @@ before(async () => {
 });
 after(async () => { await browser?.close(); await vite?.close(); });
 
-async function openPanel({ data = healthy, width = 1280 } = {}) {
+async function openPanel({ data = healthy, width = 1280, room = null, running = false, dark = false } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
   page.setDefaultTimeout(12000);
   const state = { data, failure: false, requests: 0 };
-  await page.addInitScript(() => localStorage.setItem('dst-tab', 'overview'));
+  await page.addInitScript(({ id, dark }) => {
+    localStorage.setItem('dst-tab', 'overview');
+    localStorage.setItem('dst-theme', dark ? 'dark' : 'light');
+    if (id) localStorage.setItem('dst-room', String(id));
+  }, { id: room?.id, dark });
   await page.route('**/api/**', route => {
     const path = new URL(route.request().url()).pathname;
     const ok = data => route.fulfill({ json: { code: 200, data } });
@@ -40,10 +44,19 @@ async function openPanel({ data = healthy, width = 1280 } = {}) {
       return ok(state.data);
     }
     if (path === '/api/auth/status') return ok({ enabled: false, authenticated: true });
-    if (path === '/api/rooms') return ok([]);
+    if (path === '/api/rooms') return ok(room ? [room] : []);
+    if (path === '/api/status') return ok(running ? room.shards.map(shard => ({
+      shard: shard.name, state: 'running', playersReady: true, uptime: '2h 15m',
+      cpuPct: 1.2, memBytes: GB, pid: 1234, port: 10999,
+    })) : []);
+    if (path === '/api/worldstate') return ok(room.shards.map(shard => ({
+      shard: shard.name, state: { day: 108, season: 'spring', remainingDays: 18, savedAt: '2026-10-26T12:00:00Z' },
+    })));
+    if (path === '/api/players') return ok({ players: [], errors: {} });
+    if (path === '/api/logs/stream') return route.fulfill({ contentType: 'text/event-stream', body: '' });
     if (path === '/api/rooms/meta') return ok({});
     if (path === '/api/server') return ok({ installed: true, candidates: [] });
-    if (path === '/api/install') return ok({ installed: true });
+    if (path === '/api/install') return ok({ installed: true, version: '759671' });
     return ok([]);
   });
   await page.goto(origin);
@@ -69,6 +82,74 @@ test('没有房间也显示宿主机而非分片内存，桌面与手机无横�
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     } finally { await page.close(); }
   }
+});
+
+test('四分片概览的资源与快捷操作保持紧凑，桌面首屏可见日志且手机不溢出', async () => {
+  const room = {
+    id: 2, key: 'Cluster_1', name: 'Skr Wu的世界 单人 双穿', gameMode: 'survival', maxPlayers: 2,
+    shards: [{ name: 'Master', isMaster: true }, { name: 'Caves' }, { name: 'Island' }, { name: 'Volcano' }],
+    locations: { Master: 'forest', Caves: 'cave', Island: 'shipwrecked', Volcano: 'volcanoworld' },
+  };
+  for (const scenario of [
+    { width: 2240, running: false, dark: false },
+    { width: 1440, running: true, dark: true },
+    { width: 375, running: true, dark: false },
+  ]) {
+    const { page, section } = await openPanel({ room, ...scenario });
+    try {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await section.getByText('50.0%', { exact: true }).waitFor();
+      await page.getByRole('region', { name: '分片状态', exact: true }).getByText('第 108 天', { exact: true }).first().waitFor();
+      await page.getByRole('region', { name: '在线玩家', exact: true }).getByText(scenario.running ? '暂无在线玩家' : '房间未运行', { exact: true }).waitFor();
+      const quick = page.getByRole('region', { name: '快捷操作', exact: true });
+      assert.ok((await quick.boundingBox()).height < 180, '快捷操作不被拉高');
+      for (const card of await section.locator('.stat').all()) {
+        assert.ok((await card.boundingBox()).height < 150, '资源指标按内容取高');
+        assert.equal(await card.locator('.stat-value').evaluate(el => el.scrollWidth <= el.clientWidth), true, '指标数字不截断');
+      }
+      if (scenario.width > 1100) {
+        const logs = page.getByRole('region', { name: '实时日志', exact: true });
+        assert.ok((await logs.boundingBox()).y < 850, '桌面首屏能看见日志入口');
+        const left = await page.getByRole('heading', { name: '分片管理', exact: true }).locator('xpath=ancestor::*[@data-slot="card"]').boundingBox();
+        const right = await page.getByRole('region', { name: '在线玩家', exact: true }).boundingBox();
+        assert.ok(Math.abs(left.y + left.height - right.y - right.height) < 2, '主区左右底部对齐');
+        assert.equal(await page.getByRole('region', { name: '世界状态', exact: true }).count(), 0);
+        assert.equal(await logs.locator('.console').count(), 1);
+      }
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+      if (scenario.running) {
+        await page.getByRole('region', { name: '分片状态', exact: true }).getByText('运行中', { exact: true }).first().focus();
+        const details = page.getByRole('tooltip');
+        await details.waitFor();
+        assert.match(await details.innerText(), /CPU（占整机）1\.2%.*内存 1\.00 GB/);
+        assert.match(await details.innerText(), /PID 1234/);
+        await page.keyboard.press('Escape');
+      }
+      await page.locator('#page-content').evaluate(el => { el.scrollTop = 0; });
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/overview-refactor-${scenario.width}-${scenario.dark ? 'dark' : 'light'}.png`, import.meta.url)) });
+    } finally { await page.close(); }
+  }
+});
+
+test('概览统一四项资源指标，服务器配置仅在设置页提供', async () => {
+  const { page } = await openPanel();
+  try {
+    assert.deepEqual(await page.locator('.stat-label').allTextContents(), ['运行分片', '进程资源占用', '宿主机内存', '存档盘可用空间']);
+    assert.equal(await page.getByRole('progressbar', { name: '宿主机内存使用率' }).getAttribute('aria-valuenow'), '50');
+    assert.equal(await page.getByRole('progressbar', { name: '存档盘已用空间' }).getAttribute('aria-valuenow'), '60');
+    assert.equal(await page.getByText('更改服务器文件位置', { exact: true }).count(), 0);
+    assert.equal(await page.getByRole('button', { name: '检查更新', exact: true }).count(), 0);
+    const nav = page.locator('#app-navigation');
+    await nav.getByRole('button', { name: '设置', exact: true }).click();
+    await page.getByRole('heading', { name: '服务器文件与架构', exact: true }).waitFor();
+    await page.getByText('更改服务器文件位置', { exact: true }).click();
+    await page.getByLabel('安装目录', { exact: true }).waitFor();
+    await page.getByLabel('架构', { exact: true }).waitFor();
+    await nav.getByRole('button', { name: '概览', exact: true }).click();
+    await page.getByRole('region', { name: '宿主机资源' }).waitFor();
+    assert.equal(await page.getByText('更改服务器文件位置', { exact: true }).count(), 0);
+  } finally { await page.close(); }
 });
 
 test('导航和主题使用组件提示，支持键盘焦点、Escape 和动态内容', async () => {

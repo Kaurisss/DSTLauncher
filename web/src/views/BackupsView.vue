@@ -6,6 +6,7 @@ import { onMounted, ref, watch } from 'vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiSkeleton from '@/components/ui/UiSkeleton.vue';
+import { Button } from '@/components/ui/button';
 import BackupTable from '@/components/backups/BackupTable.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -88,9 +89,9 @@ function exportSave(name) {
     <template #title>存档备份</template>
     <template #actions>
       <RollbackDialog />
-      <button class="btn btn-sm btn-primary" :disabled="!rooms.current" @click="create">
+      <Button size="sm" :disabled="!rooms.current" @click="create">
         立即备份
-      </button>
+      </Button>
     </template>
 
     <UiSkeleton v-if="!rooms.loaded" variant="table" :rows="3" />

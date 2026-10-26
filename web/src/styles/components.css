@@ -8,21 +8,17 @@
    卡片
    -------------------------------------------------------------------------- */
 
-/* 概览页的分区：状态区（主）与服务器文件区（辅）。
-   7:5 而非等分——分片行要放下「状态 · 运行时长 · PID · 端口 · 重启次数」，
-   给状态区更多宽度才不会挤成两行；服务器文件区内容少，窄一点反而更紧凑。
-   两列等高（stretch），卡片上下沿对齐，比参差不齐整齐。 */
-.overview-split {
+/* 左侧分片管理，右侧快捷操作与玩家；两栏底部对齐。 */
+.overview-workspace {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-  gap: 16px;
   align-items: stretch;
-  margin-bottom: 16px;
+  gap: 16px;
 }
 
-.overview-col {
-  display: flex;
-  flex-direction: column;
+.overview-sidebar {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 16px;
   min-width: 0;
 }
@@ -52,8 +48,7 @@
 .card-head small { font-size: 12px; font-weight: 400; color: var(--text-muted); }
 .card-actions { display: flex; align-items: center; gap: 8px; margin-left: auto; flex-wrap: wrap; }
 
-/* 卡片内部纵向撑满：两列等高时（见 .overview-split），内容少的一侧
-   不会只挤在顶部。 */
+/* 旧卡片的内容区填满剩余空间。 */
 .card-body { flex: 1; min-height: 0; padding: 18px; }
 /* 控制台这类区域需要贴边，不留内边距 */
 .card-body-flush { padding: 0; }
@@ -435,7 +430,6 @@ input[type="radio"] {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-  margin-bottom: 16px;
 }
 
 .stat {
@@ -486,6 +480,7 @@ input[type="radio"] {
 
 .stat.is-ok .stat-icon     { background: var(--ok-soft);     color: var(--ok); }
 .stat.is-warn .stat-icon   { background: var(--warn-soft);   color: var(--warn); }
+.stat.is-warn [data-slot="progress-indicator"] { background: var(--warn); }
 .stat.is-danger .stat-icon { background: var(--danger-soft); color: var(--danger); }
 .stat.is-info .stat-icon   { background: var(--info-soft);   color: var(--info); }
 
@@ -494,38 +489,26 @@ input[type="radio"] {
    -------------------------------------------------------------------------- */
 
 .shard-row {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(140px, 1fr) minmax(170px, 1.2fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px 14px;
-  flex-wrap: wrap;
-  padding: 12px 0;
-  border-bottom: 1px solid var(--border);
+  gap: 12px;
+  padding: 20px 0;
 }
 .shard-row:first-child { padding-top: 0; }
-.shard-row:last-child { border-bottom: none; padding-bottom: 0; }
+.shard-row:last-child { padding-bottom: 0; }
 .shard-main {
   display: flex;
   align-items: center;
   gap: 8px 10px;
   flex-wrap: wrap;
-  flex: 1 1 200px;
   min-width: 0;
 }
 /* 需要纵向堆叠内容的行（例如进度条 + 说明文字） */
 .shard-row-block { display: block; }
 .shard-row-block > * + * { margin-top: 8px; }
 .shard-name { font-weight: 600; font-size: 13.5px; }
-.shard-meta { font-size: 12px; color: var(--text-muted); }
 .shard-actions { display: flex; gap: 6px; margin-left: auto; }
-
-/* 资源占用：数字用等宽字形，刷新时宽度不会来回抖 */
-.shard-res { display: flex; gap: 14px; font-size: 12px; color: var(--text-muted); }
-.shard-res .res-val {
-  font-weight: 500;
-  color: var(--text-2);
-  font-variant-numeric: tabular-nums;
-}
 
 /* 长路径展示：等宽 + 允许换行，避免撑破卡片 */
 .path-line {
@@ -563,26 +546,6 @@ input[type="radio"] {
    日志控制台
    -------------------------------------------------------------------------- */
 
-/* 分区标题：与卡片标题同字号，但落在页面背景上 */
-.log-section-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 12px;
-}
-.log-section-head h2 { font-size: 15px; font-weight: 600; }
-
-/* 分屏容器：每个分片一个面板。窄屏在 1100px 处堆成单列。 */
-.log-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 16px;
-}
-/* 只有一个分片时占满整行 */
-.log-grid > .log-pane:only-child { grid-column: 1 / -1; }
-
 /* 单个分片的日志面板：标题栏 + 日志区 + 命令输入。
    终端始终是深底，所以把 shadcn 语义 token 局部映射到代码色，
    内部 Button/Input/Switch 不用逐个覆盖颜色。 */
@@ -616,7 +579,6 @@ input[type="radio"] {
   border-bottom: 1px solid var(--code-border);
 }
 
-.log-pane-title,
 .log-pane-tools {
   display: flex;
   align-items: center;
@@ -625,10 +587,22 @@ input[type="radio"] {
 }
 .log-pane-tools { margin-left: auto; }
 
-.log-pane-name { font-size: 13px; font-weight: 600; }
 .log-pane-sub { font-size: 11.5px; color: var(--code-muted); }
-.log-connection { font-size: 11.5px; color: var(--code-muted); white-space: nowrap; }
-.log-connection.is-connected { color: var(--code-ok); }
+.log-tabs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.log-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: var(--code-muted);
+  cursor: pointer;
+}
+.log-tab[data-state="active"] { background: var(--code-border); color: var(--code-text); }
+.log-tab:focus-visible { outline: 2px solid var(--code-info); outline-offset: 2px; }
+.log-tab-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--code-muted); }
+.log-tab-dot.is-connected { background: var(--code-ok); }
 
 .log-autoscroll {
   display: inline-flex;
@@ -1361,14 +1335,20 @@ input[type="radio"] {
    -------------------------------------------------------------------------- */
 
 /* 业务页响应式布局 */
-/* 分栏在中等宽度下会各自过窄（服务器文件区不足 400px），先堆成单列 */
+/* 中等宽度下改为单列，保留控制、快捷操作、资源和详情的阅读顺序。 */
 @media (max-width: 1100px) {
   .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .overview-split { grid-template-columns: 1fr; }
-  .log-grid { grid-template-columns: 1fr; }
+  .overview-workspace { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 560px) {
+  .stat-row { gap: 12px; }
+  .stat-row .stat-icon { display: none; }
 }
 
 @media (max-width: 720px) {
+  .shard-row { grid-template-columns: minmax(0, 1fr) auto; }
+  .shard-world { grid-column: 1 / -1; grid-row: 2; }
   .field { grid-template-columns: 1fr; gap: 5px; }
   /* 单列时标签跑到输入框上方，右对齐会显得别扭 */
   .field-label { font-size: 12px; text-align: left; }

@@ -91,10 +91,10 @@ test('轮询更新结果但不覆盖编辑中的计划，移动端不溢出', as
 test('概览显示存档天数和零天剩余，失败分片单独报错', async () => {
   const { page, errors } = await openPanel('overview');
   try {
-    const region = page.getByRole('region', { name: '世界状态', exact: true });
+    const region = page.getByRole('region', { name: '分片状态', exact: true });
     await region.getByText('第 16 天', { exact: true }).waitFor();
     assert.match(await region.innerText(), /冬季/);
-    assert.match(await region.innerText(), /本季剩余 0 天/);
+    assert.match(await region.innerText(), /剩 0 天/);
     assert.match(await region.innerText(), /存档于/);
     assert.match(await region.innerText(), /读取失败：快照尚未写完/);
     assert.deepEqual(errors, []);

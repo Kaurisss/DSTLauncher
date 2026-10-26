@@ -121,7 +121,6 @@ onMounted(async () => {
 
   if (ok) {
     // 表单枚举值失败不影响使用，不阻塞进入面板。
-    // 安装状态由概览页的 InstallPanel 自己拉取，这里不重复请求。
     guard(() => rooms.loadMeta());
   }
 

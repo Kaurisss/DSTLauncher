@@ -73,13 +73,13 @@ async function run(action) {
 <template>
   <UiCard>
     <template #title>快捷操作</template>
-    <section aria-label="快捷操作" class="flex h-full flex-col justify-center gap-3.5">
+    <section aria-label="快捷操作" class="grid min-w-0 gap-3.5">
       <div class="flex flex-wrap gap-2">
         <Button variant="outline" size="sm" :disabled="!!busy || !anyRunning || rooms.starting" @click="run('save')">{{ busy === 'save' ? '等待保存完成…' : '立即保存' }}</Button>
         <Button variant="outline" size="sm" :disabled="!!busy || !masterRunning || rooms.starting" @click="run('skipday')">{{ busy === 'skipday' ? '等待游戏回执…' : '主世界快进一天' }}</Button>
       </div>
-      <form class="flex flex-wrap gap-2" @submit.prevent="run('announce')">
-        <Input v-model="message" class="min-w-0 flex-1 basis-44" aria-label="全服公告" placeholder="输入全服公告内容（最多 500 字）" :disabled="!!busy || !masterRunning || rooms.starting" />
+      <form class="flex flex-col gap-2 sm:flex-row" @submit.prevent="run('announce')">
+        <Input v-model="message" class="min-w-0 flex-1" aria-label="全服公告" placeholder="输入全服公告内容（最多 500 字）" :disabled="!!busy || !masterRunning || rooms.starting" />
         <Button type="submit" size="sm" :disabled="!!busy || !masterRunning || !validMessage || rooms.starting">{{ busy === 'announce' ? '等待游戏回执…' : '发送全服公告' }}</Button>
       </form>
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">{{ error }}</p>
