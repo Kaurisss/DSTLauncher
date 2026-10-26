@@ -42,15 +42,16 @@ after(async () => {
   await vite?.close();
 });
 
-async function openPanel(width = 1440) {
+async function openPanel(width = 1440, dark = false) {
   const page = await browser.newPage({ viewport: { width, height: 1000 } });
   page.setDefaultTimeout(10000);
   const state = { commands: [], commandError: '', errors: [] };
   page.on('pageerror', error => state.errors.push(error.message));
-  await page.addInitScript(() => {
+  await page.addInitScript(dark => {
     localStorage.setItem('dst-tab', 'overview');
     localStorage.setItem('dst-room', '1');
-  });
+    localStorage.setItem('dst-theme', dark ? 'dark' : 'light');
+  }, dark);
   await page.route('**/api/**', route => {
     const url = new URL(route.request().url());
     const ok = data => route.fulfill({ json: { code: 200, data } });
@@ -92,6 +93,9 @@ test('单窗口 Tabs 切换不重连，后台分片持续接收，草稿、自�
   try {
     const tabs = console.getByRole('tab');
     assert.equal(await tabs.count(), 4);
+    assert.equal(await console.locator('[data-slot="code-block"]').count(), 1);
+    assert.equal(await console.locator('[data-slot="code-block-content"]').count(), 1);
+    assert.equal(await console.locator('[data-slot="code-block-code"]').evaluate(el => window.getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
     await console.getByRole('tab', { name: /火山 Volcano 已连接/ }).waitFor();
     assert.equal(await console.locator('.console').count(), 1);
     const count = opened.length;
@@ -118,6 +122,8 @@ test('单窗口 Tabs 切换不重连，后台分片持续接收，草稿、自�
     await caves.click();
     assert.equal(await console.getByRole('textbox', { name: '洞穴 控制台命令', exact: true }).inputValue(), 'c_listallplayers()');
     assert.equal(await console.locator('.console').count(), 1);
+    await console.scrollIntoViewIfNeeded();
+    await page.screenshot({ path: fileURLToPath(new URL('../../.scratch/screenshots/console-code-block.png', import.meta.url)) });
     assert.deepEqual(state.errors, []);
   } finally { await page.close(); }
 });
@@ -153,6 +159,42 @@ test('清屏只作用于当前分片，命令发送到选定分片，失败保�
     assert.equal(await console.getByText('房间 1 Master 第 79 行', { exact: true }).count(), 0);
     assert.deepEqual(state.errors, []);
   } finally { await page.close(); }
+});
+
+test('自动滚动在浅色深色主题下开关底色可区分，悬停与键盘切换保持正确', async () => {
+  for (const dark of [false, true]) {
+    const { page, console, state } = await openPanel(1440, dark);
+    try {
+      const toggle = console.getByRole('switch', { name: '森林 自动滚动', exact: true });
+      const styles = () => toggle.evaluate(async el => {
+        await Promise.all(el.getAnimations({ subtree: true }).map(animation => animation.finished));
+        return {
+          track: window.getComputedStyle(el).backgroundColor,
+          thumb: window.getComputedStyle(el.firstElementChild).backgroundColor,
+          thumbX: el.firstElementChild.getBoundingClientRect().x - el.getBoundingClientRect().x,
+        };
+      });
+      await toggle.hover();
+      await toggle.focus();
+      assert.equal(await toggle.getAttribute('aria-checked'), 'true');
+      const enabled = await styles();
+      await console.locator('[data-slot="code-block-header"]').screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/log-autoscroll-${dark ? 'dark' : 'light'}-on.png`, import.meta.url)) });
+      await page.keyboard.press('Space');
+      assert.equal(await toggle.getAttribute('aria-checked'), 'false');
+      const disabled = await styles();
+      assert.notEqual(enabled.track, disabled.track);
+      assert.notEqual(enabled.track, 'rgba(0, 0, 0, 0)');
+      assert.notEqual(disabled.track, 'rgba(0, 0, 0, 0)');
+      assert.notEqual(enabled.track, enabled.thumb);
+      assert.notEqual(disabled.track, disabled.thumb);
+      assert.ok(enabled.thumbX - disabled.thumbX > 8, '开关圆点有明确的位置变化');
+      await console.locator('[data-slot="code-block-header"]').screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/log-autoscroll-${dark ? 'dark' : 'light'}-off.png`, import.meta.url)) });
+      await page.keyboard.press('Space');
+      assert.equal(await toggle.getAttribute('aria-checked'), 'true');
+      assert.equal((await styles()).track, enabled.track);
+      assert.deepEqual(state.errors, []);
+    } finally { await page.close(); }
+  }
 });
 
 test('手机 Tabs 可键盘切换且无横向溢出，连接断开在对应 Tab 报告', async () => {

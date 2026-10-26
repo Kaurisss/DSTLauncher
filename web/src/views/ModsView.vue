@@ -16,8 +16,9 @@ import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiPill from '@/components/ui/UiPill.vue';
-import UiSkeleton from '@/components/ui/UiSkeleton.vue';
+import UiLoading from '@/components/ui/UiLoading.vue';
 import { Button } from '@/components/ui/button';
+import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton } from '@/components/ui/code-block';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -427,12 +428,12 @@ watch([() => rooms.current, shard], () => {
         </Tooltip>
       </template>
 
-      <UiSkeleton v-if="!rooms.loaded" variant="mod" :rows="4" />
+      <UiLoading v-if="!rooms.loaded" />
       <UiEmpty v-else-if="!rooms.current" icon="package" text="请先在「房间」页新建一个房间" />
       <!-- 骨架屏只给首屏：后台刷新（每 15 秒的房间轮询触发的 load）不能
          把整个内容区（含创意工坊搜索结果、更新进度块）拆掉重建，
          否则表现为整页周期性闪烁、搜索结果周期性消失 -->
-      <UiSkeleton v-else-if="loading && !mods.length" variant="mod" :rows="4" />
+      <UiLoading v-else-if="loading && !mods.length" />
       <UiEmpty v-else-if="loadError" icon="alert" :text="'读取模组失败：' + loadError" />
 
       <template v-else>
@@ -531,7 +532,10 @@ watch([() => rooms.current, shard], () => {
         <DialogDescription class="sr-only">模组下载任务的进度与日志</DialogDescription>
         <p v-if="queuedCount" class="field-tip">队列中还有 {{ queuedCount }} 个待下载</p>
         <p v-if="updateError || pollError" class="text-sm text-destructive" role="alert">{{ pollError ? '无法读取更新进度：' + pollError : updateError }}</p>
-        <pre class="mod-update-log mod-terminal" tabindex="0" role="region" aria-label="模组更新输出">{{ output.join('\n') || (updating ? '正在等待更新输出…' : '暂无更新输出') }}</pre>
+        <CodeBlock size="sm">
+          <CodeBlockActions><CodeBlockCopyButton :value="output.join('\n')" :disabled="!output.length" /></CodeBlockActions>
+          <CodeBlockContent wrap class="mod-terminal" role="region" aria-label="模组更新输出">{{ output.join('\n') || (updating ? '正在等待更新输出…' : '暂无更新输出') }}</CodeBlockContent>
+        </CodeBlock>
         <div class="flex justify-end gap-2">
           <Button v-if="pollError" variant="outline" @click="pollUpdate">重试</Button>
           <Button v-if="updating" variant="destructive" :disabled="stopping" @click="stopUpdate">{{ stopping ? '正在中止…' : '中止' }}</Button>

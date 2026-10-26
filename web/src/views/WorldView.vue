@@ -11,7 +11,7 @@ import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiField from '@/components/ui/UiField.vue';
-import UiSkeleton from '@/components/ui/UiSkeleton.vue';
+import UiLoading from '@/components/ui/UiLoading.vue';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -489,10 +489,10 @@ onMounted(() => selectShard(rooms.shards[0]));
         </button>
       </template>
 
-      <UiSkeleton v-if="!rooms.loaded" variant="form" :rows="2" />
+      <UiLoading v-if="!rooms.loaded" />
       <UiEmpty v-else-if="!rooms.current" icon="globe" text="请先在「房间」页新建一个房间" />
       <!-- 只在首次加载时铺骨架；切分片保留旧内容到新数据回来，避免整页重建闪一下 -->
-      <UiSkeleton v-else-if="loading && !view" variant="form" :rows="2" />
+      <UiLoading v-else-if="loading && !view" />
       <p v-else-if="loadError" class="field-tip">读取失败：{{ loadError }}</p>
 
       <div v-else-if="view" class="world-config-body">

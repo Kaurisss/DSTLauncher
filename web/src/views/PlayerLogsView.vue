@@ -4,6 +4,7 @@ import { HugeiconsIcon } from '@hugeicons/vue';
 import { ArrowLeft01Icon, ArrowRight01Icon, Copy01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
+import UiLoading from '@/components/ui/UiLoading.vue';
 import UiField from '@/components/ui/UiField.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -232,7 +233,7 @@ async function blockPlayer(entry) {
       </form>
 
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">读取失败：{{ error }}</p>
-      <p v-else-if="loading && !result" role="status" class="text-sm text-muted-foreground">读取记录中…</p>
+      <UiLoading v-else-if="loading && !result" />
       <UiEmpty v-else-if="!rooms.current" icon="users" text="请先选择房间" />
       <UiEmpty v-else-if="!result?.exists" icon="inbox" text="该分片还没有聊天日志，开服并产生聊天或进出记录后显示" />
       <UiEmpty v-else-if="!entries.length" icon="inbox" text="历史日志中没有匹配的记录" />

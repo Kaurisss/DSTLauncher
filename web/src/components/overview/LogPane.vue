@@ -4,6 +4,7 @@ import { computed, onActivated, ref, watch } from 'vue';
 import { TabsContent } from 'reka-ui';
 
 import { Input } from '@/components/ui/input';
+import { CodeBlockContent, CodeBlockLine } from '@/components/ui/code-block';
 import { Button } from '@/components/ui/button';
 import { useLogs } from '@/composables/useLogs.js';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -41,7 +42,7 @@ defineExpose({ autoscroll });
 
 function onScroll() {
   // 用户手动滚到底部时重新打开跟随，省得再去点开关
-  const el = box.value;
+  const el = box.value?.$el;
   if (!el?.isConnected) return;
   scrollTop.value = el.scrollTop;
   if (el.scrollTop + el.clientHeight >= el.scrollHeight - 30 && !autoscroll.value) {
@@ -64,7 +65,7 @@ function restoreScroll() {
   scrollQueued = true;
   requestAnimationFrame(() => {
     scrollQueued = false;
-    const el = box.value;
+    const el = box.value?.$el;
     if (el?.isConnected) el.scrollTop = autoscroll.value ? el.scrollHeight : scrollTop.value;
   });
 }
@@ -91,21 +92,20 @@ async function submit() {
 
 <template>
   <TabsContent :value="shard" force-mount class="min-w-0 outline-none">
-    <div
+    <CodeBlockContent
       ref="box"
+      wrap
       class="console"
       tabindex="0"
       role="region"
       :aria-label="`${label} 日志输出`"
       @scroll="onScroll"
     >
-      <div v-if="!lines.length" class="console-empty">
-        <p>暂无 {{ label }} 的日志输出。</p>
-      </div>
-      <div v-for="l in lines" :key="l.id" class="log-line" :class="'k-' + l.kind">
+      <CodeBlockLine v-if="!lines.length" class="text-muted-foreground">暂无 {{ label }} 的日志输出。</CodeBlockLine>
+      <CodeBlockLine v-for="l in lines" :key="l.id" class="log-line" :class="'k-' + l.kind">
         <span class="log-text">{{ l.text }}</span>
-      </div>
-    </div>
+      </CodeBlockLine>
+    </CodeBlockContent>
 
     <form class="console-form" @submit.prevent="submit">
       <span class="console-prompt" aria-hidden="true">$</span>

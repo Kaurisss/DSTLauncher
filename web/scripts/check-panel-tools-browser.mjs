@@ -456,6 +456,40 @@ test('删除等待期间禁用操作，切房间或筛选不携带选择且迟�
   } finally { await close(); }
 });
 
+test('玩家日志首次和筛选加载用 Spinner，刷新时保留已有记录', async () => {
+  const { page, state, close } = await openPanel();
+  try {
+    let pending = state.hold('delayChat');
+    await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
+    const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
+    const spinner = panel.getByRole('status', { name: '加载中', exact: true });
+    await spinner.waitFor();
+    assert.equal(await spinner.locator('svg').count(), 1);
+    assert.equal(await panel.getByText('读取记录中…', { exact: true }).count(), 0);
+    state.delayChat = null;
+    pending.release();
+    await panel.getByText('房间2-Surface', { exact: true }).waitFor();
+    await spinner.waitFor({ state: 'hidden' });
+    pending = state.hold('delayChat');
+    await Promise.all([
+      page.waitForRequest(request => new URL(request.url()).pathname === '/api/chat-log'),
+      panel.getByRole('button', { name: '刷新记录', exact: true }).click(),
+    ]);
+    assert.equal(await panel.getByText('房间2-Surface', { exact: true }).isVisible(), true);
+    assert.equal(await spinner.count(), 0);
+    state.delayChat = null;
+    pending.release();
+    await panel.getByRole('button', { name: '刷新记录', exact: true }).waitFor({ state: 'visible' });
+    pending = state.hold('delayChat');
+    await panel.getByRole('textbox', { name: '搜索历史记录', exact: true }).fill('KU_chat-1');
+    await spinner.waitFor();
+    state.delayChat = null;
+    pending.release();
+    await panel.getByText('房间2-Surface', { exact: true }).waitFor();
+    await spinner.waitFor({ state: 'hidden' });
+  } finally { await close(); }
+});
+
 test('自动刷新可暂停，暂停期间仍可手动刷新，恢复后立即取新记录', async () => {
   const { page, state, close } = await openPanel();
   try {

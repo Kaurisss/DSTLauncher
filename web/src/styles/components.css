@@ -546,48 +546,22 @@ input[type="radio"] {
    日志控制台
    -------------------------------------------------------------------------- */
 
-/* 单个分片的日志面板：标题栏 + 日志区 + 命令输入。
-   终端始终是深底，所以把 shadcn 语义 token 局部映射到代码色，
-   内部 Button/Input/Switch 不用逐个覆盖颜色。 */
-.log-pane {
-  --background: var(--code-bg);
-  --foreground: var(--code-text);
-  --muted: var(--code-border);
-  --muted-foreground: var(--code-muted);
-  --border: var(--code-border);
-  --input: var(--code-muted);
-  --ring: var(--code-info);
-
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  border: 1px solid var(--code-border);
-  border-radius: calc(var(--radius) + 4px);
-  overflow: hidden;
-  background: var(--code-bg);
-  color: var(--code-text);
-  color-scheme: dark;
+[data-slot="code-block-content"] {
+  --font-mono: "Cascadia Code", Consolas, "Liberation Mono", monospace;
+  font-variant-ligatures: none;
 }
 
-.log-pane-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: var(--code-bg);
-  border-bottom: 1px solid var(--code-border);
+/* 旧 code 标签的底色和内边距不能覆盖 Code Block 的内容层。 */
+[data-slot="code-block-code"] {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
 }
 
-.log-pane-tools {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-.log-pane-tools { margin-left: auto; }
-
-.log-pane-sub { font-size: 11.5px; color: var(--code-muted); }
+.log-pane-tools { display: flex; align-items: center; gap: 8px; min-width: 0; margin-left: auto; }
+.log-pane-sub { font-size: 11.5px; color: var(--text-muted); }
 .log-tabs { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
 .log-tab {
   display: inline-flex;
@@ -596,85 +570,31 @@ input[type="radio"] {
   padding: 6px 10px;
   border-radius: 6px;
   font-size: 13px;
-  color: var(--code-muted);
+  color: var(--text-muted);
   cursor: pointer;
 }
-.log-tab[data-state="active"] { background: var(--code-border); color: var(--code-text); }
-.log-tab:focus-visible { outline: 2px solid var(--code-info); outline-offset: 2px; }
-.log-tab-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--code-muted); }
-.log-tab-dot.is-connected { background: var(--code-ok); }
-
-.log-autoscroll {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  color: var(--code-muted);
-  cursor: pointer;
-  user-select: none;
-  white-space: nowrap;
-}
-
-.log-empty { padding: 26px 16px; }
+.log-tab[data-state="active"] { background: var(--surface-3); color: var(--text); }
+.log-tab:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+.log-tab-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--text-muted); }
+.log-tab-dot.is-connected { background: var(--ok); }
+.log-autoscroll { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); cursor: pointer; user-select: none; white-space: nowrap; }
 
 .console {
-  flex: none;
   height: clamp(16rem, 36vh, 24rem);
-  padding: 12px 0;
-  overflow: auto;
   scrollbar-gutter: stable;
   overscroll-behavior: contain;
-  background: var(--code-bg);
-  color: var(--code-text);
-  font-family: "JetBrains Mono", "Cascadia Code", ui-monospace, Consolas, monospace;
   font-size: 12px;
   line-height: 1.7;
 }
-.console:focus-visible { outline: 2px solid var(--code-info); outline-offset: -2px; }
-
-.log-line {
-  display: flex;
-  gap: 8px;
-  padding: 0 16px;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-.log-text { flex: 1; }
-
-/* 进程事件按类型着色，和服务器原始输出区分开。
-   普通日志（k-log）与未知类型不单独设色，直接用深底上的默认前景色。 */
-.log-line.k-start   .log-text { color: var(--code-ok); }
-.log-line.k-ready   .log-text { color: var(--code-ok); }
-.log-line.k-stop    .log-text { color: var(--code-info); }
-.log-line.k-restart .log-text { color: var(--code-warn); }
-.log-line.k-warn    .log-text { color: var(--code-warn); }
-.log-line.k-crash   .log-text { color: var(--code-danger); }
-.log-line.k-cmd     .log-text { color: var(--code-info); }
-.log-line.k-cmd     .log-text::before { content: "$ "; color: var(--code-muted); }
-
-.console-empty {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 16px;
-  color: var(--code-muted);
-}
-
-.console-form {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 16px;
-  background: var(--code-bg);
-  border-top: 1px solid var(--code-border);
-}
-
-.console-prompt {
-  flex-shrink: 0;
-  color: var(--code-muted);
-  font-family: "JetBrains Mono", "Cascadia Code", ui-monospace, Consolas, monospace;
-  font-size: 12px;
-}
+.console:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.log-line { white-space: pre-wrap; word-break: break-all; }
+.log-line.k-start .log-text, .log-line.k-ready .log-text { color: var(--ok); }
+.log-line.k-stop .log-text, .log-line.k-cmd .log-text { color: var(--info); }
+.log-line.k-restart .log-text, .log-line.k-warn .log-text { color: var(--warn); }
+.log-line.k-crash .log-text { color: var(--danger); }
+.log-line.k-cmd .log-text::before { content: "$ "; color: var(--text-muted); }
+.console-form { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-top: 1px solid var(--border); }
+.console-prompt { flex-shrink: 0; color: var(--text-muted); font-family: ui-monospace, Consolas, monospace; font-size: 12px; }
 
 /* --------------------------------------------------------------------------
    房间卡片
@@ -810,22 +730,6 @@ input[type="radio"] {
 .mod-name { font-weight: 600; font-size: 13.5px; }
 .mod-id { font-size: 11.5px; color: var(--text-muted); font-family: "JetBrains Mono", ui-monospace, monospace; }
 .mod-actions { display: flex; align-items: center; gap: 6px; margin-left: auto; }
-.mod-update-log {
-  margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--code-border);
-  border-radius: 8px;
-  background: var(--code-bg);
-  color: var(--code-text);
-  font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
-  font-size: 12px;
-  line-height: 1.55;
-  max-height: 260px;
-  overflow: auto;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
 .opt { display: grid; grid-template-columns: 190px 1fr; gap: 6px 12px; align-items: center; margin-bottom: 11px; }
 .opt > label { font-size: 13px; word-break: break-word; text-align: right; }
 .opt-desc { grid-column: 2; font-size: 12px; color: var(--text-muted); margin-top: -2px; }
@@ -1205,46 +1109,8 @@ input[type="radio"] {
 .table td .btn + .btn { margin-left: 6px; }
 
 /* --------------------------------------------------------------------------
-   配置预览
+   空态、进度条
    -------------------------------------------------------------------------- */
-
-.file-card + .file-card { margin-top: 16px; }
-.file-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 9px; }
-.file-path { font-size: 12.5px; font-weight: 600; word-break: break-all; }
-
-.file-body {
-  max-height: 360px;
-  padding: 13px 15px;
-  overflow: auto;
-  border: 1px solid var(--code-border);
-  border-radius: var(--radius-sm);
-  background: var(--code-bg);
-  color: var(--code-text);
-  font-size: 12px;
-  line-height: 1.7;
-  white-space: pre-wrap;
-  word-break: break-all;
-}
-
-/* --------------------------------------------------------------------------
-   骨架屏、空态、进度条
-   -------------------------------------------------------------------------- */
-
-.skeleton {
-  border-radius: 6px;
-  background: var(--surface-3);
-  background-image: linear-gradient(90deg, transparent 20%, var(--surface-2) 50%, transparent 80%);
-  background-size: 220% 100%;
-  animation: shimmer 1.5s ease-in-out infinite;
-}
-@keyframes shimmer {
-  from { background-position: 130% 0; }
-  to   { background-position: -30% 0; }
-}
-
-.skeleton-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; }
-.skeleton-row:first-child { padding-top: 0; }
-.skeleton-row:last-child { padding-bottom: 0; }
 
 .empty {
   display: flex;

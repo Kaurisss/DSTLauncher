@@ -5,7 +5,7 @@ import { onMounted, ref, watch } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
-import UiSkeleton from '@/components/ui/UiSkeleton.vue';
+import UiLoading from '@/components/ui/UiLoading.vue';
 import { Button } from '@/components/ui/button';
 import BackupTable from '@/components/backups/BackupTable.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
@@ -41,7 +41,7 @@ async function load() {
 onMounted(load);
 // 用 current 而不是 currentId 做触发（原因见 ModsView）：currentId 刷新后
 // 值不变 watch 不到，current 要等房间列表加载完才从 null 变成房间对象
-watch(() => rooms.current, load);
+watch(() => rooms.current, () => { items.value = []; load(); });
 
 async function create() {
   const room = rooms.current;
@@ -94,9 +94,9 @@ function exportSave(name) {
       </Button>
     </template>
 
-    <UiSkeleton v-if="!rooms.loaded" variant="table" :rows="3" />
+    <UiLoading v-if="!rooms.loaded" />
     <UiEmpty v-else-if="!rooms.current" icon="archive" text="请先在「房间」页新建一个房间" />
-    <UiSkeleton v-else-if="loading" variant="table" :rows="3" />
+    <UiLoading v-else-if="loading && !items.length" />
     <UiEmpty v-else-if="loadError" icon="alert" :text="'读取备份失败：' + loadError" />
     <UiEmpty v-else-if="!items.length" icon="archive" text="暂无备份" />
     <BackupTable v-else :items="items" @restore="restore" @remove="remove" @export="exportSave" />

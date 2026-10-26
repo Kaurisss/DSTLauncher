@@ -149,7 +149,8 @@ async function openMods({
     return ok([]);
   });
   await page.goto(origin);
-  await page.locator(delayMods ? '.mod-skeleton' : '.mod-entry-head').first().waitFor();
+  if (delayMods) await page.getByRole('status', { name: '加载中', exact: true }).waitFor();
+  else await page.locator('.mod-entry-head').first().waitFor();
   return { page, requests, releaseDetails, releaseMods, releaseToggle, state };
 }
 
@@ -466,23 +467,46 @@ test('封面加载失败保留占位图，运行中冻结修改但标题仍可�
   }
 });
 
-test('封面列表的骨架行与真实条目在桌面、窄屏下保持同高和相同行距', async () => {
+test('模组配置等待 schema 时使用 Spinner，完成后恢复表单内容', async () => {
+  const { page } = await openMods();
+  let release;
+  const pending = new Promise(resolve => { release = resolve; });
+  await page.route('**/api/mods/schema*', async route => {
+    await pending;
+    return route.fulfill({ json: { code: 200, data: [] } });
+  });
+  try {
+    await page.locator('.mod').nth(1).getByRole('button', { name: '配置', exact: true }).click();
+    const dialog = page.getByRole('dialog');
+    await dialog.getByRole('status', { name: '加载中', exact: true }).waitFor();
+    assert.equal(await dialog.locator('[data-slot="skeleton"]').count(), 0);
+    release();
+    await dialog.getByText('该模组没有可配置项。', { exact: true }).waitFor();
+    assert.equal(await dialog.getByRole('status', { name: '加载中', exact: true }).count(), 0);
+  } finally { release(); await page.close(); }
+});
+
+test('首次加载使用 Spinner，刷新保留模组列表且不闪回占位', async () => {
   for (const width of [1280, 390]) {
-    const { page, releaseMods } = await openMods({ delayMods: true, width });
+    const { page, releaseMods, state } = await openMods({ delayMods: true, width });
+    let releaseRefresh = () => {};
     try {
-      const measure = selector => page.locator(selector).evaluateAll(items => {
-        const rects = items.map(el => el.getBoundingClientRect());
-        // 入场平移会产生浮点舍入误差，保留千分之一像素后再比较。
-        return { height: Number(rects[0].height.toFixed(3)), gap: Number((rects[1].top - rects[0].bottom).toFixed(3)) };
-      });
-      const skeleton = await measure('.mod-skeleton .mod');
+      assert.equal(await page.locator('[data-slot="skeleton"]').count(), 0);
       releaseMods();
       await waitForTitle(page);
-      const content = await measure('.mod');
-      assert.ok(Math.abs(skeleton.height - content.height) <= 1, `${width}px：骨架 ${skeleton.height}px，内容 ${content.height}px`);
-      assert.equal(skeleton.gap, content.gap, `${width}px：条目间距一致`);
+      await page.getByRole('status', { name: '加载中', exact: true }).waitFor({ state: 'hidden' });
+      state.listDelay = new Promise(resolve => { releaseRefresh = resolve; });
+      await Promise.all([
+        page.waitForRequest(request => new URL(request.url()).pathname === '/api/mods'),
+        page.getByRole('button', { name: '刷新', exact: true }).click(),
+      ]);
+      assert.equal(await page.locator('.mod').count(), 4);
+      assert.equal(await page.getByRole('status', { name: '加载中', exact: true }).count(), 0);
+      assert.equal(await page.locator('[data-slot="skeleton"]').count(), 0);
+      releaseRefresh();
     } finally {
       releaseMods();
+      releaseRefresh();
       await page.close();
     }
   }
@@ -533,7 +557,7 @@ test('下载留在后台，日志按需打开，关闭后继续轮询，可重�
     await dialog.waitFor();
     await dialog.getByText('25%', { exact: true }).waitFor();
     assert.match(await dialog.locator('pre').innerText(), /正在处理模组/);
-    assert.equal(await page.locator('#page-content pre.mod-update-log').count(), 0, '主列表不再承载终端');
+    assert.equal(await page.locator('#page-content').getByRole('region', { name: '模组更新输出', exact: true }).count(), 0, '主列表不再承载终端');
     await page.keyboard.press('Escape');
     await dialog.waitFor({ state: 'hidden' });
     const reopen = page.getByRole('button', { name: '更新日志', exact: true });
@@ -558,13 +582,23 @@ test('下载留在后台，日志按需打开，关闭后继续轮询，可重�
 });
 
 test('历史更新输出只通过日志入口查看，进入页面不自动弹出模态框', async () => {
-  const { page } = await openMods({ updateStatuses: [{ running: false, output: ['历史更新输出'] }] });
+  const history = ['历史更新输出', '<img src=x onerror=alert(1)>'];
+  const { page } = await openMods({ updateStatuses: [{ running: false, output: history }] });
   try {
     await page.waitForLoadState('networkidle');
     assert.equal(await page.getByRole('dialog').count(), 0);
-    assert.equal(await page.locator('pre.mod-update-log').count(), 0);
+    assert.equal(await page.getByRole('region', { name: '模组更新输出', exact: true }).count(), 0);
     await page.getByRole('button', { name: '更新日志', exact: true }).click();
-    await page.getByRole('dialog').getByText('历史更新输出', { exact: true }).waitFor();
+    const dialog = page.getByRole('dialog', { name: '模组更新', exact: true });
+    const output = dialog.getByRole('region', { name: '模组更新输出', exact: true });
+    await output.getByText(history.join('\n'), { exact: true }).waitFor();
+    assert.equal(await dialog.locator('[data-slot="code-block"]').count(), 1);
+    assert.equal(await output.locator('img').count(), 0);
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await dialog.getByRole('button', { name: 'Copy', exact: true }).click();
+    await dialog.getByRole('button', { name: 'Copied', exact: true }).waitFor();
+    assert.equal((await page.evaluate(() => window.navigator.clipboard.readText())).replace(/\r\n/g, '\n'), history.join('\n'));
+    await page.screenshot({ path: fileURLToPath(new URL('../../.scratch/screenshots/mod-update-code-block.png', import.meta.url)) });
   } finally {
     await page.close();
   }

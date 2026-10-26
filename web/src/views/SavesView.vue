@@ -18,7 +18,8 @@ import Icon from '@/components/ui/Icon.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Skeleton } from '@/components/ui/skeleton';
+import UiLoading from '@/components/ui/UiLoading.vue';
+import { Spinner } from '@/components/ui/spinner';
 import {
   Table, TableBody, TableCaption, TableCell, TableEmpty,
   TableHead, TableHeader, TableRow,
@@ -140,7 +141,7 @@ async function remove(item) {
   <UiCard>
     <template #title>存档管理</template>
     <template #actions>
-      <Button variant="outline" size="sm" :disabled="loading" @click="load">刷新</Button>
+      <Button variant="outline" size="sm" :disabled="loading" @click="load"><Spinner v-if="loading && items.length" aria-hidden="true" />刷新</Button>
     </template>
 
     <div class="grid min-w-0 gap-4">
@@ -184,13 +185,9 @@ async function remove(item) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            <template v-if="loading">
-              <TableRow v-for="row in 4" :key="row" aria-hidden="true">
-                <TableCell v-for="column in columns" :key="column.id || column.accessorKey" class="h-12">
-                  <Skeleton class="h-4 w-full" />
-                </TableCell>
-              </TableRow>
-            </template>
+            <TableRow v-if="loading && !items.length">
+              <TableCell :colspan="columns.length"><UiLoading /></TableCell>
+            </TableRow>
             <TableEmpty v-else-if="loadError" :colspan="columns.length">
               <span role="alert" class="text-destructive">读取失败：{{ loadError }}</span>
             </TableEmpty>
@@ -211,7 +208,7 @@ async function remove(item) {
         </Table>
       </div>
 
-      <nav v-if="!loading && !loadError && items.length" aria-label="存档分页" class="flex flex-wrap items-center justify-end gap-2">
+      <nav v-if="!loadError && items.length" aria-label="存档分页" class="flex flex-wrap items-center justify-end gap-2">
         <span class="mr-2 text-sm text-muted-foreground" aria-live="polite">第 {{ table.atoms.pagination.get().pageIndex + 1 }} / {{ Math.max(1, table.getPageCount()) }} 页</span>
         <Button variant="outline" size="sm" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
           <Icon name="chevron" class="rotate-180" :size="14" />上一页
