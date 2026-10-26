@@ -58,8 +58,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section aria-label="宿主机资源" class="mb-4 grid gap-3">
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2" :class="container ? 'lg:grid-cols-3' : ''">
+  <section aria-label="宿主机资源" class="grid gap-3">
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2" :class="container ? 'xl:grid-cols-3' : ''">
       <UiStat
         label="宿主机内存"
         :value="memory ? ((memoryUsed / memory.totalBytes) * 100).toFixed(1) + '%' : '—'"
@@ -89,7 +89,7 @@ onUnmounted(() => {
         <TooltipContent class="break-all">{{ snapshot?.diskPath }}</TooltipContent>
       </Tooltip>
     </div>
-    <div v-if="warnings.length || errors.length" role="status" class="grid gap-1 break-words text-sm text-amber-700 dark:text-amber-400">
+    <div v-if="warnings.length || errors.length" role="status" class="grid gap-1 break-words rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
       <p v-for="message in [...warnings, ...errors]" :key="message">{{ message }}</p>
     </div>
   </section>

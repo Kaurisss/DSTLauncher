@@ -20,6 +20,13 @@
   margin-bottom: 16px;
 }
 
+.overview-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
 .stack > * + * { margin-top: 16px; }
 
 .card {
@@ -428,15 +435,14 @@ input[type="radio"] {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 16px;
-  /* 与 .overview-split / 卡片间距保持一致，页面纵向节奏才均匀 */
   margin-bottom: 16px;
 }
 
 .stat {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  padding: 16px;
+  padding: 12px 14px;
   background: var(--surface);
   border: 1px solid var(--border);
   /* 与 shadcn 卡片一致（rounded-xl = radius + 4px） */
@@ -459,17 +465,24 @@ input[type="radio"] {
 .stat-icon svg { width: 17px; height: 17px; }
 
 .stat-body { min-width: 0; }
-.stat-label { font-size: 11.5px; color: var(--text-muted); }
+.stat-label { font-size: 11.5px; line-height: 1.3; color: var(--text-muted); }
 .stat-value {
-  font-size: 21px;
+  font-size: 18px;
   font-weight: 600;
-  line-height: 1.25;
+  line-height: 1.3;
   letter-spacing: -.02em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.stat-sub { font-size: 11.5px; color: var(--text-muted); }
+.stat-sub {
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 
 .stat.is-ok .stat-icon     { background: var(--ok-soft);     color: var(--ok); }
 .stat.is-warn .stat-icon   { background: var(--warn-soft);   color: var(--warn); }
@@ -483,18 +496,26 @@ input[type="radio"] {
 .shard-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  justify-content: space-between;
+  gap: 10px 14px;
   flex-wrap: wrap;
-  /* 分片行信息密度低，行高给足才显得舒展（状态卡与服务器文件卡共用） */
-  padding: 13px 0;
+  padding: 12px 0;
   border-bottom: 1px solid var(--border);
 }
 .shard-row:first-child { padding-top: 0; }
 .shard-row:last-child { border-bottom: none; padding-bottom: 0; }
+.shard-main {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  flex-wrap: wrap;
+  flex: 1 1 200px;
+  min-width: 0;
+}
 /* 需要纵向堆叠内容的行（例如进度条 + 说明文字） */
 .shard-row-block { display: block; }
 .shard-row-block > * + * { margin-top: 8px; }
-.shard-name { font-weight: 600; font-size: 13.5px; min-width: 58px; }
+.shard-name { font-weight: 600; font-size: 13.5px; }
 .shard-meta { font-size: 12px; color: var(--text-muted); }
 .shard-actions { display: flex; gap: 6px; margin-left: auto; }
 
@@ -545,12 +566,13 @@ input[type="radio"] {
 /* 分区标题：与卡片标题同字号，但落在页面背景上 */
 .log-section-head {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
-  margin-bottom: 16px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
 }
-.log-section-head h2 { font-size: 16px; font-weight: 600; }
-.log-section-head p { font-size: 14px; color: var(--text-muted); }
+.log-section-head h2 { font-size: 15px; font-weight: 600; }
 
 /* 分屏容器：每个分片一个面板。窄屏在 1100px 处堆成单列。 */
 .log-grid {

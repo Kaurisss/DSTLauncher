@@ -3,7 +3,7 @@ import { computed } from 'vue';
 import { HugeiconsIcon } from '@hugeicons/vue';
 import {
   Archive02Icon, CodeFolderIcon, DashboardSquare01Icon, EarthIcon,
-  Folder01Icon, PackageIcon, ServerStack01Icon, Settings02Icon,
+  Folder01Icon, Message01Icon, PackageIcon, ServerStack01Icon, Settings02Icon,
 } from '@hugeicons/core-free-icons';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -24,7 +24,7 @@ const { connected } = useLogs();
 const { setOpenMobile } = useSidebar();
 const icons = {
   dashboard: DashboardSquare01Icon, server: ServerStack01Icon, globe: EarthIcon,
-  package: PackageIcon, archive: Archive02Icon, folder: Folder01Icon, fileCode: CodeFolderIcon,
+  package: PackageIcon, message: Message01Icon, archive: Archive02Icon, folder: Folder01Icon, fileCode: CodeFolderIcon,
   settings: Settings02Icon,
 };
 const panelVersion = computed(() => rooms.meta?.panelVersion || '');

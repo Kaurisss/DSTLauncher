@@ -231,9 +231,9 @@ test('房间选择持久化，列表轮询保留对象身份与当前选择', as
   assert.equal(rooms.currentId, 2);
 });
 
-test('八个页面使用同一导航清单，选择持久化且拒绝未知页面', async () => {
+test('九个页面使用同一导航清单，选择持久化且拒绝未知页面', async () => {
   const ui = useUiStore(pinia);
-  assert.equal(ui.tabs.length, 8);
+  assert.equal(ui.tabs.length, 9);
   for (const tab of ui.tabs) ui.select(tab.key);
   await Promise.resolve();
   assert.equal(ui.activeTab, 'settings');

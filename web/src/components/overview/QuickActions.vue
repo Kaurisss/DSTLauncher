@@ -73,19 +73,17 @@ async function run(action) {
 <template>
   <UiCard>
     <template #title>快捷操作</template>
-    <template #hint>操作当前房间「{{ rooms.current?.name || '未选择' }}」。保存会等待所有运行分片完成写入；公告由主分片广播。</template>
-    <section aria-label="快捷操作" class="space-y-3">
+    <section aria-label="快捷操作" class="flex h-full flex-col justify-center gap-3.5">
       <div class="flex flex-wrap gap-2">
-        <Button variant="outline" :disabled="!!busy || !anyRunning || rooms.starting" @click="run('save')">{{ busy === 'save' ? '等待保存完成…' : '立即保存' }}</Button>
-        <Button variant="outline" :disabled="!!busy || !masterRunning || rooms.starting" @click="run('skipday')">{{ busy === 'skipday' ? '等待游戏回执…' : '主世界快进一天' }}</Button>
+        <Button variant="outline" size="sm" :disabled="!!busy || !anyRunning || rooms.starting" @click="run('save')">{{ busy === 'save' ? '等待保存完成…' : '立即保存' }}</Button>
+        <Button variant="outline" size="sm" :disabled="!!busy || !masterRunning || rooms.starting" @click="run('skipday')">{{ busy === 'skipday' ? '等待游戏回执…' : '主世界快进一天' }}</Button>
       </div>
       <form class="flex flex-wrap gap-2" @submit.prevent="run('announce')">
-        <Input v-model="message" class="min-w-0 flex-1 basis-48" aria-label="全服公告" placeholder="输入公告，最多 500 个字符" :disabled="!!busy || !masterRunning || rooms.starting" />
-        <Button type="submit" :disabled="!!busy || !masterRunning || !validMessage || rooms.starting">{{ busy === 'announce' ? '等待游戏回执…' : '发送全服公告' }}</Button>
+        <Input v-model="message" class="min-w-0 flex-1 basis-44" aria-label="全服公告" placeholder="输入全服公告内容（最多 500 字）" :disabled="!!busy || !masterRunning || rooms.starting" />
+        <Button type="submit" size="sm" :disabled="!!busy || !masterRunning || !validMessage || rooms.starting">{{ busy === 'announce' ? '等待游戏回执…' : '发送全服公告' }}</Button>
       </form>
-      <p v-if="!masterRunning" class="text-sm text-muted-foreground">启动主分片并等待世界加载完成后，可以广播公告或快进主世界。</p>
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">{{ error }}</p>
-      <div v-if="report" role="status" class="space-y-1 break-words text-sm">
+      <div v-if="report" role="status" class="space-y-1 break-words rounded-md bg-muted/50 px-3 py-2 text-xs">
         <p v-if="report.completed">{{ report.action === 'save' ? '已确认保存' : report.action === 'announce' ? '公告已提交' : '已执行快进' }}：{{ report.completed }}</p>
         <p v-if="report.skipped" class="text-muted-foreground">未运行，已跳过：{{ report.skipped }}</p>
         <p v-for="failure in report.failures" :key="failure" class="text-destructive">{{ failure }}</p>

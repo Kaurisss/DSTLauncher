@@ -31,6 +31,7 @@ const VIEWS = {
   rooms: defineAsyncComponent(() => import('@/views/RoomsView.vue')),
   world: defineAsyncComponent(() => import('@/views/WorldView.vue')),
   mods: defineAsyncComponent(() => import('@/views/ModsView.vue')),
+  logs: defineAsyncComponent(() => import('@/views/PlayerLogsView.vue')),
   backups: defineAsyncComponent(() => import('@/views/BackupsView.vue')),
   saves: defineAsyncComponent(() => import('@/views/SavesView.vue')),
   config: defineAsyncComponent(() => import('@/views/ConfigView.vue')),

@@ -34,6 +34,7 @@ export const useUiStore = defineStore('ui', () => {
     { key: 'rooms', label: '房间', icon: 'server' },
     { key: 'world', label: '世界配置', icon: 'globe' },
     { key: 'mods', label: '模组', icon: 'package' },
+    { key: 'logs', label: '玩家日志', icon: 'message' },
     { key: 'backups', label: '备份', icon: 'archive' },
     { key: 'saves', label: '存档', icon: 'folder' },
     { key: 'config', label: '配置预览', icon: 'fileCode' },
@@ -42,8 +43,6 @@ export const useUiStore = defineStore('ui', () => {
 
   // 初值取上次的选择；存了不认识的旧 key（版本迭代删过页面）时回落到概览
   const activeTab = ref(readStoredTab(tabs.map(t => t.key)) || 'overview');
-  // Keep the selected log view when the overview remounts for another room.
-  const logView = ref('runtime');
 
   // 与 rooms.js 的房间记忆同理：切换就落盘，刷新后停在原页面
   watch(activeTab, storeTab);
@@ -52,5 +51,5 @@ export const useUiStore = defineStore('ui', () => {
     if (tabs.some(t => t.key === key)) activeTab.value = key;
   }
 
-  return { tabs, activeTab, logView, select };
+  return { tabs, activeTab, select };
 });

@@ -32,6 +32,13 @@ const shardTone = computed(() => {
   return shardRunning.value > 0 ? 'warn' : '';
 });
 
+const shardSub = computed(() => {
+  if (!rooms.current || !shardTotal.value) return '未启用分片';
+  if (rooms.starting) return '正在准备开服…';
+  if (shardRunning.value === shardTotal.value) return '全部运行中';
+  return shardRunning.value > 0 ? '部分运行中' : '全部已停止';
+});
+
 /** 运行中分片的资源合计。CPU 为各分片之和，口径是「占整机」。 */
 const res = computed(() => {
   const live = rooms.statuses.filter(s => s.state === 'running');
@@ -64,7 +71,8 @@ const resTone = computed(() => {
 const roomSub = computed(() => {
   const r = rooms.current;
   if (!r) return '还没有房间';
-  return GAME_MODE_LABEL[r.gameMode] || r.gameMode;
+  const mode = GAME_MODE_LABEL[r.gameMode] || r.gameMode;
+  return r.maxPlayers ? `${mode} · ${r.maxPlayers} 人` : mode;
 });
 
 const serverValue = computed(() => {
@@ -89,12 +97,12 @@ const serverTone = computed(() => {
   <!-- 必须保持单一根节点：App.vue 用 <Transition> 包裹视图组件，
        而 Transition 只接受「恰好一个」根元素。多根（fragment）会让切换动画失效，
        表现为来回点导航后右侧内容整个空白。 -->
-  <div>
+  <div class="overview-page">
     <div class="stat-row">
       <UiStat
         label="运行分片"
         :value="`${shardRunning} / ${shardTotal}`"
-        sub="每个世界一个独立进程"
+        :sub="shardSub"
         icon="server"
         :tone="shardTone"
       />
@@ -121,13 +129,8 @@ const serverTone = computed(() => {
       />
     </div>
 
-    <HostResources />
-    <WorldState />
-
-    <!-- 状态区（主）与服务器文件区（辅）按 7:5 分栏：
-         分片行要放下「状态 · 运行时长 · PID · 端口 · 重启次数」，
-         给它更多宽度才不会挤成两行；服务器文件内容少，窄一点更紧凑。
-         不用 auto-fit 等分——那样两个区各占一半，状态区会大片留白。 -->
+    <!-- 第一层主控工作台：左侧管分片进程与回档，右侧管游戏内即时指令（保存/快进/公告），
+         所有高频开服与控服操作集中在首屏黄金区域。 -->
     <div class="overview-split">
       <UiCard>
         <template #title>房间状态</template>
@@ -143,14 +146,26 @@ const serverTone = computed(() => {
         <ShardList />
       </UiCard>
 
-      <UiCard>
-        <template #title>服务器文件</template>
-        <InstallPanel />
-      </UiCard>
+      <QuickActions />
     </div>
 
-    <PlayersPanel />
-    <QuickActions />
+    <!-- 第二层详情与环境：左栏聚焦游戏内状态（世界进度 + 在线玩家），
+         右栏聚焦宿主机资源与服务器文件，语义分区清晰且左右高度均衡。 -->
+    <div class="overview-split">
+      <div class="overview-col">
+        <WorldState />
+        <PlayersPanel />
+      </div>
+
+      <div class="overview-col">
+        <HostResources />
+        <UiCard class="flex-1">
+          <template #title>服务器文件</template>
+          <InstallPanel />
+        </UiCard>
+      </div>
+    </div>
+
     <LogConsole />
   </div>
 </template>

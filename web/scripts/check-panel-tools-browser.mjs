@@ -204,10 +204,45 @@ test('快进需确认，取消不请求；主分片未运行时禁用操作', as
   finally { await other.close(); }
 });
 
+test('玩家日志筛选框铺满字段宽度，菜单左对齐且选项留有内边距', async () => {
+  for (const width of [1280, 375]) {
+    const { page, close } = await openPanel({ width });
+    try {
+      if (width < 768) await page.getByRole('button', { name: '切换导航', exact: true }).click();
+      const nav = page.locator(width < 768 ? '[data-mobile="true"]' : '#app-navigation');
+      await nav.getByRole('button', { name: '玩家日志', exact: true }).click();
+      const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
+      await panel.getByText('房间2-Surface', { exact: true }).waitFor();
+      for (const name of ['记录分片', '记录类型']) {
+        const trigger = panel.getByRole('combobox', { name, exact: true });
+        const field = await trigger.evaluate(el => {
+          const box = el.getBoundingClientRect();
+          const parent = el.closest('.field');
+          return { width: box.width, fieldWidth: parent.getBoundingClientRect().width,
+            labelBottom: parent.querySelector('label').getBoundingClientRect().bottom, top: box.top };
+        });
+        assert.ok(Math.abs(field.width - field.fieldWidth) < 1, `${name}应铺满字段宽度`);
+        assert.ok(field.labelBottom <= field.top, `${name}标签应在控件上方`);
+        const anchor = await trigger.boundingBox();
+        await trigger.click();
+        const menu = page.getByRole('listbox');
+        await menu.waitFor();
+        await menu.evaluate(async el => { await Promise.all(el.getAnimations().map(animation => animation.finished)); });
+        const bounds = await menu.boundingBox();
+        const option = await menu.getByRole('option').first().boundingBox();
+        assert.ok(Math.abs(bounds.x - anchor.x) < 1, `${name}菜单应与控件左对齐`);
+        assert.ok(option.x >= bounds.x + 3, `${name}选项不应贴住菜单边缘`);
+        await page.keyboard.press('Escape');
+      }
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    } finally { await close(); }
+  }
+});
+
 test('聊天筛选按房间与分片隔离，转义文本，忽略旧响应，离开后停止轮询', async () => {
   const { page, state, close } = await openPanel();
   try {
-    await page.getByRole('button', { name: '聊天与进出记录', exact: true }).click();
+    await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
     const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
     await panel.getByText('房间2-Surface', { exact: true }).waitFor();
     assert.equal(await page.evaluate(() => !!window.fixtureInjected), false);
@@ -229,7 +264,7 @@ test('聊天筛选按房间与分片隔离，转义文本，忽略旧响应，�
     old.release(); await arrived;
     assert.equal(await panel.getByText('房间2-Surface', { exact: true }).count(), 0);
     const before = state.reads.length;
-    await page.getByRole('button', { name: '运行日志', exact: true }).click();
+    await page.locator('#app-navigation').getByRole('button', { name: '概览', exact: true }).click();
     await page.waitForTimeout(5200);
     assert.equal(state.reads.length, before);
   } finally { await close(); }
@@ -240,7 +275,8 @@ test('窄屏深色主题无横向溢出，聊天读取错误可刷新恢复', as
   try {
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     state.chatError = true;
-    await page.getByRole('button', { name: '聊天与进出记录', exact: true }).click();
+    await page.getByRole('button', { name: '切换导航', exact: true }).click();
+    await page.locator('[data-mobile="true"]').getByRole('button', { name: '玩家日志', exact: true }).click();
     const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
     await panel.getByRole('alert').waitFor();
     state.chatError = false;

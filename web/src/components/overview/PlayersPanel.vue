@@ -151,8 +151,8 @@ function preventWhileBusy(event) {
 </script>
 
 <template>
-  <section aria-label="在线玩家" class="mb-4">
-    <UiCard>
+  <section aria-label="在线玩家" class="flex min-w-0 flex-1 flex-col">
+    <UiCard class="flex-1">
       <template #title>在线玩家</template>
       <template #actions>
         <Button variant="outline" size="sm" :disabled="!canQuery || loading || busy" @click="load">
@@ -174,25 +174,25 @@ function preventWhileBusy(event) {
       </div>
       <p v-if="actionError && !teleportOpen" role="alert" class="mb-3 break-words text-sm text-destructive">{{ actionError }}</p>
 
-      <div class="grid gap-3">
+      <div v-if="players.length" class="grid gap-2.5">
         <article
           v-for="player in players" :key="`${player.shard}:${player.userid}`"
           :aria-label="`${player.name || player.userid} ${player.userid} ${labelOf(player.shard)}`"
-          class="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-border p-3"
+          class="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-lg border border-border/80 bg-muted/20 px-3 py-2.5"
         >
           <div class="min-w-0 flex-1 basis-48">
-            <div class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
+            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
               <strong class="break-all font-medium">{{ player.name || player.userid }}</strong>
-              <span v-if="player.admin" class="text-xs text-primary">管理员</span>
+              <span class="break-all font-mono text-xs text-muted-foreground">{{ player.userid }}</span>
+              <span v-if="player.admin" class="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">管理员</span>
               <span v-else-if="player.adminSaved" class="text-xs text-muted-foreground">管理员待重启生效</span>
             </div>
-            <p class="break-all font-mono text-xs text-muted-foreground">{{ player.userid }}</p>
-            <p class="mt-1 break-words text-xs text-muted-foreground">
+            <p class="mt-0.5 break-words text-xs text-muted-foreground">
               {{ labelOf(player.shard) }} · {{ CHARACTERS[player.prefab] || player.prefab || '选角中' }}
               · {{ player.days == null ? '天数未知' : player.days + ' 天' }}{{ player.ghost ? ' · 幽灵' : '' }}
             </p>
           </div>
-          <div class="flex max-w-full flex-wrap gap-2">
+          <div class="flex max-w-full flex-wrap gap-1.5">
             <Button variant="outline" size="sm" :disabled="busy" @click="act(player, 'kick')">踢出</Button>
             <Button variant="destructive" size="sm" :disabled="busy" @click="act(player, 'ban')">封禁</Button>
             <Button variant="outline" size="sm" :disabled="busy || !player.inWorld || !player.ghost" @click="act(player, 'revive')">复活</Button>

@@ -75,13 +75,15 @@ function staleTip(s) {
 
   <template v-else>
     <div v-for="s in rows" :key="s.shard" class="shard-row">
-      <span class="dot" :class="s.state" />
-      <span class="shard-name">{{ label(s) }}</span>
-      <Tooltip v-if="staleVersion(s)">
-        <TooltipTrigger as-child><span class="pill pill-warn" tabindex="0">需重启</span></TooltipTrigger>
-        <TooltipContent>{{ staleTip(s) }}</TooltipContent>
-      </Tooltip>
-      <span class="shard-meta">{{ meta(s) }}</span>
+      <div class="shard-main">
+        <span class="dot" :class="s.state" />
+        <span class="shard-name">{{ label(s) }}</span>
+        <Tooltip v-if="staleVersion(s)">
+          <TooltipTrigger as-child><span class="pill pill-warn" tabindex="0">需重启</span></TooltipTrigger>
+          <TooltipContent>{{ staleTip(s) }}</TooltipContent>
+        </Tooltip>
+        <span class="shard-meta">{{ meta(s) }}</span>
+      </div>
       <!-- 占用率按「占整机」口径，与任务管理器一致 -->
       <Tooltip v-if="isLive(s)">
         <TooltipTrigger as-child>
