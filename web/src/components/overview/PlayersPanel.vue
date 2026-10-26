@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { adminApi, playerApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
-import { shardLabel } from '@/lib/format.js';
+import { CHARACTERS, shardLabel } from '@/lib/format.js';
 import { toast } from '@/lib/toast.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 
@@ -31,13 +31,6 @@ let requestId = 0;
 let disposed = false;
 let timer;
 
-const CHARACTERS = {
-  wilson: '威尔逊', willow: '薇洛', wolfgang: '沃尔夫冈', wendy: '温蒂',
-  wx78: 'WX-78', wickerbottom: '薇克巴顿', woodie: '伍迪', wes: '韦斯',
-  waxwell: '麦斯威尔', wathgrithr: '薇格弗德', webber: '韦伯', winona: '薇诺娜',
-  wortox: '沃拓克斯', wormwood: '沃姆伍德', warly: '沃利', wurt: '沃特',
-  walter: '沃尔特', wanda: '旺达', wonkey: '芜猴',
-};
 const labelOf = name => shardLabel(name, rooms.current?.locations?.[name]);
 
 const LABELS = { kick: '踢出', ban: '封禁', revive: '复活', teleport: '传送', admin: '设为管理员' };

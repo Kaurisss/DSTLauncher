@@ -18,6 +18,7 @@ import (
 
 	"dst-windows/internal/automation"
 	"dst-windows/internal/backup"
+	"dst-windows/internal/chatlog"
 	"dst-windows/internal/config"
 	"dst-windows/internal/modmgr"
 	"dst-windows/internal/panelcfg"
@@ -72,6 +73,7 @@ type Server struct {
 	maintenanceMu sync.RWMutex
 	automation    *automation.Engine
 	automationErr error
+	playerLogs    *chatlog.History
 }
 
 // NewServer 创建 HTTP 服务。
@@ -91,6 +93,7 @@ func NewServer(o Options) *Server {
 		envPassword:    strings.TrimSpace(o.Password),
 		authSecret:     generateSecret(),
 		authConfigSeen: o.WorkDir != "" && panelcfg.Exists(o.WorkDir),
+		playerLogs:     chatlog.NewHistory(filepath.Join(o.RootDir, "playerlogs")),
 	}
 	s.automation, s.automationErr = automation.New(filepath.Join(o.RootDir, "automation.json"))
 	return s

@@ -256,6 +256,7 @@ func main() {
 	// 单模组更新要临时改写下载清单再恢复，同样由 web 层提供
 	mgr.SetModsSetupSwap(api.SwapModsSetup)
 	stopAutomation := api.StartAutomation()
+	stopPlayerLogs := api.StartPlayerLogs()
 
 	srv := &http.Server{
 		Addr:    fmt.Sprintf("%s:%d", *bind, *port),
@@ -304,6 +305,7 @@ func main() {
 				fmt.Printf("关闭房间「%s」失败: %v\n", c.Name, err)
 			}
 		}
+		stopPlayerLogs()
 		fmt.Println("已安全退出")
 	}()
 

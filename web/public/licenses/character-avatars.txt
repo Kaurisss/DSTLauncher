@@ -1,0 +1,11 @@
+角色头像来源
+
+web/public/character-avatars/ 中的 PNG 提取自本机安装的《饥荒联机版》：
+<Steam 游戏库>/steamapps/common/Don't Starve Together/data/databundles/images.zip
+
+源文件：images/avatars.tex、images/avatars.xml。
+使用 KTEX 首层 DXT5 图集，解码后翻转 V 轴，按 XML 像素中心 UV 裁切，保留透明背景与 96×96 原始尺寸。
+文件名对应 avatar_<角色 prefab>.tex；unknown.png 对应 avatar_mod.tex，供模组或未知角色使用。
+素材随面板打包，运行时不访问外部图片服务。
+
+美术素材版权归 Klei Entertainment 所有，不适用本仓库源代码的 MIT 许可。

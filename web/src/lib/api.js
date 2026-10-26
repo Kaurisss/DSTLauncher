@@ -147,8 +147,11 @@ export const procApi = {
 /* ---------- 日志 ---------- */
 
 export const logApi = {
-  chat: (room, shard, kind = 'all', search = '') => request('/api/chat-log', {
-    params: { room, shard, kind, search, limit: 200 },
+  chat: (room, shard, kind = 'all', search = '', page = 1, limit = 10) => request('/api/chat-log', {
+    params: { room, shard, kind, search, page, limit },
+  }),
+  removeChat: (room, shard, ids) => request('/api/chat-log', {
+    method: 'DELETE', params: { room, shard }, body: { ids },
   }),
   tail: (roomId, shard, lines) => request('/api/logs', { params: { room: roomId, shard, lines } }),
   /** SSE 只能用 EventSource，因此这里返回地址而不是发起请求。 */

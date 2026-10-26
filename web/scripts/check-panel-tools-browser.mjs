@@ -4,6 +4,7 @@ import { after, before, test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 import { createServer } from 'vite';
 import { chromium } from 'playwright';
+import { CHARACTERS } from '../src/lib/format.js';
 
 let vite, browser, origin;
 before(async () => {
@@ -66,6 +67,8 @@ async function openPanel({ tab = 'overview', width = 1280, stopped = false, dark
       } else {
         const body = req.postDataJSON();
         state.writes.push({ path, id, kind, method, body });
+        if (state.delayListWrite) await state.delayListWrite.promise;
+        if (state.failListWrite) return fail('黑名单写入失败');
         const normalized = body.kleiId.replace(/^ku_/i, 'KU_');
         if (method === 'POST' && !ids.includes(normalized)) ids.push(normalized);
         if (method === 'DELETE') ids.splice(ids.indexOf(normalized), 1);
@@ -81,12 +84,29 @@ async function openPanel({ tab = 'overview', width = 1280, stopped = false, dark
     }
     if (path === '/api/chat-log') {
       const shard = url.searchParams.get('shard'), kind = url.searchParams.get('kind'), search = url.searchParams.get('search');
-      state.reads.push({ path, id, shard, kind, search });
+      const key = `${id}/${shard}`;
+      const rows = state.chatEntries || [{ id: 1, offset: 100, time: '00:01:02', kind: 'chat', userid: 'KU_chat-1', name: `房间${id}-${shard}`, message: '<img src=x onerror="window.fixtureInjected=true"> 你好世界',
+        prefab: 'wilson', steamid: '76561198000000001', ip: '192.0.2.1', recordedAt: '2026-01-02T03:04:05Z', collectedAt: '2026-02-03T04:05:06Z' },
+        { id: 2, offset: 200, time: '00:01:03', kind: 'join', name: '加入玩家', message: '进入游戏', collectedAt: '2026-02-03T04:05:06Z' }];
+      state.deletedChat ||= {};
+      const removed = state.deletedChat[key] ||= [];
+      if (method === 'DELETE') {
+        assert.ok(url.searchParams.has('room') && shard, '写入必须指定房间与分片');
+        const body = req.postDataJSON();
+        state.writes.push({ path, id, shard, method, body });
+        if (state.delayChatWrite) await state.delayChatWrite.promise;
+        if (state.failChatWrite) return fail('历史删除失败');
+        const ids = body.ids.filter(value => rows.some(row => row.id === value) && !removed.includes(value));
+        removed.push(...ids);
+        return ok({ deleted: ids.length });
+      }
+      const page = Number(url.searchParams.get('page')), limit = Number(url.searchParams.get('limit'));
+      assert.ok(page >= 1 && limit >= 1 && limit <= 500, '显式使用服务端分页');
+      state.reads.push({ path, id, shard, kind, search, page, limit });
       if (state.delayChat) await state.delayChat.promise;
       if (state.chatError) return fail('聊天日志暂不可读');
-      const rows = [{ offset: 100, time: '00:01:02', kind: 'chat', userid: 'KU_chat-1', name: `房间${id}-${shard}`, message: '<img src=x onerror="window.fixtureInjected=true"> 你好世界' },
-        { offset: 200, time: '00:01:03', kind: 'join', name: '加入玩家', message: '进入游戏' }];
-      return ok({ entries: rows.filter(row => (kind === 'all' || kind === row.kind) && (!search || `${row.name} ${row.userid} ${row.message}`.includes(search))), exists: true, truncated: true });
+      const filtered = rows.filter(row => !removed.includes(row.id) && (kind === 'all' || kind === row.kind) && (!search || `${row.name} ${row.userid} ${row.message}`.includes(search)));
+      return ok({ entries: filtered.slice((page - 1) * limit, page * limit), total: filtered.length, page, pageSize: limit, exists: true, truncated: false, modified: '2026-02-03T04:05:06Z' });
     }
     return ok([]);
   });
@@ -246,11 +266,11 @@ test('聊天筛选按房间与分片隔离，转义文本，忽略旧响应，�
     const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
     await panel.getByText('房间2-Surface', { exact: true }).waitFor();
     assert.equal(await page.evaluate(() => !!window.fixtureInjected), false);
-    assert.equal(await panel.locator('img').count(), 0);
+    assert.equal(await panel.locator('img:not([src^="/character-avatars/"])').count(), 0);
     await panel.getByRole('combobox', { name: '记录类型', exact: true }).click();
     await page.getByRole('option', { name: '聊天', exact: true }).click();
     await panel.getByText('加入玩家', { exact: true }).waitFor({ state: 'hidden' });
-    await panel.getByRole('textbox', { name: '搜索最近记录', exact: true }).fill('KU_chat-1');
+    await panel.getByRole('textbox', { name: '搜索历史记录', exact: true }).fill('KU_chat-1');
     await panel.getByText('房间2-Surface', { exact: true }).waitFor();
     assert.equal(state.reads.at(-1).search, 'KU_chat-1');
     const old = state.hold('delayChat');
@@ -267,6 +287,243 @@ test('聊天筛选按房间与分片隔离，转义文本，忽略旧响应，�
     await page.locator('#app-navigation').getByRole('button', { name: '概览', exact: true }).click();
     await page.waitForTimeout(5200);
     assert.equal(state.reads.length, before);
+  } finally { await close(); }
+});
+
+test('玩家日志表格分页、调整条数、筛选及重置保持正确记录范围', async () => {
+  const { page, state, close } = await openPanel();
+  try {
+    state.chatEntries = Array.from({ length: 45 }, (_, i) => ({
+      id: i + 1, offset: i, time: '00:01:02', kind: 'chat', userid: `KU_test-${i}`, name: `日志玩家${i}`, message: `消息 ${i}`,
+    }));
+    await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
+    const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
+    const table = panel.getByRole('table', { name: '游戏聊天记录' });
+    await table.getByText('日志玩家0', { exact: true }).waitFor();
+    assert.equal(await table.locator('tbody tr').count(), 10);
+    await panel.getByRole('button', { name: '下一页', exact: true }).click();
+    await table.getByText('日志玩家10', { exact: true }).waitFor();
+    assert.equal(state.reads.at(-1).page, 2);
+    assert.equal(state.reads.at(-1).limit, 10);
+    await panel.getByText('第 11–20 条，共 45 条', { exact: true }).waitFor();
+    await panel.getByRole('combobox', { name: '每页日志条数', exact: true }).click();
+    await page.getByRole('option', { name: '20 条 / 页', exact: true }).click();
+    await table.getByText('日志玩家0', { exact: true }).waitFor();
+    assert.equal(await table.locator('tbody tr').count(), 20);
+    assert.equal(state.reads.at(-1).page, 1);
+    assert.equal(state.reads.at(-1).limit, 20);
+    await panel.getByRole('button', { name: '下一页', exact: true }).click();
+    await table.getByText('日志玩家20', { exact: true }).waitFor();
+    await panel.getByRole('textbox', { name: '搜索历史记录' }).fill('日志玩家42');
+    await table.getByText('日志玩家42', { exact: true }).waitFor();
+    assert.equal(await table.locator('tbody tr').count(), 1);
+    assert.equal(await panel.getByRole('button', { name: '下一页', exact: true }).isDisabled(), true);
+    await panel.getByRole('button', { name: '重置筛选' }).click();
+    await table.getByText('日志玩家0', { exact: true }).waitFor();
+    await panel.getByRole('button', { name: '下一页', exact: true }).click();
+    await panel.getByRole('combobox', { name: '记录分片', exact: true }).click();
+    await page.getByRole('option', { name: 'Below', exact: true }).click();
+    await table.getByText('日志玩家0', { exact: true }).waitFor();
+    assert.equal(state.reads.at(-1).shard, 'Below');
+    assert.equal(await panel.getByRole('button', { name: '上一页', exact: true }).isDisabled(), true);
+  } finally { await close(); }
+});
+
+test('玩家身份、事件与事件时间如实显示，Steam 链接仅接受数字', async () => {
+  const { page, state, close } = await openPanel();
+  try {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    state.chatEntries = [
+      { id: 71, offset: 0, kind: 'death', name: '死亡玩家', prefab: 'wilson', steamid: '76561198000000001', ip: '192.0.2.7', time: '00:02:03', recordedAt: '2026-01-02T03:04:05Z', collectedAt: '2026-02-03T04:05:06Z', message: '被猎犬击杀' },
+      { id: 72, offset: 20, kind: 'resurrect', prefab: 'modded_hero', steamid: 'javascript:alert(1)', time: '00:02:04', collectedAt: '2026-02-03T04:05:06Z', message: '复活事件' },
+      { id: 73, offset: 30, kind: 'join', name: '等待选角', time: '00:02:05', message: '进入游戏' },
+    ];
+    await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
+    const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
+    const death = panel.getByRole('row').filter({ hasText: '死亡玩家' });
+    const portrait = death.getByRole('img', { name: '威尔逊', exact: true });
+    await portrait.waitFor();
+    assert.equal(await portrait.getAttribute('src'), '/character-avatars/wilson.png');
+    await portrait.evaluate(image => image.decode());
+    await page.evaluate(async prefabs => {
+      await Promise.all(prefabs.map(prefab => {
+        const avatar = new window.Image();
+        avatar.src = `/character-avatars/${prefab}.png`;
+        return avatar.decode();
+      }));
+    }, [...Object.keys(CHARACTERS), 'unknown']);
+    await portrait.focus();
+    await page.getByRole('tooltip', { name: '威尔逊', exact: true }).waitFor();
+    await page.keyboard.press('Escape');
+    await death.getByText('死亡', { exact: true }).waitFor();
+    await death.getByText('192.0.2.7', { exact: true }).waitFor();
+    assert.equal(await death.locator('time').getAttribute('datetime'), '2026-01-02T03:04:05Z');
+    const link = death.getByRole('link');
+    assert.equal(await link.getAttribute('href'), 'https://steamcommunity.com/profiles/76561198000000001');
+    assert.equal(await link.getAttribute('target'), '_blank');
+    assert.equal(await link.getAttribute('rel'), 'noopener noreferrer');
+    await death.getByRole('button', { name: '复制 Steam ID 76561198000000001' }).click();
+    await page.getByText('Steam ID 已复制', { exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => window.navigator.clipboard.readText()), '76561198000000001');
+    const revived = panel.getByRole('row').filter({ hasText: '复活事件' });
+    await revived.getByText('复活', { exact: true }).waitFor();
+    const unknown = revived.getByRole('img', { name: 'modded_hero', exact: true });
+    assert.equal(await unknown.getAttribute('src'), '/character-avatars/unknown.png');
+    await unknown.evaluate(image => image.decode());
+    assert.equal(await panel.getByRole('row').filter({ hasText: '等待选角' }).getByRole('img').count(), 0);
+    await revived.getByText('运行时长 00:02:04', { exact: true }).waitFor();
+    assert.equal(await revived.getByRole('link').count(), 0);
+    assert.equal(await revived.locator('time').count(), 0);
+    assert.equal(await panel.locator('time[datetime="2026-02-03T04:05:06Z"]').count(), 0);
+    for (const [label, kind] of [['死亡', 'death'], ['复活', 'resurrect']]) {
+      await panel.getByRole('combobox', { name: '记录类型', exact: true }).click();
+      await page.getByRole('option', { name: label, exact: true }).click();
+      await panel.getByRole('table').getByText(label, { exact: true }).waitFor();
+      assert.equal(state.reads.at(-1).kind, kind);
+    }
+  } finally { await close(); }
+});
+
+test('玩家历史删除需确认、失败保留选择、批量删除后校正越界页', async () => {
+  const { page, state, close } = await openPanel();
+  try {
+    state.chatEntries = Array.from({ length: 12 }, (_, i) => ({ id: i + 1, offset: i, kind: 'chat', time: '00:01:02', name: `删除玩家${i}`, message: '历史' }));
+    await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
+    const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
+    await panel.getByRole('checkbox', { name: '选择日志 1', exact: true }).click();
+    await panel.getByRole('button', { name: '删除所选（1）', exact: true }).waitFor();
+    await panel.getByRole('button', { name: '下一页', exact: true }).click();
+    await panel.getByText('删除玩家10', { exact: true }).waitFor();
+    assert.equal(await panel.getByRole('button', { name: '删除所选（0）', exact: true }).isDisabled(), true);
+    await panel.getByRole('button', { name: '删除日志 11', exact: true }).click();
+    const dialog = page.getByRole('alertdialog');
+    await dialog.getByText(/只删面板历史、不删游戏原始日志/).waitFor();
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    assert.equal(state.writes.length, 0);
+    await panel.getByRole('checkbox', { name: '选择本页日志', exact: true }).click();
+    state.failChatWrite = true;
+    await panel.getByRole('button', { name: '删除所选（2）', exact: true }).click();
+    await dialog.getByRole('button', { name: '确定', exact: true }).click();
+    await page.getByText('历史删除失败', { exact: true }).waitFor();
+    assert.equal(await panel.getByRole('checkbox', { name: '选择日志 11', exact: true }).isChecked(), true);
+    state.failChatWrite = false;
+    await panel.getByRole('button', { name: '删除所选（2）', exact: true }).click();
+    await dialog.getByRole('button', { name: '确定', exact: true }).click();
+    await panel.getByText('删除玩家0', { exact: true }).waitFor();
+    await panel.getByText('第 1–10 条，共 10 条', { exact: true }).waitFor();
+    assert.equal(state.reads.at(-1).page, 1);
+    assert.deepEqual(state.writes.at(-1).body, { ids: [11, 12] });
+    assert.equal(state.writes.at(-1).id, 2);
+    assert.equal(state.writes.at(-1).shard, 'Surface');
+    await panel.getByRole('button', { name: '删除日志 1', exact: true }).click();
+    await dialog.getByRole('button', { name: '确定', exact: true }).click();
+    await panel.getByText('第 1–9 条，共 9 条', { exact: true }).waitFor();
+    assert.deepEqual(state.writes.at(-1).body, { ids: [1] });
+  } finally { await close(); }
+});
+
+test('删除等待期间禁用操作，切房间或筛选不携带选择且迟到结果不刷新新查询', async () => {
+  const { page, state, close } = await openPanel();
+  try {
+    await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
+    const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
+    await panel.getByRole('checkbox', { name: '选择日志 1', exact: true }).click();
+    await panel.getByRole('textbox', { name: '搜索历史记录', exact: true }).fill('你好');
+    await panel.getByRole('button', { name: '删除所选（0）', exact: true }).waitFor();
+    await panel.getByRole('checkbox', { name: '选择日志 1', exact: true }).click();
+    await panel.getByRole('combobox', { name: '记录分片', exact: true }).click();
+    await page.getByRole('option', { name: 'Below', exact: true }).click();
+    await panel.getByText('房间2-Below', { exact: true }).waitFor();
+    assert.equal(await panel.getByRole('checkbox', { name: '选择日志 1', exact: true }).isChecked(), false);
+    await panel.getByRole('switch', { name: '自动刷新玩家日志' }).click();
+    const pending = state.hold('delayChatWrite');
+    await panel.getByRole('button', { name: '删除日志 1', exact: true }).click();
+    const sent = page.waitForRequest(r => r.url().includes('/api/chat-log') && r.method() === 'DELETE');
+    await page.getByRole('alertdialog').getByRole('button', { name: '确定', exact: true }).click();
+    await sent;
+    assert.equal(await panel.getByRole('button', { name: '删除日志 1', exact: true }).isDisabled(), true);
+    assert.equal(await panel.getByRole('checkbox', { name: '选择日志 1', exact: true }).isDisabled(), true);
+    await selectRoom(page, 3);
+    await panel.getByText('房间3-Surface', { exact: true }).waitFor();
+    const before = state.reads.length;
+    const arrived = page.waitForResponse(r => r.url().includes('/api/chat-log') && r.request().method() === 'DELETE');
+    pending.release(); await arrived;
+    await panel.getByRole('button', { name: '删除日志 1', exact: true }).waitFor({ state: 'visible' });
+    assert.equal(state.reads.length, before);
+    assert.equal(await panel.getByRole('checkbox', { name: '选择日志 1', exact: true }).isChecked(), false);
+    assert.deepEqual(state.deletedChat['2/Below'], [1]);
+    assert.deepEqual(state.deletedChat['3/Surface'], []);
+  } finally { await close(); }
+});
+
+test('自动刷新可暂停，暂停期间仍可手动刷新，恢复后立即取新记录', async () => {
+  const { page, state, close } = await openPanel();
+  try {
+    await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
+    const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
+    await panel.getByText('房间2-Surface', { exact: true }).waitFor();
+    const toggle = page.getByRole('switch', { name: '自动刷新玩家日志' });
+    await toggle.click();
+    const response = page.waitForResponse(r => r.url().includes('/api/chat-log'));
+    await page.getByRole('button', { name: '刷新记录', exact: true }).click();
+    await response;
+    const count = state.reads.length;
+    await page.waitForTimeout(5200);
+    assert.equal(state.reads.length, count);
+    const resumed = page.waitForRequest(r => r.url().includes('/api/chat-log'));
+    await toggle.click();
+    await resumed;
+    assert.equal(await toggle.getAttribute('aria-checked'), 'true');
+    assert.equal(state.reads.length, count + 1);
+  } finally { await close(); }
+});
+
+test('日志 ID 可复制，加入黑名单需确认，失败可重试且迟到结果不串房间', async () => {
+  const { page, state, close } = await openPanel();
+  try {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
+    const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
+    const player = panel.getByRole('row').filter({ hasText: 'KU_chat-1' });
+    await player.getByRole('button', { name: '复制 Klei ID KU_chat-1' }).click();
+    await page.getByText('Klei ID 已复制', { exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => window.navigator.clipboard.readText()), 'KU_chat-1');
+    assert.equal(await panel.getByRole('row').filter({ hasText: '加入玩家' }).getByRole('button', { name: '加入黑名单', exact: true }).count(), 0);
+    await player.getByRole('button', { name: '加入黑名单', exact: true }).click();
+    const dialog = page.getByRole('alertdialog');
+    await dialog.getByText(/不会立即踢出在线玩家/).waitFor();
+    await dialog.getByRole('button', { name: '取消', exact: true }).click();
+    assert.equal(state.writes.length, 0);
+    state.failListWrite = true;
+    await player.getByRole('button', { name: '加入黑名单', exact: true }).click();
+    await dialog.getByRole('button', { name: '确定', exact: true }).click();
+    await page.getByText('黑名单写入失败', { exact: true }).waitFor();
+    state.failListWrite = false;
+    const pending = state.hold('delayListWrite');
+    await player.getByRole('button', { name: '加入黑名单', exact: true }).click();
+    const sent = page.waitForRequest(r => r.url().includes('/api/player-lists') && r.method() === 'POST');
+    await dialog.getByRole('button', { name: '确定', exact: true }).click();
+    await sent;
+    assert.equal(await player.getByRole('button', { name: '处理中…', exact: true }).isDisabled(), true);
+    await selectRoom(page, 3);
+    await panel.getByText('房间3-Surface', { exact: true }).waitFor();
+    const arrived = page.waitForResponse(r => r.url().includes('/api/player-lists'));
+    pending.release(); await arrived;
+    assert.equal(await panel.getByRole('button', { name: '已加入黑名单', exact: true }).count(), 0);
+    assert.equal(state.lists[2].blocklist.includes('KU_chat-1'), true);
+    assert.equal(state.lists[3].blocklist.includes('KU_chat-1'), false);
+    assert.deepEqual(state.writes.map(({ id, kind, method, body }) => ({ id, kind, method, body })), [
+      { id: 2, kind: 'blocklist', method: 'POST', body: { kleiId: 'KU_chat-1' } },
+      { id: 2, kind: 'blocklist', method: 'POST', body: { kleiId: 'KU_chat-1' } },
+    ]);
+    await panel.getByRole('button', { name: '加入黑名单', exact: true }).click();
+    await dialog.getByRole('button', { name: '确定', exact: true }).click();
+    await panel.getByRole('button', { name: '已加入黑名单', exact: true }).waitFor();
+    assert.equal(await panel.getByRole('button', { name: '已加入黑名单', exact: true }).isDisabled(), true);
+    assert.equal(state.writes.at(-1).id, 3);
+    await page.evaluate(() => Object.defineProperty(window.navigator, 'clipboard', { value: undefined, configurable: true }));
+    await panel.getByRole('button', { name: '复制 Klei ID KU_chat-1' }).click();
+    await page.getByText('当前连接不支持剪贴板访问，请选中 ID 手动复制', { exact: true }).waitFor();
   } finally { await close(); }
 });
 

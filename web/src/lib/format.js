@@ -1,3 +1,11 @@
+export const CHARACTERS = {
+  wilson: '威尔逊', willow: '薇洛', wolfgang: '沃尔夫冈', wendy: '温蒂',
+  wx78: 'WX-78', wickerbottom: '薇克巴顿', woodie: '伍迪', wes: '韦斯',
+  waxwell: '麦斯威尔', wathgrithr: '薇格弗德', webber: '韦伯', winona: '薇诺娜',
+  wortox: '沃拓克斯', wormwood: '沃姆伍德', warly: '沃利', wurt: '沃特',
+  walter: '沃尔特', wanda: '旺达', wonkey: '芜猴',
+};
+
 // 展示层的格式化与字典。
 //
 // Vue 的插值默认就是转义的，所以这里不需要 esc()。

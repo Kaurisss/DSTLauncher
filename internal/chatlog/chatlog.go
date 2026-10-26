@@ -1,32 +1,30 @@
-// Package chatlog reads a bounded, read-only tail of a shard's game chat log.
+// Package chatlog collects player identities and archives game chat events.
 package chatlog
 
 import (
-	"bytes"
 	"fmt"
-	"io"
-	"os"
-	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
 	"unicode/utf8"
 )
 
-const MaxBytes = 1024 * 1024
-
 type Query struct {
 	Limit  int
 	Kind   string
 	Search string
+	Page   int
 }
 
 func (q Query) Validate() error {
 	if q.Limit < 1 || q.Limit > 500 {
 		return fmt.Errorf("日志条数须为 1–500")
 	}
+	if q.Page < 0 {
+		return fmt.Errorf("页码须为正整数")
+	}
 	switch q.Kind {
-	case "all", "chat", "whisper", "join", "leave", "announcement":
+	case "all", "chat", "whisper", "join", "leave", "death", "resurrect", "announcement":
 	default:
 		return fmt.Errorf("不支持的聊天记录类型")
 	}
@@ -37,12 +35,18 @@ func (q Query) Validate() error {
 }
 
 type Entry struct {
-	Offset  int64  `json:"offset"`
-	Time    string `json:"time"`
-	Kind    string `json:"kind"`
-	UserID  string `json:"userid,omitempty"`
-	Name    string `json:"name,omitempty"`
-	Message string `json:"message"`
+	ID          int64      `json:"id,omitempty"`
+	Offset      int64      `json:"offset"`
+	Time        string     `json:"time"`
+	Kind        string     `json:"kind"`
+	UserID      string     `json:"userid,omitempty"`
+	Name        string     `json:"name,omitempty"`
+	Message     string     `json:"message"`
+	Prefab      string     `json:"prefab,omitempty"`
+	SteamID     string     `json:"steamid,omitempty"`
+	IP          string     `json:"ip,omitempty"`
+	RecordedAt  *time.Time `json:"recordedAt,omitempty"`
+	CollectedAt time.Time  `json:"collectedAt,omitzero"`
 }
 
 type Result struct {
@@ -50,9 +54,17 @@ type Result struct {
 	Exists    bool      `json:"exists"`
 	Truncated bool      `json:"truncated"`
 	Modified  time.Time `json:"modified"`
+	Total     int       `json:"total"`
+	Page      int       `json:"page"`
+	PageSize  int       `json:"pageSize"`
 }
 
 var prefix = regexp.MustCompile(`^\[([0-9]+:[0-5][0-9]:[0-5][0-9])\]:\s*\[([^\]]+)\]\s*(.*)$`)
+
+var announcementSeparators = []string{
+	"死于：", "死于:", "复活自：", "复活自:", "was killed by", "died from", "starved", "committed suicide",
+	"was resurrected", "resurrected from", "was revived by", "revived by",
+}
 
 func parse(line string, offset int64) (Entry, bool) {
 	match := prefix.FindStringSubmatch(line)
@@ -86,110 +98,22 @@ func parse(line string, offset int64) (Entry, bool) {
 		e.Kind = "leave"
 		e.Name = e.Message
 		e.Message = "离开游戏"
+	case "Death Announcement", "Resurrect Announcement":
+		e.Kind = "death"
+		if match[2] == "Resurrect Announcement" {
+			e.Kind = "resurrect"
+		}
+		for _, separator := range announcementSeparators {
+			if at := strings.Index(e.Message, " "+separator); at > 0 {
+				e.Name = strings.TrimSpace(e.Message[:at])
+				e.Message = strings.TrimSpace(e.Message[at:])
+				break
+			}
+		}
 	case "Announcement":
 		e.Kind = "announcement"
 	default:
 		return Entry{}, false
 	}
 	return e, true
-}
-
-func Read(clusterDir, shard string, q Query) (Result, error) {
-	result := Result{Entries: []Entry{}}
-	if err := q.Validate(); err != nil {
-		return result, err
-	}
-	if shard == "" || shard == "." || shard == ".." || strings.ContainsAny(shard, "/\\") {
-		return result, fmt.Errorf("分片名无效")
-	}
-	// Resolve the actual directory and reject links leading outside this cluster.
-	base, err := filepath.EvalSymlinks(clusterDir)
-	if os.IsNotExist(err) {
-		return result, nil
-	}
-	if err != nil {
-		return result, err
-	}
-	dir, err := filepath.EvalSymlinks(filepath.Join(clusterDir, shard))
-	if os.IsNotExist(err) {
-		return result, nil
-	}
-	if err != nil {
-		return result, err
-	}
-	relative, err := filepath.Rel(base, dir)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
-		return result, fmt.Errorf("分片日志路径超出当前房间")
-	}
-	path := filepath.Join(dir, "server_chat_log.txt")
-	info, err := os.Lstat(path)
-	if os.IsNotExist(err) {
-		return result, nil
-	}
-	if err != nil {
-		return result, err
-	}
-	if !info.Mode().IsRegular() {
-		return result, fmt.Errorf("聊天日志不是普通文件")
-	}
-	f, err := os.Open(path)
-	if err != nil {
-		return result, err
-	}
-	defer f.Close()
-	info, err = f.Stat()
-	if err != nil {
-		return result, err
-	}
-	start := info.Size() - MaxBytes
-	if start < 0 {
-		start = 0
-	}
-	data := make([]byte, info.Size()-start)
-	n, err := f.ReadAt(data, start)
-	if err != nil && err != io.EOF {
-		return result, err
-	}
-	data = data[:n]
-	result.Exists = true
-	result.Modified = info.ModTime()
-	result.Truncated = start > 0
-	if start > 0 {
-		if end := bytes.IndexByte(data, '\n'); end >= 0 {
-			start += int64(end + 1)
-			data = data[end+1:]
-		} else {
-			return result, nil
-		}
-	}
-	// Ignore a line still being written; it will appear after its newline arrives.
-	if end := bytes.LastIndexByte(data, '\n'); end >= 0 {
-		data = data[:end+1]
-	} else {
-		return result, nil
-	}
-	needle := strings.ToLower(strings.TrimSpace(q.Search))
-	for _, line := range bytes.SplitAfter(data, []byte{'\n'}) {
-		text := strings.TrimSuffix(strings.TrimSuffix(string(line), "\n"), "\r")
-		entry, ok := parse(text, start)
-		start += int64(len(line))
-		if !ok || (q.Kind != "all" && entry.Kind != q.Kind) {
-			continue
-		}
-		haystack := entry.Name + " " + entry.UserID + " " + entry.Message + " " + entry.Time
-		if needle != "" && !strings.Contains(strings.ToLower(haystack), needle) {
-			continue
-		}
-		result.Entries = append(result.Entries, entry)
-	}
-	if len(result.Entries) > q.Limit {
-		result.Entries = result.Entries[len(result.Entries)-q.Limit:]
-		result.Truncated = true
-	}
-	// Latest first while keeping each shard's file order; the clock is game uptime,
-	// not wall time and must not be used to sort across game restarts.
-	for i, j := 0, len(result.Entries)-1; i < j; i, j = i+1, j-1 {
-		result.Entries[i], result.Entries[j] = result.Entries[j], result.Entries[i]
-	}
-	return result, nil
 }
