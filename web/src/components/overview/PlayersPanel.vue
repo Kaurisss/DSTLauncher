@@ -197,7 +197,7 @@ function preventWhileBusy(event) {
             <Button variant="destructive" size="sm" :disabled="busy" @click="act(player, 'ban')">封禁</Button>
             <Button variant="outline" size="sm" :disabled="busy || !player.inWorld || !player.ghost" @click="act(player, 'revive')">复活</Button>
             <Button variant="outline" size="sm" :disabled="busy || !canTeleport(player)" @click="openTeleport(player)">传送</Button>
-            <Button variant="outline" size="sm" :disabled="busy || player.admin || player.adminSaved || !/^KU_[A-Za-z0-9]{1,32}$/.test(player.userid)" @click="act(player, 'admin')">设为管理员</Button>
+            <Button variant="outline" size="sm" :disabled="busy || player.admin || player.adminSaved || !/^KU_[A-Za-z0-9_-]{1,32}$/.test(player.userid)" @click="act(player, 'admin')">设为管理员</Button>
           </div>
         </article>
       </div>

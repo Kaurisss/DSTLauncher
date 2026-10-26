@@ -105,6 +105,16 @@ export const adminApi = {
 
 /* ---------- 在线玩家 ---------- */
 
+export const playerListApi = {
+  list: (room, kind) => request('/api/player-lists', { params: { room, kind } }),
+  add: (room, kind, kleiId) => request('/api/player-lists', {
+    method: 'POST', params: { room, kind }, body: { kleiId },
+  }),
+  remove: (room, kind, kleiId) => request('/api/player-lists', {
+    method: 'DELETE', params: { room, kind }, body: { kleiId },
+  }),
+};
+
 export const playerApi = {
   list: roomId => request('/api/players', { params: { room: roomId } }),
   act: (roomId, body) => request('/api/players/action', {
@@ -121,6 +131,7 @@ export const hostApi = {
 /* ---------- 进程控制 ---------- */
 
 export const procApi = {
+  quick: (room, body) => request('/api/quick-action', { method: 'POST', params: { room }, body }),
   status: roomId => request('/api/status', { params: { room: roomId } }),
   start: (roomId, shard) => request('/api/start', { params: { room: roomId, shard } }),
   stop: (roomId, shard, timeout) => request('/api/stop', {
@@ -136,6 +147,9 @@ export const procApi = {
 /* ---------- 日志 ---------- */
 
 export const logApi = {
+  chat: (room, shard, kind = 'all', search = '') => request('/api/chat-log', {
+    params: { room, shard, kind, search, limit: 200 },
+  }),
   tail: (roomId, shard, lines) => request('/api/logs', { params: { room: roomId, shard, lines } }),
   /** SSE 只能用 EventSource，因此这里返回地址而不是发起请求。 */
   streamUrl(roomId, shard, lines = 200) {

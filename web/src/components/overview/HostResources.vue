@@ -13,6 +13,8 @@ let timer;
 
 const memory = computed(() => snapshot.value?.memory);
 const disk = computed(() => snapshot.value?.disk);
+const container = computed(() => snapshot.value?.containerMemory);
+const containerLow = computed(() => !!container.value && container.value.availableBytes / container.value.totalBytes <= 0.1);
 const memoryUsed = computed(() => memory.value
   ? memory.value.totalBytes - memory.value.availableBytes : 0);
 const memoryLow = computed(() => !!memory.value
@@ -21,6 +23,7 @@ const diskLow = computed(() => !!disk.value
   && (disk.value.availableBytes / disk.value.totalBytes < 0.1
     || disk.value.availableBytes < 5 * 1024 ** 3));
 const warnings = computed(() => [
+  containerLow.value ? '容器剩余内存配额不足 10%，请减少运行分片或提高容器限额。' : '',
   memoryLow.value ? '宿主机内存使用已达 90%，请减少运行分片或释放内存。' : '',
   diskLow.value ? '存档盘空间不足，请清理旧备份或扩容。' : '',
 ].filter(Boolean));
@@ -28,6 +31,7 @@ const errors = computed(() => [
   error.value,
   snapshot.value?.memoryError ? '内存读取失败：' + snapshot.value.memoryError : '',
   snapshot.value?.diskError ? '存档盘读取失败：' + snapshot.value.diskError : '',
+  snapshot.value?.containerMemoryError ? '容器内存读取失败：' + snapshot.value.containerMemoryError : '',
 ].filter(Boolean));
 
 async function refresh() {
@@ -55,13 +59,21 @@ onUnmounted(() => {
 
 <template>
   <section aria-label="宿主机资源" class="mb-4 grid gap-3">
-    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2" :class="container ? 'lg:grid-cols-3' : ''">
       <UiStat
         label="宿主机内存"
         :value="memory ? ((memoryUsed / memory.totalBytes) * 100).toFixed(1) + '%' : '—'"
         :sub="memory ? '已用 ' + fmtSize(memoryUsed) + ' / ' + fmtSize(memory.totalBytes) : (errors.length ? '读取失败' : '读取中…')"
         icon="cpu"
         :tone="memoryLow ? 'warn' : ''"
+      />
+      <UiStat
+        v-if="container"
+        label="容器内存配额"
+        :value="fmtSize(container.availableBytes)"
+        :sub="'剩余可用 / 限额 ' + fmtSize(container.totalBytes)"
+        icon="cpu"
+        :tone="containerLow ? 'warn' : ''"
       />
       <Tooltip :disabled="!snapshot?.diskPath">
         <TooltipTrigger as-child>

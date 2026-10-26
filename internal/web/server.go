@@ -131,6 +131,7 @@ func (s *Server) Handler() http.Handler {
 
 	// 房间管理员（adminlist.txt）
 	mux.HandleFunc("/api/admins", s.handleAdmins)
+	mux.HandleFunc("/api/player-lists", s.handlePlayerLists)
 
 	// 在线玩家与结构化管理操作
 	mux.HandleFunc("/api/players", s.handlePlayers)
@@ -148,10 +149,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/restart", s.handleRestart)
 	mux.HandleFunc("/api/rollback", s.handleRollback)
 	mux.HandleFunc("/api/cmd", s.handleCmd)
+	mux.HandleFunc("/api/quick-action", s.handleQuickAction)
 
 	// 日志
 	mux.HandleFunc("/api/logs", s.handleLogs)
 	mux.HandleFunc("/api/logs/stream", s.handleLogStream)
+	mux.HandleFunc("/api/chat-log", s.handleChatLog)
 
 	// 模组
 	mux.HandleFunc("/api/mods", s.handleMods)

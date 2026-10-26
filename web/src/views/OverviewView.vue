@@ -13,6 +13,7 @@ import InstallPanel from '@/components/overview/InstallPanel.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import WorldState from '@/components/overview/WorldState.vue';
 import LogConsole from '@/components/overview/LogConsole.vue';
+import QuickActions from '@/components/overview/QuickActions.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
 import { useProcessControl } from '@/composables/useProcessControl.js';
@@ -149,6 +150,7 @@ const serverTone = computed(() => {
     </div>
 
     <PlayersPanel />
+    <QuickActions />
     <LogConsole />
   </div>
 </template>

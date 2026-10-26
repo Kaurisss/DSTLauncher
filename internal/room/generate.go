@@ -2,7 +2,6 @@ package room
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -93,19 +92,25 @@ func (r *Room) serverIni(s Shard) string {
 }
 
 // whitelistSlots 统计白名单条目数。
-// DST 用它为白名单玩家在 max_players 之外额外预留名额，文件缺失或为空时为 0。
+// 预留位包含在 max_players 内；空行、注释和重复 ID 不占预留位。
 func (r *Room) whitelistSlots(clusterDir string) int {
-	data, err := os.ReadFile(filepath.Join(clusterDir, "whitelist.txt"))
+	list, err := ReadPlayerList(clusterDir, WhiteList)
 	if err != nil {
 		return 0
 	}
-	n := 0
-	for _, line := range strings.Split(string(data), "\n") {
-		if strings.TrimSpace(line) != "" {
-			n++
-		}
+	n := len(list)
+	if n > r.MaxPlayers {
+		n = r.MaxPlayers
 	}
 	return n
+}
+
+// ReservedSlots reports the effective reservation used in cluster.ini.
+func (r *Room) ReservedSlots(clusterDir string) int { return r.whitelistSlots(clusterDir) }
+
+func RefreshClusterConfig(root, confDir string, r *Room) error {
+	dir := config.ClusterDir(root, confDir, r.ID)
+	return config.WriteFileAtomic(filepath.Join(dir, clusterIniName), []byte(r.clusterIni(r.whitelistSlots(dir))))
 }
 
 // shardNamed 按名字取分片定义。

@@ -42,7 +42,7 @@ func (m *Manager) Rollback(clusterKey string, count int) error {
 	m.rollbackMu.Lock()
 	if time.Now().Before(m.rollbackUntil[clusterKey]) {
 		m.rollbackMu.Unlock()
-		return fmt.Errorf("该房间正在回档，请等待一分钟后再试")
+		return fmt.Errorf("该房间正在回档或刚执行过世界时间操作，请等待一分钟后再试")
 	}
 	if m.rollbackUntil == nil {
 		m.rollbackUntil = make(map[string]time.Time)

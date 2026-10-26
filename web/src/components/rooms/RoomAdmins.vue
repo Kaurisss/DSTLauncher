@@ -57,8 +57,8 @@ async function add() {
   const room = props.room;
   const id = input.value.trim();
   if (!room || !id || busy.value) return;
-  if (!/^KU_[A-Za-z0-9]{1,32}$/i.test(id)) {
-    toast('Klei ID 不合法：应为 KU_ 开头、后接字母数字', 'err');
+  if (!/^KU_[A-Za-z0-9_-]{1,32}$/i.test(id)) {
+    toast('Klei ID 不合法：应为 KU_ 开头、后接字母、数字、下划线或短横线', 'err');
     return;
   }
 

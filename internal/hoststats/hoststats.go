@@ -14,16 +14,24 @@ type Capacity struct {
 }
 
 type Snapshot struct {
-	Memory      *Capacity `json:"memory"`
-	Disk        *Capacity `json:"disk"`
-	DiskPath    string    `json:"diskPath"`
-	MemoryError string    `json:"memoryError,omitempty"`
-	DiskError   string    `json:"diskError,omitempty"`
+	ContainerMemory      *Capacity `json:"containerMemory,omitempty"`
+	ContainerMemoryError string    `json:"containerMemoryError,omitempty"`
+	Memory               *Capacity `json:"memory"`
+	Disk                 *Capacity `json:"disk"`
+	DiskPath             string    `json:"diskPath"`
+	MemoryError          string    `json:"memoryError,omitempty"`
+	DiskError            string    `json:"diskError,omitempty"`
 }
 
 // Read keeps independent failures separate so a disk error never hides memory.
 func Read(saveDir string) Snapshot {
 	result := Snapshot{DiskPath: saveDir}
+	container, containerErr := readContainerMemory()
+	if containerErr != nil {
+		result.ContainerMemoryError = containerErr.Error()
+	} else {
+		result.ContainerMemory = container
+	}
 	memory, err := readMemory()
 	if err != nil {
 		result.MemoryError = err.Error()

@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import RoomGrid from '@/components/rooms/RoomGrid.vue';
 import RoomEditor from '@/components/rooms/RoomEditor.vue';
 import RoomAdmins from '@/components/rooms/RoomAdmins.vue';
+import RoomPlayerLists from '@/components/rooms/RoomPlayerLists.vue';
 import SaveUploadPanel from '@/components/rooms/SaveUploadPanel.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard, toast } from '@/lib/toast.js';
@@ -108,6 +109,7 @@ async function onRemove(id) {
         <template #title>房间已不存在</template>
       </UiCard>
       <RoomAdmins v-if="editingRoom" :key="editingRoom.id" :room="editingRoom" />
+      <RoomPlayerLists v-if="editingRoom" :key="`lists-${editingRoom.id}`" :room="editingRoom" />
     </template>
 
     <UiCard v-else>

@@ -233,3 +233,15 @@ test('轮询更新容量，请求失败清除旧值，恢复后清除错误，�
     assert.equal(state.requests, count);
   } finally { await page.close(); }
 });
+
+test('容器内存独立显示限额和剩余空间，配额耗尽仍显示零且发出提醒', async () => {
+  const data = { ...healthy, containerMemory: { totalBytes: 2 * GB, availableBytes: 0 } };
+  const { page, section } = await openPanel({ data, width: 375 });
+  try {
+    await section.getByText('容器内存配额', { exact: true }).waitFor();
+    assert.match(await section.innerText(), /剩余可用 \/ 限额 2.00 GB/);
+    assert.match(await section.innerText(), /容器剩余内存配额/);
+    assert.match(await section.innerText(), /16.00 GB/);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+  } finally { await page.close(); }
+});

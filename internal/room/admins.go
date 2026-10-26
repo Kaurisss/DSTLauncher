@@ -20,9 +20,9 @@ import (
 // AdminsFileName 是集群目录下的管理员名单文件名。
 const AdminsFileName = "adminlist.txt"
 
-// kleiIDRe 校验 Klei 用户 ID：KU_ 前缀 + 字母数字。
+// kleiIDRe 校验 Klei 用户 ID：KU_ 前缀 + 字母、数字、下划线或短横线。
 // 放宽长度到 1-32，Klei 并没有承诺 ID 段的固定长度。
-var kleiIDRe = regexp.MustCompile(`^KU_[A-Za-z0-9]{1,32}$`)
+var kleiIDRe = regexp.MustCompile(`^KU_[A-Za-z0-9_-]{1,32}$`)
 
 // ValidKleiID 判断是否是合法的 Klei 用户 ID。
 func ValidKleiID(id string) bool { return kleiIDRe.MatchString(id) }
@@ -58,9 +58,11 @@ func ReadAdmins(clusterDir string) ([]string, error) {
 
 // AddAdmin 校验并追加一个管理员，返回更新后的名单。
 func AddAdmin(clusterDir, id string) ([]string, error) {
+	playerListsMu.Lock()
+	defer playerListsMu.Unlock()
 	id = NormalizeKleiID(id)
 	if !ValidKleiID(id) {
-		return nil, fmt.Errorf("Klei ID 不合法: %q（应为 KU_ 开头、后接字母数字，可在游戏内用 TheNet:GetUserID() 查看）", id)
+		return nil, fmt.Errorf("Klei ID 不合法: %q（应为 KU_ 开头、后接字母、数字、下划线或短横线，可在游戏内用 TheNet:GetUserID() 查看）", id)
 	}
 
 	list, err := ReadAdmins(clusterDir)
@@ -81,6 +83,8 @@ func AddAdmin(clusterDir, id string) ([]string, error) {
 
 // RemoveAdmin 按 ID（忽略大小写）移除一个管理员，返回更新后的名单。
 func RemoveAdmin(clusterDir, id string) ([]string, error) {
+	playerListsMu.Lock()
+	defer playerListsMu.Unlock()
 	list, err := ReadAdmins(clusterDir)
 	if err != nil {
 		return nil, err

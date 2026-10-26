@@ -8,10 +8,15 @@ import { computed } from 'vue';
 
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import LogPane from '@/components/overview/LogPane.vue';
+import ChatLogPanel from '@/components/overview/ChatLogPanel.vue';
+import { Button } from '@/components/ui/button';
 import { useRoomsStore } from '@/stores/rooms.js';
+import { useUiStore } from '@/stores/ui.js';
 import { shardLabel } from '@/lib/format.js';
 
 const rooms = useRoomsStore();
+const ui = useUiStore();
+const mode = computed({ get: () => ui.logView, set: value => { ui.logView = value; } });
 const shardNames = computed(() => rooms.shards.map(name =>
   shardLabel(name, rooms.current?.locations?.[name])).join('、'));
 </script>
@@ -23,7 +28,13 @@ const shardNames = computed(() => rooms.shards.map(name =>
       <p>{{ shardNames }}是独立进程，日志分屏查看</p>
     </div>
 
-    <div v-if="!rooms.shards.length" class="log-empty">
+    <div role="group" aria-label="日志视图" class="mb-3 flex flex-wrap gap-2">
+      <Button size="sm" :variant="mode === 'runtime' ? 'default' : 'outline'" :aria-pressed="mode === 'runtime'" @click="mode = 'runtime'">运行日志</Button>
+      <Button size="sm" :variant="mode === 'chat' ? 'default' : 'outline'" :aria-pressed="mode === 'chat'" @click="mode = 'chat'">聊天与进出记录</Button>
+    </div>
+
+    <ChatLogPanel v-if="mode === 'chat'" />
+    <div v-else-if="!rooms.shards.length" class="log-empty">
       <UiEmpty icon="inbox" text="还没有可用的房间。先在「房间」页新建一个，再回来看日志。" />
     </div>
 
