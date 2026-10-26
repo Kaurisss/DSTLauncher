@@ -382,7 +382,6 @@ watch([() => rooms.current, shard], () => {
 <template>
   <DialogRoot v-model:open="updateOpen">
     <UiCard>
-      <template #title>模组管理</template>
       <template #actions>
         <Select v-if="rooms.current" v-model="shard" :disabled="configOpen || busyItems.length > 0 || workshopOpen || queueing || pendingIds.length > 0">
           <SelectTrigger aria-label="模组分片" class="w-full min-w-0 sm:w-52">

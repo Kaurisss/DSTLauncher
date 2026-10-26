@@ -1,20 +1,10 @@
 <script setup>
 import { computed } from 'vue';
-import iconUrl from '@/assets/icon.png';
 import { HugeiconsIcon } from '@hugeicons/vue';
 import { ComputerIcon, Moon02Icon, Sun03Icon } from '@hugeicons/core-free-icons';
 
 import { Button } from '@/components/ui/button';
-import { Field, FieldLabel } from '@/components/ui/field';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -27,16 +17,15 @@ const rooms = useRoomsStore();
 const ui = useUiStore();
 const theme = useTheme();
 const pageTitle = computed(() => ui.tabs.find(t => t.key === ui.activeTab)?.label || '控制台');
-const pageSub = computed(() => {
+const roomDetails = computed(() => {
   const room = rooms.current;
-  if (!room) return '还没有房间';
-  return `${room.key} · ${GAME_MODE_LABEL[room.gameMode] || room.gameMode} · ${room.maxPlayers} 人`;
+  if (!room) return '';
+  const mode = GAME_MODE_LABEL[room.gameMode] || room.gameMode || '';
+  return [room.key, mode.split(' ')[0], room.maxPlayers != null ? room.maxPlayers + '人' : ''].filter(Boolean).join(' · ');
 });
 const themeIcon = computed(() => ({ auto: ComputerIcon, light: Sun03Icon, dark: Moon02Icon })[theme.mode.value]);
-const themeTitle = computed(() => {
-  const shown = theme.resolved.value === 'dark' ? '深色' : '浅色';
-  return `当前：${theme.label.value}（显示为${shown}）\n点击切换为：${theme.nextLabel.value}`;
-});
+const themeTitle = computed(() => '切换主题：' + theme.label.value);
+
 function onTheme() {
   theme.cycle();
   toast(`主题：${theme.label.value}`);
@@ -44,72 +33,40 @@ function onTheme() {
 </script>
 
 <template>
-  <header class="sticky top-0 z-20 flex h-14 w-full min-w-0 shrink-0 items-center bg-sidebar text-sidebar-foreground">
-    <!-- 左侧：与侧边栏图标列严格对齐的触发按钮区域 -->
-    <div class="flex h-14 w-11 sm:w-12 shrink-0 items-center justify-center">
+  <header class="flex h-16 min-w-0 shrink-0 items-center gap-3 border-b border-border bg-background px-4 text-foreground md:px-6">
+    <div class="flex min-w-0 flex-1 items-center gap-2">
       <Tooltip>
         <TooltipTrigger as-child>
-          <SidebarTrigger aria-controls="app-navigation" aria-label="切换导航" size="icon" />
+          <SidebarTrigger class="md:hidden" aria-controls="app-navigation" aria-label="切换导航" size="icon-sm" />
         </TooltipTrigger>
         <TooltipContent>展开或收起导航</TooltipContent>
       </Tooltip>
+      <h1 class="truncate text-sm font-semibold sm:text-base">{{ pageTitle }}</h1>
     </div>
 
-    <!-- 品牌标识与标题 -->
-    <div class="flex min-w-0 items-center gap-2 pr-2 sm:gap-2.5 sm:pr-3">
-      <img
-        :src="iconUrl"
-        alt="DST"
-        width="32"
-        height="32"
-        class="size-7 sm:size-8 shrink-0 rounded-lg object-cover shadow-xs"
-      />
-      <div class="min-w-0">
-        <p class="truncate text-sm font-semibold leading-tight text-sidebar-foreground">DST 开服控制台</p>
-      </div>
-    </div>
-
-    <!-- 中间：当前页面 -->
-    <div class="hidden md:flex min-w-0 items-center gap-2 pl-1">
-      <Separator orientation="vertical" class="h-4 bg-sidebar-border" />
-      <h1 class="shrink-0 text-sm font-medium text-sidebar-foreground">{{ pageTitle }}</h1>
+    <div class="flex min-w-0 shrink-0 items-center gap-2">
+      <Select :model-value="rooms.currentId ? String(rooms.currentId) : ''" :disabled="!rooms.list.length" @update:model-value="rooms.select">
+        <SelectTrigger id="roomSelect" aria-label="房间" class="w-36 min-w-0 max-w-[42vw] bg-card data-[size=default]:h-10 sm:w-64 sm:max-w-none lg:w-auto lg:max-w-[55vw]">
+          <SelectValue as-child>
+            <span class="flex min-w-0 flex-1 flex-col items-start gap-0.5 lg:flex-row lg:items-center lg:gap-2">
+              <span class="block max-w-full truncate text-xs sm:text-sm lg:max-w-72">{{ rooms.current?.name || (rooms.list.length ? '选择房间' : '（暂无房间）') }}</span>
+              <span v-if="roomDetails" class="max-w-full truncate text-[10px] text-muted-foreground lg:rounded-md lg:bg-muted lg:px-1.5 lg:py-0.5 lg:text-xs">{{ roomDetails }}</span>
+            </span>
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent position="popper" align="end">
+          <SelectGroup>
+            <SelectItem v-for="room in rooms.list" :key="room.id" :value="String(room.id)">{{ room.name }}</SelectItem>
+          </SelectGroup>
+        </SelectContent>
+      </Select>
       <Tooltip>
         <TooltipTrigger as-child>
-          <span class="text-xs text-muted-foreground truncate" tabindex="0">· {{ pageSub }}</span>
-        </TooltipTrigger>
-        <TooltipContent>{{ pageSub }}</TooltipContent>
-      </Tooltip>
-    </div>
-
-    <!-- 右侧：房间 + 主题 -->
-    <div class="ml-auto flex min-w-0 shrink-0 items-center gap-1.5 pr-3 sm:gap-2 sm:pr-4 md:pr-6">
-      <Field orientation="horizontal" class="w-auto min-w-0 *:data-[slot=field-label]:flex-none">
-        <FieldLabel for="roomSelect" class="hidden sm:block text-sidebar-foreground">房间</FieldLabel>
-        <Select
-          :model-value="rooms.currentId ? String(rooms.currentId) : ''"
-          :disabled="!rooms.list.length"
-          @update:model-value="(val) => rooms.select(val)"
-        >
-          <SelectTrigger id="roomSelect" class="w-32 max-w-[38vw] sm:w-48 sm:max-w-none bg-background/80">
-            <SelectValue :placeholder="rooms.list.length ? '选择房间' : '（暂无房间）'" />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            <SelectGroup>
-              <SelectItem v-for="room in rooms.list" :key="room.id" :value="String(room.id)">
-                {{ room.name }}
-              </SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-      </Field>
-      <Tooltip>
-        <TooltipTrigger as-child>
-          <Button variant="outline" size="sm" class="shrink-0 px-2 sm:pl-2 sm:pr-2.5 bg-background/80" aria-label="切换主题" @click="onTheme">
+          <Button variant="outline" size="icon" class="shrink-0" aria-label="切换主题" @click="onTheme">
             <HugeiconsIcon :icon="themeIcon" aria-hidden="true" />
-            <span class="hidden sm:inline">{{ theme.label.value }}</span>
           </Button>
         </TooltipTrigger>
-        <TooltipContent class="whitespace-pre-line">{{ themeTitle }}</TooltipContent>
+        <TooltipContent>{{ themeTitle }}</TooltipContent>
       </Tooltip>
     </div>
   </header>

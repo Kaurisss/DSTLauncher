@@ -111,7 +111,8 @@ async function openPanel({ tab = 'overview', width = 1280, stopped = false, dark
     return ok([]);
   });
   await page.goto(origin);
-  await page.getByRole('heading', { name: tab === 'rooms' ? '房间列表' : '快捷操作', exact: true }).waitFor();
+  if (tab === 'rooms') await page.getByRole('button', { name: '新建房间', exact: true }).waitFor();
+  else await page.getByRole('heading', { name: '快捷操作', exact: true }).waitFor();
   return { page, state, close: async () => {
     state.pending.forEach(d => d.release());
     await page.close();

@@ -139,7 +139,6 @@ async function remove(item) {
 
 <template>
   <UiCard>
-    <template #title>存档管理</template>
     <template #actions>
       <Button variant="outline" size="sm" :disabled="loading" @click="load"><Spinner v-if="loading && items.length" aria-hidden="true" />刷新</Button>
     </template>

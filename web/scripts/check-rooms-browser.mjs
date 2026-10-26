@@ -102,7 +102,7 @@ async function openRooms({ width = 1280, height = 900, delaySave = false, delayU
     return ok([]);
   });
   await page.goto(origin);
-  await page.getByRole('heading', { name: '房间列表', exact: true }).waitFor();
+  await page.getByRole('button', { name: '新建房间', exact: true }).waitFor();
   if (!empty) await page.getByRole('button', { name: '选择房间 测试房间乙', exact: true }).waitFor();
   const close = async () => {
     releaseSave?.(); releaseUpload?.();
@@ -155,10 +155,10 @@ test('新建进入独立二级页，返回不保存；保存中禁止返回，�
     assert.equal(await page.getByRole('heading', { name: '房间管理员', exact: true }).count(), 0);
     await page.getByRole('button', { name: '新建房间', exact: true }).click();
     await page.locator('#f_name').fill('不应保存的草稿');
-    assert.equal(await page.getByRole('heading', { name: '房间列表', exact: true }).count(), 0);
+    assert.equal(await page.locator('#new-room-button').count(), 0);
     assert.equal(await page.getByRole('dialog').count(), 0);
     await page.getByRole('button', { name: '返回房间列表', exact: true }).click();
-    await page.getByRole('heading', { name: '房间列表', exact: true }).waitFor();
+    await page.getByRole('button', { name: '新建房间', exact: true }).waitFor();
     assert.equal(writes(state, '/api/rooms', 'POST').length, 0);
     await page.getByRole('button', { name: '新建房间', exact: true }).click();
     assert.equal(await page.locator('#f_name').inputValue(), defaults.name);
@@ -178,7 +178,7 @@ test('新建进入独立二级页，返回不保存；保存中禁止返回，�
     assert.equal(payload.pvp, false);
     assert.equal(payload.voteKick, false);
     releaseSave();
-    await page.getByRole('heading', { name: '房间列表', exact: true }).waitFor();
+    await page.getByRole('button', { name: '新建房间', exact: true }).waitFor();
     await card(page, '新建测试房间').waitFor();
     assert.equal(await page.evaluate(() => localStorage.getItem('dst-room')), '4');
   } finally { await close(); }
@@ -199,7 +199,7 @@ test('编辑和管理员绑定所编辑房间，保存失败保留草稿，重�
     await page.getByRole('button', { name: '保存', exact: true }).click();
     await page.getByRole('alert').filter({ hasText: '测试端口冲突' }).waitFor();
     assert.equal(await page.locator('#f_name').inputValue(), '编辑后的乙房间');
-    assert.equal(await page.getByRole('heading', { name: '房间列表', exact: true }).count(), 0);
+    assert.equal(await page.locator('#new-room-button').count(), 0);
     state.saveError = '';
     await page.getByRole('button', { name: '保存', exact: true }).click();
     await card(page, '编辑后的乙房间').waitFor();
@@ -370,6 +370,6 @@ test('编辑期间房间被移除时不把编辑表单变为新建表单', async
     assert.equal(await page.locator('#f_name').count(), 0);
     assert.equal(writes(state, '/api/rooms', 'POST').length, 0);
     await page.getByRole('button', { name: '返回房间列表', exact: true }).click();
-    await page.getByRole('heading', { name: '房间列表', exact: true }).waitFor();
+    await page.getByRole('button', { name: '新建房间', exact: true }).waitFor();
   } finally { await close(); }
 });

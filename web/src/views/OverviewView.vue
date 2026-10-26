@@ -1,7 +1,7 @@
 <script setup>
 // 概览页：资源指标、分片管理与实时日志。
 
-import { computed, onMounted } from 'vue';
+import { computed } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
 import { Button } from '@/components/ui/button';
@@ -16,13 +16,10 @@ import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
 import { useProcessControl } from '@/composables/useProcessControl.js';
 import { fmtSize } from '@/lib/format.js';
-import { guard } from '@/lib/toast.js';
 
 const rooms = useRoomsStore();
 const system = useSystemStore();
 const proc = useProcessControl();
-
-onMounted(() => guard(() => system.refresh()));
 
 const shardTotal = computed(() => rooms.shards.length);
 const shardRunning = computed(() => rooms.statuses.filter(s => s.state === 'running').length);

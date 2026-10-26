@@ -26,15 +26,15 @@ before(async () => {
 });
 after(async () => { await browser?.close(); await vite?.close(); });
 
-async function openPanel({ data = healthy, width = 1280, room = null, running = false, dark = false } = {}) {
+async function openPanel({ data = healthy, width = 1280, room = null, roomList = null, running = false, dark = false, tab = 'overview' } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
   page.setDefaultTimeout(12000);
   const state = { data, failure: false, requests: 0 };
-  await page.addInitScript(({ id, dark }) => {
-    localStorage.setItem('dst-tab', 'overview');
+  await page.addInitScript(({ id, dark, tab }) => {
+    localStorage.setItem('dst-tab', tab);
     localStorage.setItem('dst-theme', dark ? 'dark' : 'light');
     if (id) localStorage.setItem('dst-room', String(id));
-  }, { id: room?.id, dark });
+  }, { id: room?.id, dark, tab });
   await page.route('**/api/**', route => {
     const path = new URL(route.request().url()).pathname;
     const ok = data => route.fulfill({ json: { code: 200, data } });
@@ -44,7 +44,7 @@ async function openPanel({ data = healthy, width = 1280, room = null, running = 
       return ok(state.data);
     }
     if (path === '/api/auth/status') return ok({ enabled: false, authenticated: true });
-    if (path === '/api/rooms') return ok(room ? [room] : []);
+    if (path === '/api/rooms') return ok(roomList || (room ? [room] : []));
     if (path === '/api/status') return ok(running ? room.shards.map(shard => ({
       shard: shard.name, state: 'running', playersReady: true, uptime: '2h 15m',
       cpuPct: 1.2, memBytes: GB, pid: 1234, port: 10999,
@@ -54,14 +54,15 @@ async function openPanel({ data = healthy, width = 1280, room = null, running = 
     })));
     if (path === '/api/players') return ok({ players: [], errors: {} });
     if (path === '/api/logs/stream') return route.fulfill({ contentType: 'text/event-stream', body: '' });
-    if (path === '/api/rooms/meta') return ok({});
+    if (path === '/api/rooms/meta') return ok({ panelVersion: 'v0.1.2' });
     if (path === '/api/server') return ok({ installed: true, candidates: [] });
     if (path === '/api/install') return ok({ installed: true, version: '759671' });
     return ok([]);
   });
   await page.goto(origin);
   const section = page.getByRole('region', { name: '宿主机资源' });
-  await section.getByText('宿主机内存', { exact: true }).waitFor();
+  if (tab === 'overview') await section.getByText('宿主机内存', { exact: true }).waitFor();
+  else await page.getByRole('heading', { level: 1 }).waitFor();
   return { page, section, state };
 }
 
@@ -152,6 +153,80 @@ test('概览统一四项资源指标，服务器配置仅在设置页提供', as
   } finally { await page.close(); }
 });
 
+test('通顶侧栏为220px，品牌版本和单行状态归位，工作区标题与卡片严格对齐', async () => {
+  const room = { id: 1, key: 'Cluster_1', name: 'Skr Wu的世界 单人 双穿', gameMode: 'survival', maxPlayers: 2, shards: [{ name: 'Master', isMaster: true }] };
+  const other = { ...room, id: 2, key: 'Cluster_2', name: '备用房间', gameMode: 'endless', maxPlayers: 6 };
+  const { page } = await openPanel({ room, roomList: [room, other], tab: 'config', width: 1440 });
+  try {
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    const sidebar = page.locator('[data-slot="sidebar-container"]');
+    const brand = sidebar.locator('[data-slot="sidebar-header"]');
+    const footer = sidebar.locator('[data-slot="sidebar-footer"]');
+    await brand.getByText('v0.1.2', { exact: true }).waitFor();
+    await footer.getByText('游戏版本 759671', { exact: true }).waitFor();
+    assert.equal(await brand.getByText('DST 开服控制台', { exact: true }).count(), 1);
+    assert.equal(await footer.getByText('v0.1.2', { exact: true }).count(), 0);
+    const sidebarBox = await sidebar.boundingBox();
+    assert.equal(sidebarBox.x, 0);
+    assert.equal(sidebarBox.y, 0);
+    assert.equal(sidebarBox.width, 220);
+    assert.equal(sidebarBox.height, 900);
+    const header = page.locator('[data-slot="main-workspace"] > header');
+    const title = header.getByRole('heading', { level: 1, name: '配置预览', exact: true });
+    const card = page.locator('.page-view > [data-slot="card"]');
+    await card.waitFor();
+    assert.equal((await header.boundingBox()).x, sidebarBox.width);
+    assert.equal((await header.boundingBox()).y, 0);
+    assert.ok(Math.abs((await title.boundingBox()).x - (await card.boundingBox()).x) < 1);
+    assert.equal(await card.getByRole('heading', { name: '配置预览', exact: true }).count(), 0);
+    const logStatus = footer.getByRole('status');
+    const version = footer.getByText('游戏版本 759671', { exact: true });
+    assert.ok(Math.abs((await logStatus.boundingBox()).y - (await version.boundingBox()).y) < 2, '底部状态保持单行');
+    const selector = header.getByRole('combobox', { name: '房间', exact: true });
+    assert.match(await selector.innerText(), /Skr Wu的世界 单人 双穿/);
+    assert.match(await selector.innerText(), /Cluster_1 · 生存 · 2人/);
+    assert.doesNotMatch(await header.innerText(), /survival/);
+    assert.equal(await header.getByText('Cluster_1 · 生存 · 2人', { exact: true }).count(), 1);
+    await selector.click();
+    await page.getByRole('option', { name: '备用房间', exact: true }).click();
+    assert.match(await selector.innerText(), /备用房间/);
+    assert.match(await selector.innerText(), /Cluster_2 · 无尽 · 6人/);
+    assert.equal(await page.evaluate(() => localStorage.getItem('dst-room')), '2');
+    assert.equal(await title.isVisible(), true, '换房不改变当前页面');
+    await page.screenshot({ path: fileURLToPath(new URL('../../.scratch/screenshots/layout-1440-light.png', import.meta.url)) });
+    const lightText = await title.evaluate(el => window.getComputedStyle(el).color);
+    await header.getByRole('button', { name: '切换主题', exact: true }).click();
+    await page.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+    await page.evaluate(async () => { await Promise.all(document.getAnimations().map(animation => animation.finished)); });
+    assert.notEqual(await title.evaluate(el => window.getComputedStyle(el).color), lightText, '主题切换后标题前景色同步更新');
+    await page.screenshot({ path: fileURLToPath(new URL('../../.scratch/screenshots/layout-1440-dark.png', import.meta.url)) });
+  } finally { await page.close(); }
+});
+
+test('手机主标题和长房间选择器不溢出，品牌与版本在通顶抽屉内', async () => {
+  const room = { id: 1, key: 'Cluster_1', name: 'Skr Wu的世界 单人 双穿 '.repeat(4), gameMode: 'survival', maxPlayers: 2, shards: [{ name: 'Master', isMaster: true }] };
+  const { page } = await openPanel({ room, width: 375, tab: 'config' });
+  try {
+    const header = page.locator('[data-slot="main-workspace"] > header');
+    assert.equal(await header.getByRole('heading', { level: 1, name: '配置预览', exact: true }).isVisible(), true);
+    assert.equal(await header.getByRole('button', { name: '切换主题', exact: true }).innerText(), '');
+    assert.equal(await header.evaluate(el => el.scrollWidth <= el.clientWidth), true);
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    await page.locator('.page-view > *').first().waitFor();
+    await page.evaluate(async () => { await Promise.all(document.getAnimations().map(animation => animation.finished)); });
+    await page.screenshot({ path: fileURLToPath(new URL('../../.scratch/screenshots/layout-375-light.png', import.meta.url)) });
+    await header.getByRole('button', { name: '切换导航', exact: true }).click();
+    const drawer = page.locator('[data-mobile="true"]');
+    await drawer.getByText('DST 开服控制台', { exact: true }).waitFor();
+    await drawer.getByText('v0.1.2', { exact: true }).waitFor();
+    assert.equal((await drawer.boundingBox()).y, 0);
+    await drawer.getByRole('button', { name: '房间', exact: true }).click();
+    await drawer.waitFor({ state: 'hidden' });
+    assert.equal(await header.getByRole('heading', { level: 1 }).innerText(), '房间');
+    assert.equal(await page.locator('#new-room-button').isVisible(), true);
+  } finally { await page.close(); }
+});
+
 test('导航和主题使用组件提示，支持键盘焦点、Escape 和动态内容', async () => {
   const { page } = await openPanel();
   try {
@@ -166,8 +241,8 @@ test('导航和主题使用组件提示，支持键盘焦点、Escape 和动态�
     await theme.focus();
     await page.getByRole('tooltip').waitFor();
     const before = await page.getByRole('tooltip').innerText();
-    assert.match(before, /当前：.*\s+点击切换为：/);
-    assert.equal(await page.locator('[data-slot="tooltip-content"]').evaluate(element => window.getComputedStyle(element).whiteSpace), 'pre-line');
+    assert.equal(before, '切换主题：浅色');
+    assert.equal(await theme.innerText(), '', '主题入口仅显示图标');
     await page.keyboard.press('Enter');
     await page.getByRole('tooltip').waitFor({ state: 'hidden' });
     await page.mouse.move(0, 0);
@@ -208,7 +283,7 @@ test('页面切换入场后内容可见，减少动态效果时停用动画', as
   } finally { await page.close(); }
 });
 
-test('折叠导航只重排一次正文，图标不跳动，快速反向切换可恢复', async () => {
+test('折叠导航只重排一次正文，收起按钮与菜单对齐且等距，快速反向切换可恢复', async () => {
   const { page } = await openPanel();
   try {
     await page.emulateMedia({ reducedMotion: 'no-preference' });
@@ -217,7 +292,6 @@ test('折叠导航只重排一次正文，图标不跳动，快速反向切换�
         const panel = document.querySelector('#page-content');
         const view = panel.firstElementChild.firstElementChild;
         const icon = document.querySelector('#app-navigation svg');
-        const top = icon.getBoundingClientRect().top;
         const widths = [];
         const positions = [];
         document.querySelector('[data-sidebar="trigger"]').click();
@@ -227,14 +301,23 @@ test('折叠导航只重排一次正文，图标不跳动，快速反向切换�
           positions.push(panel.getBoundingClientRect().left);
         }
         return {
-          widths, positions, top, finalTop: icon.getBoundingClientRect().top,
+          widths, positions,
+          icon: icon.getBoundingClientRect().toJSON(),
+          trigger: document.querySelector('[data-sidebar="trigger"] svg').getBoundingClientRect().toJSON(),
+          nextIcon: document.querySelectorAll('#app-navigation svg')[1].getBoundingClientRect().toJSON(),
           sameView: view === panel.firstElementChild.firstElementChild,
           edge: document.querySelector('[data-slot="sidebar-container"]').getBoundingClientRect().right,
         };
       });
       assert.ok(Math.max(...result.widths) - Math.min(...result.widths) < 1, '正文宽度不随动画逐帧改变');
       assert.ok(Math.max(...result.positions) - Math.min(...result.positions) > 10, '正文仍有平滑位移动画');
-      assert.equal(result.top, result.finalTop, '导航图标保持原来的垂直位置');
+      if (!expanded) {
+        assert.ok(Math.abs(result.icon.x + result.icon.width / 2 - result.trigger.x - result.trigger.width / 2) < 1, '收起按钮与导航图标中心线对齐');
+        const firstGap = result.icon.y + result.icon.height / 2 - result.trigger.y - result.trigger.height / 2;
+        const menuGap = result.nextIcon.y + result.nextIcon.height / 2 - result.icon.y - result.icon.height / 2;
+        await page.screenshot({ path: fileURLToPath(new URL('../../.scratch/screenshots/layout-sidebar-collapsed.png', import.meta.url)) });
+        assert.ok(Math.abs(firstGap - menuGap) < 1, `收起按钮到概览的间距与导航项间距一致：${firstGap} / ${menuGap}`);
+      }
       assert.equal(result.sameView, true, '展开收起不重建业务页面');
       assert.ok(Math.abs(result.positions.at(-1) - result.edge) < 1, '动画结束后正文与侧栏边界对齐');
       assert.equal(await page.getByRole('button', { name: '切换导航', exact: true }).getAttribute('aria-expanded'), String(expanded));
@@ -245,11 +328,11 @@ test('折叠导航只重排一次正文，图标不跳动，快速反向切换�
       await new Promise(resolve => window.setTimeout(resolve, 60));
       trigger.click();
     });
-    await page.waitForFunction(() => document.querySelector('#page-content').getAnimations().length === 0);
+    await page.waitForFunction(() => document.querySelector('[data-slot="main-workspace"]').getAnimations().length === 0);
     assert.equal(await page.getByRole('button', { name: '切换导航', exact: true }).getAttribute('aria-expanded'), 'true');
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await page.getByRole('button', { name: '切换导航', exact: true }).click();
-    assert.equal(await page.locator('#page-content').evaluate(element => element.getAnimations().length), 0);
+    assert.equal(await page.locator('[data-slot="main-workspace"]').evaluate(element => element.getAnimations().length), 0);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   } finally { await page.close(); }
 });

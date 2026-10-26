@@ -86,7 +86,6 @@ function exportSave(name) {
 
 <template>
   <UiCard>
-    <template #title>存档备份</template>
     <template #actions>
       <RollbackDialog />
       <Button size="sm" :disabled="!rooms.current" @click="create">

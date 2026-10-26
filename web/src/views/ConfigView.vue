@@ -71,7 +71,6 @@ watch(() => rooms.current, load);
 
 <template>
   <UiCard>
-    <template #title>配置预览</template>
     <template #actions>
       <Button variant="outline" size="sm" :disabled="loading" @click="load"><Spinner v-if="loading && files.length" aria-hidden="true" />刷新</Button>
     </template>

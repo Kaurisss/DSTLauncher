@@ -113,7 +113,6 @@ async function onRemove(id) {
     </template>
 
     <UiCard v-else>
-      <template #title>房间列表</template>
       <template #actions>
         <Button id="new-room-button" size="sm" :disabled="preparing" @click="openEditor()">
           <Icon name="plus" size="14" />新建房间

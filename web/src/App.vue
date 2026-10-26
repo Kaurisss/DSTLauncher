@@ -52,11 +52,11 @@ const logs = useLogs();
 const loginPwd = ref('');
 const loggingIn = ref(false);
 const loginError = ref('');
-const pageContent = ref(null);
+const workspace = ref(null);
 let sidebarAnimation;
 
 async function animateSidebarChange() {
-  const panel = pageContent.value;
+  const panel = workspace.value;
   if (!panel) return;
   const left = panel.getBoundingClientRect().left;
   sidebarAnimation?.cancel();
@@ -164,18 +164,16 @@ onUnmounted(() => {
     </form>
   </div>
 
-  <SidebarProvider v-else class="flex h-svh max-h-svh flex-col overflow-hidden bg-sidebar" @update:open="animateSidebarChange">
+  <SidebarProvider v-else class="h-svh max-h-svh overflow-hidden bg-sidebar" style="--sidebar-width: 220px" @update:open="animateSidebarChange">
     <a href="#page-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:p-3 focus:text-foreground focus:shadow-md">跳到内容</a>
-    <TopBar />
-
-    <div class="flex flex-1 min-h-0 w-full overflow-hidden">
-      <AppSidebar />
+    <AppSidebar />
+    <div ref="workspace" data-slot="main-workspace" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+      <TopBar />
 
       <main
         id="page-content"
-        ref="pageContent"
         tabindex="-1"
-        class="flex-1 min-w-0 md:rounded-tl-xl bg-background md:border-t md:border-l border-border shadow-xs flex flex-col overflow-y-auto"
+        class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
         style="scrollbar-gutter: stable"
       >
         <div class="page-view w-full max-w-[2400px] min-w-0 p-4 md:p-6">

@@ -190,7 +190,6 @@ async function blockPlayer(entry) {
 
 <template>
   <UiCard role="region" aria-label="聊天与进出记录" class="min-w-0" :aria-busy="loading">
-    <template #title>玩家日志</template>
     <template #actions>
       <div class="flex items-center gap-2 text-xs text-muted-foreground">
         <Switch id="player-log-refresh" v-model="autoRefresh" aria-label="自动刷新玩家日志" />

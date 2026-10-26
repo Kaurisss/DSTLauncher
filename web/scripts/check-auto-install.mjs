@@ -97,6 +97,14 @@ test('兼容卡片保留原有插槽、标题语义和无内边距模式', async
   assert.match(html, /data-slot="card-content"[^>]*class="[^"]*\bp-0\b/);
 });
 
+test('只有操作的卡片不产生空标题，刷新控件仍保留', async () => {
+  const html = await renderToString(createSSRApp({
+    render: () => h(UiCard, null, { actions: () => h('button', '刷新'), default: () => '配置内容' }),
+  }).use(pinia));
+  assert.ok(html.includes('刷新') && html.includes('配置内容'));
+  assert.doesNotMatch(html, /role="heading"/);
+});
+
 test('结果提示换为 Sonner 后仍保留 guard 成功与错误契约', async () => {
   const success = mock.method(notify, 'success', () => 'success-toast');
   const error = mock.method(notify, 'error', () => 'error-toast');
