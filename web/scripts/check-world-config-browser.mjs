@@ -3,6 +3,8 @@
 // 在真实浏览器里跑：SSR 不会执行 onMounted，视图的加载流程只有真挂载才走得到。
 // 接口全部被下面的 fetch 替身拦住，不读写任何真实存档。
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { after, before, test } from 'node:test';
 import { createServer } from 'vite';
 import { chromium } from 'playwright';
@@ -51,11 +53,13 @@ const SHIPWRECKED = {
   gameVersion: '756039', generatedAt: '2026-10-05T00:01:41+08:00',
 };
 
-async function openWorldPage(data) {
+async function openWorldPage(data, options = {}) {
   data = globalThis.structuredClone(data);
   const byShard = data.Master ? data : null;
   const shardOf = name => (byShard ? byShard[name] || byShard.Master : data);
-  const page = await browser.newPage();
+  const page = await browser.newPage({ viewport: { width: options.width || 1280, height: 800 } });
+  await page.addInitScript(dark => { localStorage.setItem('dst-theme', dark ? 'dark' : 'light'); }, !!options.dark);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const requests = [];
   await page.route('**/api/**', async route => {
     const url = new URL(route.request().url());
@@ -74,7 +78,7 @@ async function openWorldPage(data) {
       }]);
     }
     if (url.pathname === '/api/rooms/meta') return ok({ gameModes: [], tickRates: [] });
-    if (url.pathname === '/api/status') return ok([{ shard: 'Master', state: 'stopped' }]);
+    if (url.pathname === '/api/status') return ok([{ shard: 'Master', state: options.running ? 'running' : 'stopped' }]);
     if (url.pathname === '/api/worldconfig') {
       if (route.request().method() === 'PUT') {
         const payload = route.request().postDataJSON();
@@ -98,13 +102,8 @@ async function openWorldPage(data) {
   await page.goto(`http://127.0.0.1:${port}/`);
   await page.evaluate(() => localStorage.setItem('dst-tab', 'world'));
   await page.reload();
-  await page.getByRole('button', { name: '世界配置' }).first().waitFor();
-  // 以“选项卡片出现且两个类别计数已渲染”作为加载完成信号：
-  // 仅等按钮出现时，接口响应与显存渲染还没完成，后续操作会读到骨架屏。
+  // 等类别计数和配置项，避免在接口尚未返回时开始操作。
   await page.locator('.world-options-card .seg-count').nth(1).waitFor({ timeout: 15000 });
-  // 加载完成还会触发一次两帧的骨架屏，必须等它消失再操作，
-  // 否则后续点击看到的仍是骨架屏占位。
-  await page.waitForFunction(() => !document.querySelector('.world-category-skeleton'), null, { timeout: 15000 });
   await page.waitForFunction(() => document.querySelectorAll('.opt-row').length > 0, null, { timeout: 15000 });
   return { page, requests };
 }
@@ -130,7 +129,12 @@ test('存档已生成时隐藏预设与启用开关，世界生成只读', async
   const text = await page.locator('#page-content').innerText();
   assert.doesNotMatch(text, /世界生成预设/, '不应出现预设选择');
   assert.doesNotMatch(text, /启用本文件/, '不应出现启用开关');
-  assert.match(text, /leveldataoverride\.lua/);
+  assert.doesNotMatch(text, /leveldataoverride\.lua/, '路径不常驻占用页面高度');
+  await page.getByRole('button', { name: '路径与说明', exact: true }).click();
+  const details = page.getByRole('dialog', { name: '路径与说明', exact: true });
+  assert.match(await details.innerText(), /leveldataoverride\.lua/);
+  await page.keyboard.press('Escape');
+  await details.waitFor({ state: 'hidden' });
 
   // 默认停在有内容的类别：世界规则只有 1 项，这里应直接展示它
   assert.match(text, /温和季/, '默认应展示有内容的世界规则');
@@ -142,7 +146,8 @@ test('存档已生成时隐藏预设与启用开关，世界生成只读', async
     () => document.querySelectorAll('.opt-row').length > 0, null, { timeout: 5000 },
   );
   assert.match(await page.locator('#page-content').innerText(), /竹子/);
-  // 游戏内是两侧箭头翻值：只读时左右箭头与输入框都必须不可操作
+  assert.equal(await page.getByText('地图已生成，仅供查看', { exact: true }).isVisible(), true);
+  // 只读时下拉、步进和恢复默认都必须不可操作。
   const controls = page.locator('.opt-row button, .opt-row input');
   const count = await controls.count();
   assert.ok(count > 0, '世界生成应有可渲染的控件');
@@ -156,7 +161,7 @@ test('世界规则可改，保存只提交世界规则', async () => {
   const { page, requests } = await openWorldPage(SHIPWRECKED);
   const row = page.locator('.opt-row').first();
   await row.waitFor();
-  // 游戏内布局：左右箭头翻值，不再用下拉框
+  assert.equal(await row.getByRole('combobox').count(), 0);
   assert.equal(await row.locator('.opt-arrow').first().isDisabled(), false, '世界规则必须可编辑');
 
   await row.locator('.opt-arrow').last().click();
@@ -254,7 +259,7 @@ for (const action of ['恢复默认', '重置']) {
     data.config.overrides.mild = 'shortseason';
     const { page, requests } = await openWorldPage(data);
     if (action === '重置') await page.getByRole('button', { name: '重置', exact: true }).click();
-    else await page.getByRole('button', { name: '温和季 上一项', exact: true }).click();
+    else await page.getByRole('button', { name: '温和季 恢复默认', exact: true }).click();
     const payload = await saveAndRefresh(page, requests);
     assert.equal(payload.overrides.mild, 'default');
     assert.equal(payload.overrides.bamboo, 'often');
@@ -312,7 +317,6 @@ function islandWorld(hasSave = false) {
 
 test('火山岛缺省 none 隐藏候选项，开关即时更新显隐计数搜索，隐藏值保存后保留', async () => {
   const { page, requests } = await openWorldPage(islandWorld());
-  assert.match(await page.locator('.world-options-card').innerText(), /共 3 项/);
   assert.equal(await page.locator('.world-count').innerText(), '已改 1 项');
   assert.deepEqual(await page.locator('.seg-count').allInnerTexts(), ['1', '2']);
   assert.equal(await page.locator('.opt-row', { hasText: '岛屿规则' }).count(), 0);
@@ -322,7 +326,7 @@ test('火山岛缺省 none 隐藏候选项，开关即时更新显隐计数搜�
   await search.fill('');
   await page.locator('.seg-btn', { hasText: '世界生成' }).click();
   await page.getByRole('button', { name: '火山岛 下一项', exact: true }).click();
-  assert.match(await page.locator('.world-options-card').innerText(), /共 5 项/);
+
   assert.deepEqual(await page.locator('.seg-count').allInnerTexts(), ['2', '3']);
   assert.equal(await page.locator('.opt-row', { hasText: '岛屿资源' }).locator('.opt-row-value').innerText(), '较多');
   await page.locator('.seg-btn', { hasText: '世界规则' }).click();
@@ -341,7 +345,7 @@ test('火山岛缺省 none 隐藏候选项，开关即时更新显隐计数搜�
   const payload = await saveAndRefresh(page, requests);
   assert.equal(payload.overrides.island_rule, 'often');
   assert.equal(payload.overrides.island_resource, 'often');
-  assert.match(await page.locator('.world-options-card').innerText(), /共 3 项/);
+  assert.deepEqual(await page.locator('.seg-count').allInnerTexts(), ['1', '2']);
   await page.locator('.seg-btn', { hasText: '世界生成' }).click();
   await page.getByRole('button', { name: '火山岛 下一项', exact: true }).click();
   assert.equal(await page.locator('.opt-row', { hasText: '岛屿资源' }).locator('.opt-row-value').innerText(), '较多');
@@ -382,7 +386,7 @@ test('改动计数与重置保存位于选项卡头右侧，切分片保留并�
   }];
 
   const { page, requests } = await openWorldPage({ Master: SHIPWRECKED, Caves: caves });
-  const header = page.locator('.world-options-card [data-slot="card-header"]');
+  const header = page.locator('.world-options-card .world-control-header');
   await header.locator('.world-count').waitFor();
   await header.getByRole('button', { name: '重置', exact: true }).waitFor();
   await header.getByRole('button', { name: '保存', exact: true }).waitFor();
@@ -443,4 +447,92 @@ test('改动计数与重置保存位于选项卡头右侧，切分片保留并�
   assert.ok(mobileLayout.searchTop >= mobileLayout.segBottom, '移动端搜索应换到分类下一行');
   assert.ok(Math.abs(mobileLayout.searchTop - mobileLayout.swTop) < 8, '移动端搜索与只看已改动应同行');
   await page.close();
+});
+
+test('选项名称与值为普通文本，步进切换未知值，单项还原同步分组徽章', async () => {
+  const data = ordinaryWorld();
+  data.config.overrides.mild = 'from-future-version';
+  const { page, requests } = await openWorldPage(data);
+  try {
+    const row = page.locator('.opt-row', { hasText: '温和季' });
+    const nav = page.getByRole('navigation', { name: '配置分组' });
+    assert.equal(await row.locator('.opt-row-value').innerText(), 'from-future-version');
+    assert.equal(await row.getByRole('combobox').count(), 0);
+    await row.locator('.opt-row-value').click();
+    assert.equal(await page.getByRole('listbox').count(), 0, '点击文本不展开菜单');
+    await row.getByRole('button', { name: '温和季 下一项', exact: true }).click();
+    assert.equal(await row.locator('.opt-row-value').innerText(), '短');
+    assert.equal(await nav.locator('.world-group-changes').innerText(), '1');
+    await row.hover();
+    const reset = row.getByRole('button', { name: '温和季 恢复默认', exact: true });
+    assert.equal(await reset.evaluate(el => window.getComputedStyle(el).opacity), '1');
+    await reset.focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await row.locator('.opt-row-value').innerText(), '默认');
+    assert.equal(await nav.locator('.world-group-changes').count(), 0);
+    const payload = await saveAndRefresh(page, requests);
+    assert.equal(payload.overrides.mild, 'default');
+  } finally { await page.close(); }
+});
+
+test('普通文件的预设与启用开关收进说明面板，关服前所有编辑控件冻结', async () => {
+  const { page, requests } = await openWorldPage(ordinaryWorld(true), { running: true });
+  try {
+    await page.getByText('服务器运行中，配置已冻结。请先在「总览」关闭服务器再修改。', { exact: true }).waitFor();
+    for (const control of await page.locator('.opt-row button, .opt-row input').all()) assert.equal(await control.isDisabled(), true);
+    await page.getByRole('button', { name: '路径与说明', exact: true }).click();
+    const details = page.getByRole('dialog', { name: '路径与说明', exact: true });
+    assert.equal(await details.getByRole('combobox', { name: '世界生成预设', exact: true }).isDisabled(), true);
+    assert.equal(await details.getByRole('combobox', { name: '世界规则预设', exact: true }).isDisabled(), true);
+    assert.equal(await details.getByRole('switch', { name: '启用本文件', exact: true }).isDisabled(), true);
+    assert.equal(requests.filter(r => r.method === 'PUT').length, 0);
+  } finally { await page.close(); }
+});
+
+test('真实选项布局紧凑，桌面两行吸顶保存搜索，浅色深色和手机均无横向溢出', async () => {
+  const dataset = JSON.parse(readFileSync(new URL('../../internal/worldsettings/options.json', import.meta.url), 'utf8'));
+  const data = globalThis.structuredClone(SHIPWRECKED);
+  data.location = 'forest';
+  data.mod = '';
+  data.groups = dataset.groups.map(g => ({ ...g, options: g.options.filter(o => o.worlds.includes('forest')) })).filter(g => g.options.length);
+  data.config.overrides = {};
+  const largest = data.groups.filter(g => g.category !== 'worldgen').sort((a, b) => b.options.length - a.options.length)[0];
+  for (const [width, dark] of [[2240, false], [1440, true], [375, false]]) {
+    const { page } = await openWorldPage(data, { width, dark });
+    try {
+      const nav = page.getByRole('navigation', { name: '配置分组' });
+      await nav.getByRole('button', { name: largest.label, exact: true }).click();
+      const rows = page.locator('.opt-row');
+      assert.equal(await rows.count(), largest.options.length);
+      const sizes = await page.evaluate(() => {
+        const row = document.querySelector('.opt-row').getBoundingClientRect();
+        const icon = document.querySelector('.opt-row-icon').getBoundingClientRect();
+        const grid = window.getComputedStyle(document.querySelector('.opt-group-body')).gridTemplateColumns.split(' ').length;
+        return { rowHeight: row.height, iconWidth: icon.width, iconHeight: icon.height, grid };
+      });
+      assert.ok(sizes.rowHeight <= 80, '卡片保持紧凑');
+      assert.equal(sizes.iconWidth, 56);
+      assert.equal(sizes.iconHeight, 56);
+      if (width === 2240) assert.equal(sizes.grid, 4);
+      if (width === 1440) assert.ok(sizes.grid >= 3);
+      await page.locator('#page-content').evaluate(el => el.scrollTo({ top: 0 }));
+      await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/world-workspace-${width}-${dark ? 'dark' : 'light'}.png`, import.meta.url)) });
+      await page.setViewportSize({ width, height: 360 });
+      await rows.last().scrollIntoViewIfNeeded();
+      const position = await page.evaluate(() => {
+        const header = document.querySelector('.world-control-header').getBoundingClientRect();
+        const main = document.querySelector('#page-content').getBoundingClientRect();
+        const root = document.querySelector('#page-content');
+        return { headerTop: header.top, mainTop: main.top, headerBottom: header.bottom, viewportBottom: main.bottom, scrollTop: root.scrollTop, scrollWidth: root.scrollWidth, clientWidth: root.clientWidth };
+      });
+      assert.ok(position.scrollTop > 0, '页面真实发生滚动');
+      assert.ok(Math.abs(position.headerTop - position.mainTop) < 2, '完整两行控制栏始终吸顶');
+      assert.ok(position.headerBottom < position.viewportBottom, '吸顶控件仍在视口内');
+      assert.ok(position.scrollWidth <= position.clientWidth, '主工作区不横向溢出');
+      assert.equal(await page.getByRole('button', { name: '保存', exact: true }).isVisible(), true);
+      await page.getByRole('textbox', { name: '搜索世界配置', exact: true }).fill('活动');
+      await page.locator('.opt-row-label').getByText('活动', { exact: true }).waitFor();
+      assert.equal(await nav.getByRole('button', { name: '全局', exact: true }).getAttribute('aria-current'), 'true', '吸顶搜索跨组定位');
+    } finally { await page.close(); }
+  }
 });

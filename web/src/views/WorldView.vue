@@ -5,13 +5,17 @@
 // 世界规则（settings）与世界生成（worldgen）分开成两个标签页展示；
 // 服务器运行中整个页面冻结——游戏只在启动时读这份文件，改了也不生效。
 
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { useElementSize } from '@vueuse/core';
+import { PopoverClose, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger, TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui';
 
 import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiField from '@/components/ui/UiField.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Switch } from '@/components/ui/switch';
 import {
@@ -48,6 +52,10 @@ let loadSeq = 0;
 
 const keyword = ref('');
 const onlyChanged = ref(false);
+const activeGroupId = ref('');
+const groupPanel = ref(null);
+const header = ref(null);
+const { height: headerHeight } = useElementSize(header, { width: 0, height: 0 }, { box: 'border-box' });
 
 /** 选项标签页：世界规则 / 世界生成 */
 const category = ref('settings');
@@ -119,9 +127,6 @@ const displayGroups = computed(() => {
   return groups.map(g => ({ ...g, options: g.options.filter(o => !hidden.has(o.name)) }))
     .filter(g => g.options.length > 0);
 });
-
-const totalOptions = computed(() =>
-  displayGroups.value.reduce((n, g) => n + g.options.length, 0));
 
 const changedCount = computed(() =>
   displayGroups.value.reduce((n, g) => n + g.options.filter(isChanged).length, 0));
@@ -207,14 +212,20 @@ const visibleGroups = computed(() => {
     .filter(g => g.options.length > 0);
 });
 
-/**
- * 预热当前可见选项的图标。
- *
- * 跟着 visibleGroups 走，而不是在 applyView 里按整份数据预热：
- * 那样会把另一个分类、被隐藏的火山岛专项、以及搜索时被过滤掉的项全部拉下来，
- * 一次 180+ 请求，既让 <img loading="lazy"> 形同虚设，也白下载几十张永远不显示的图。
- */
-watch(visibleGroups, groups => preloadIcons(groups), { immediate: true });
+const selectedGroup = computed(() =>
+  visibleGroups.value.find(g => g.id === activeGroupId.value) || visibleGroups.value[0]);
+
+watch([shard, category], () => { activeGroupId.value = ''; });
+watch(selectedGroup, group => preloadIcons(group ? [group] : []), { immediate: true });
+
+async function pickGroup(id) {
+  activeGroupId.value = id;
+  await nextTick();
+  groupPanel.value.$el.scrollIntoView({
+    block: 'start',
+    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
+  });
+}
 
 /* ---------- 取值读写 ---------- */
 
@@ -471,179 +482,138 @@ onMounted(() => selectShard(rooms.shards[0]));
 </script>
 
 <template>
-  <!-- 必须保持单一根节点：App.vue 用 <Transition> 包裹视图组件 -->
-  <div class="stack">
-    <UiCard>
-      <template #title>世界配置</template>
-      <template #hint>{{ rooms.current ? rooms.current.name + ' · ' + shardHint : '' }}</template>
-      <template #actions>
-        <button
-          v-for="s in rooms.shards"
-          :key="s"
-          class="btn btn-sm shard-tab transition-none"
-          :class="{ 'btn-primary': s === shard }"
-          :aria-pressed="s === shard"
-          @click="selectShard(s)"
-        >
-          {{ labelOf(s) }}
-        </button>
-      </template>
-
-      <UiLoading v-if="!rooms.loaded" />
-      <UiEmpty v-else-if="!rooms.current" icon="globe" text="请先在「房间」页新建一个房间" />
-      <!-- 只在首次加载时铺骨架；切分片保留旧内容到新数据回来，避免整页重建闪一下 -->
-      <UiLoading v-else-if="loading && !view" />
-      <p v-else-if="loadError" class="field-tip">读取失败：{{ loadError }}</p>
-
-      <div v-else-if="view" class="world-config-body">
-        <!-- 游戏只在启动时读配置，运行中修改不会生效 -->
-        <div v-if="frozen" class="notice">
-          <Icon name="info" size="16" />
-          <span>
-            房间正在运行中，配置已冻结。现在修改不会生效，
-            请先在「总览」页<strong>关闭服务器</strong>后再修改配置。
-          </span>
+  <TabsRoot :model-value="shard" as-child @update:model-value="selectShard">
+    <UiCard flush class="world-options-card" aria-label="世界配置" :aria-busy="loading" :style="{ '--world-header-height': headerHeight + 'px' }">
+      <h2 class="sr-only">世界配置</h2>
+      <div ref="header" class="world-control-header sticky top-0 z-10">
+        <div class="world-heading-row">
+          <div class="world-shard-controls">
+            <TabsList class="world-shard-tabs" aria-label="配置分片">
+              <TabsTrigger v-for="s in rooms.shards" :key="s" :value="s" class="shard-tab" :disabled="saving">
+                {{ labelOf(s) }}
+              </TabsTrigger>
+            </TabsList>
+            <Badge v-if="view" variant="secondary" class="world-type-label">{{ worldLabel }}</Badge>
+            <PopoverRoot v-if="view" :key="shard">
+              <PopoverTrigger as-child>
+                <Button variant="ghost" size="icon-sm" aria-label="路径与说明" title="路径与说明">
+                  <Icon name="info" size="16" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverPortal>
+                <PopoverContent class="world-details-popover" align="start" :side-offset="8" :collision-padding="12" aria-labelledby="world-details-title">
+                  <div class="flex items-center justify-between gap-3">
+                    <h3 id="world-details-title" class="text-sm font-semibold">路径与说明</h3>
+                    <PopoverClose as-child>
+                      <Button variant="ghost" size="icon-sm" aria-label="关闭路径与说明"><Icon name="x" size="14" /></Button>
+                    </PopoverClose>
+                  </div>
+                  <code class="block break-all bg-transparent p-0 text-xs">{{ view.file }}</code>
+                  <p class="text-xs leading-relaxed text-muted-foreground">世界规则在重启后生效；世界生成只在建图时读取，已有地图不会重新生成。</p>
+                  <p v-if="levelDataInUse" class="text-xs text-muted-foreground">此存档使用游戏生成的 leveldataoverride.lua，仅保存修改过的世界规则。</p>
+                  <template v-else>
+                    <div class="world-presets">
+                      <UiField block label="世界生成预设" for-id="w-worldgen">
+                        <Select v-model="worldgenPreset" :disabled="worldgenFrozen || loading || saving">
+                          <SelectTrigger id="w-worldgen" class="w-full"><SelectValue :placeholder="worldgenPreset || '选择预设'" /></SelectTrigger>
+                          <SelectContent position="popper" align="start">
+                            <SelectGroup>
+                              <SelectItem v-for="p in worldgenPresets" :key="p.data" :value="p.data">{{ p.label ? p.label + '（' + p.data + '）' : p.data }}</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </UiField>
+                      <UiField block label="世界规则预设" for-id="w-settings">
+                        <Select v-model="settingsPreset" :disabled="frozen || loading || saving">
+                          <SelectTrigger id="w-settings" class="w-full"><SelectValue :placeholder="settingsPreset || '选择预设'" /></SelectTrigger>
+                          <SelectContent position="popper" align="start">
+                            <SelectGroup>
+                              <SelectItem v-for="p in settingsPresets" :key="p.data" :value="p.data">{{ p.label ? p.label + '（' + p.data + '）' : p.data }}</SelectItem>
+                            </SelectGroup>
+                          </SelectContent>
+                        </Select>
+                      </UiField>
+                    </div>
+                    <label class="world-enabled">
+                      <Switch v-model="enabled" aria-label="启用本文件" :disabled="frozen || loading || saving" />
+                      <span>启用本文件</span>
+                    </label>
+                  </template>
+                </PopoverContent>
+              </PopoverPortal>
+            </PopoverRoot>
+          </div>
+          <div v-if="view" class="world-main-actions">
+            <Badge variant="secondary" class="world-count" role="status">已改 {{ changedCount }} 项</Badge>
+            <Button variant="outline" size="sm" :disabled="!canReset || frozen || loading || saving" @click="resetAll">重置</Button>
+            <Button size="sm" :disabled="!dirty || frozen || loading || saving" @click="save">{{ saving ? '保存中…' : '保存' }}</Button>
+          </div>
         </div>
-
-        <div v-if="!levelDataInUse" class="world-presets">
-          <UiField block label="世界生成预设" for-id="w-worldgen" tip="决定地图长什么样">
-            <Select v-model="worldgenPreset" :disabled="worldgenFrozen">
-              <SelectTrigger id="w-worldgen" class="w-full">
-                <SelectValue :placeholder="worldgenPreset || '选择预设'" />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                <SelectGroup>
-                  <SelectItem v-for="p in worldgenPresets" :key="p.data" :value="p.data">
-                    {{ p.label ? p.label + '（' + p.data + '）' : p.data }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </UiField>
-
-          <UiField block label="世界规则预设" for-id="w-settings" tip="决定游戏规则">
-            <Select v-model="settingsPreset" :disabled="frozen">
-              <SelectTrigger id="w-settings" class="w-full">
-                <SelectValue :placeholder="settingsPreset || '选择预设'" />
-              </SelectTrigger>
-              <SelectContent position="popper">
-                <SelectGroup>
-                  <SelectItem v-for="p in settingsPresets" :key="p.data" :value="p.data">
-                    {{ p.label ? p.label + '（' + p.data + '）' : p.data }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
-          </UiField>
+        <div v-if="view && !loadError" class="world-toolbar">
+          <div class="world-category-controls">
+            <div class="seg" role="group" aria-label="配置类别">
+              <button class="seg-btn" :class="{ 'is-active': category === 'settings' }" :aria-pressed="category === 'settings'" type="button" @click="pickCategory('settings')">
+                世界规则 <span class="seg-count">{{ categoryCounts.settings }}</span>
+              </button>
+              <button class="seg-btn" :class="{ 'is-active': category === 'worldgen' }" :aria-pressed="category === 'worldgen'" type="button" @click="pickCategory('worldgen')">
+                世界生成 <span class="seg-count">{{ categoryCounts.worldgen }}</span>
+              </button>
+            </div>
+            <span v-if="category === 'worldgen' && worldGenerated" class="world-readonly-note" role="status"><Icon name="info" size="14" />地图已生成，仅供查看</span>
+          </div>
+          <Input v-model="keyword" aria-label="搜索世界配置" placeholder="搜索选项（中英文均可）" class="world-search" />
+          <label class="world-only-changed">
+            <Switch v-model="onlyChanged" aria-label="只看已改动" />
+            <span>只看已改动</span>
+          </label>
         </div>
-
-        <label v-if="!levelDataInUse" class="world-enabled">
-          <Switch v-model="enabled" aria-label="启用本文件" :disabled="frozen" />
-          <span>启用本文件</span>
-        </label>
-
-        <div v-if="!enabled && !levelDataInUse" class="notice">
-          <span>已关闭 <code>override_enabled</code>：游戏仍会读取本文件，但不会应用里面的设置。</span>
-        </div>
-        <div v-if="worldGenerated" class="notice">
-          <Icon name="info" size="16" />
-          <span v-if="levelDataInUse">
-            该存档的配置由游戏自己的 <code>leveldataoverride.lua</code> 保存，
-            当前分片是 <strong>{{ worldLabel }}</strong>。
-            <strong>世界规则</strong>可直接在这里改；<strong>世界生成</strong>只在建图时生效，
-            地图已生成后不可修改，只做展示。
-          </span>
-          <span v-else>
-            该房间<strong>已生成过世界</strong>：世界生成类配置已冻结——
-            这些选项只在生成世界时读取，改了也不会重建已有地图。
-            如需调整地形、资源分布等，请新建房间重新生成，或另行导入存档。
-          </span>
-        </div>
-
-        <div v-if="presetMismatch" class="notice">
-          <Icon name="alert" size="16" />
-          <span>
-            世界预设与分片类型不一致：当前预设是 <strong>{{ worldgenPreset || '（未指定）' }}</strong>，
-            而这个分片是 <strong>{{ shardHint }}</strong>。
-            <template v-if="worldGenerated">
-              世界已经生成，改预设不会重建地图——要纠正只能删除该分片的存档后重新生成。
-            </template>
-            <template v-else>
-              现在启动会严格按预设生成，请先把预设改成与该类型匹配的值。
-            </template>
-          </span>
-        </div>
-
-        <p class="path-line">{{ view.file }}</p>
-      </div>
-    </UiCard>
-
-    <UiCard v-if="view && !loadError" class="world-options-card" :aria-busy="loading">
-      <template #title>选项</template>
-      <template #hint>共 {{ totalOptions }} 项</template>
-      <template #actions>
-        <span class="world-count">
-          {{ changedCount ? '已改 ' + changedCount + ' 项' : '未做改动' }}
-        </span>
-        <button class="btn btn-sm" :disabled="!canReset || frozen" @click="resetAll">重置</button>
-        <button class="btn btn-sm btn-primary" :disabled="!dirty || frozen || saving" @click="save">
-          {{ saving ? '保存中…' : '保存' }}
-        </button>
-      </template>
-
-      <div class="world-toolbar world-toolbar-sub">
-        <div class="seg">
-          <button
-            class="seg-btn"
-            :class="{ 'is-active': category === 'settings' }"
-            :aria-pressed="category === 'settings'"
-            type="button"
-            @click="pickCategory('settings')"
-          >
-            世界规则 <span class="seg-count">{{ categoryCounts.settings }}</span>
-          </button>
-          <button
-            class="seg-btn"
-            :class="{ 'is-active': category === 'worldgen' }"
-            :aria-pressed="category === 'worldgen'"
-            type="button"
-            @click="pickCategory('worldgen')"
-          >
-            世界生成 <span class="seg-count">{{ categoryCounts.worldgen }}</span>
-          </button>
-        </div>
-        <Input v-model="keyword" placeholder="搜索选项（中英文均可）" class="world-search" />
-        <label class="world-only-changed inline-flex shrink-0 items-center gap-1.5 cursor-pointer select-none whitespace-nowrap text-foreground">
-          <Switch v-model="onlyChanged" />
-          <span>只看已改动</span>
-        </label>
       </div>
 
-      <UiEmpty
-        v-if="!visibleGroups.length"
-        icon="inbox"
-        :text="onlyChanged ? '还没有改动过任何选项' : '没有匹配的选项'"
-      />
-
-      <template v-else>
-        <!-- 服务器运行中冻结：改了也不生效，引导用户先关服 -->
-        <div v-if="frozen" class="notice" style="margin-bottom: 12px">
-          <Icon name="info" size="16" />
-          <span>
-            服务器运行中，选项已冻结。请先<strong>关闭服务器</strong>再修改。
-          </span>
-        </div>
-
-        <OptionGroupPanel
-          v-for="g in visibleGroups"
-          :key="g.category + '/' + g.id"
-          :group="g"
-          :value-of="valueOf"
-          :is-changed="isChanged"
-          :disabled="frozen || (worldGenerated && g.category === 'worldgen')"
-          @change="onOptionChange"
-        />
-      </template>
+      <TabsContent :value="shard" class="outline-none">
+        <div v-if="!rooms.loaded || (loading && !view)" class="p-4"><UiLoading /></div>
+        <UiEmpty v-else-if="!rooms.current" icon="globe" text="请先在「房间」页新建一个房间" />
+        <p v-else-if="loadError" role="alert" class="p-4 text-sm text-destructive">读取失败：{{ loadError }}</p>
+        <template v-else-if="view">
+          <div v-if="frozen || (!enabled && !levelDataInUse) || presetMismatch" class="world-notices">
+            <p v-if="frozen" role="status">服务器运行中，配置已冻结。请先在「总览」关闭服务器再修改。</p>
+            <p v-if="!enabled && !levelDataInUse">已关闭 override_enabled，本文件中的设置不会应用。</p>
+            <p v-if="presetMismatch" role="alert">
+              预设 {{ worldgenPreset }} 与 {{ shardHint }} 类型不一致。
+              {{ worldGenerated ? '地图已生成，修改预设不会重建地图。' : '请在「路径与说明」中选择匹配的预设后再启动。' }}
+            </p>
+          </div>
+          <div class="world-workspace">
+            <nav v-if="activeGroups.length" class="world-group-nav" aria-label="配置分组">
+              <button
+                v-for="g in activeGroups"
+                :key="g.id"
+                type="button"
+                :aria-current="selectedGroup?.id === g.id ? 'true' : undefined"
+                :aria-controls="selectedGroup?.id === g.id ? 'world-active-group' : undefined"
+                :disabled="!visibleGroups.some(visible => visible.id === g.id)"
+                @click="pickGroup(g.id)"
+              >
+                <span>{{ g.label || g.id }}</span>
+                <span v-if="g.options.some(isChanged)" class="world-group-changes" :aria-label="g.options.filter(isChanged).length + ' 项已修改'">{{ g.options.filter(isChanged).length }}</span>
+              </button>
+            </nav>
+            <div class="world-group-content">
+              <UiEmpty v-if="!selectedGroup" icon="inbox" :text="onlyChanged ? '没有匹配的已改动选项' : '没有匹配的选项'" />
+              <OptionGroupPanel
+                v-else
+                id="world-active-group"
+                ref="groupPanel"
+                :key="category + '/' + selectedGroup.id"
+                :group="selectedGroup"
+                :value-of="valueOf"
+                :is-changed="isChanged"
+                :disabled="loading || saving || frozen || (worldGenerated && category === 'worldgen')"
+                @change="onOptionChange"
+              />
+            </div>
+          </div>
+        </template>
+      </TabsContent>
     </UiCard>
-  </div>
+  </TabsRoot>
 </template>

@@ -13,6 +13,7 @@ try {
   await vite.listen();
   browser = await chromium.launch({ executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH });
   const page = await browser.newPage({ viewport: { width: 1600, height: 1100 } });
+  await page.emulateMedia({ reducedMotion: 'reduce' });
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   let worldRequests = 0;
@@ -44,7 +45,9 @@ try {
   });
   await page.goto(vite.resolvedUrls.local[0]);
   await page.locator('#opt-settings_0').waitFor();
-  assert.equal(await page.locator('.opt-group .opt-row').count(), 126);
+  assert.deepEqual(await page.locator('.seg-count').allInnerTexts(), ['126', '64']);
+  assert.equal(await page.getByRole('navigation', { name: '配置分组' }).getByRole('button').count(), 6);
+  assert.equal(await page.locator('.opt-group .opt-row').count(), 26);
   const row = page.locator('.opt-row:has(#opt-settings_1)');
   const value = row.locator('.opt-row-value');
   const previous = row.getByRole('button', { name: 'settings选项 1 上一项', exact: true });
@@ -58,7 +61,7 @@ try {
   await next.focus();
   await page.keyboard.press('Enter');
   assert.equal((await value.innerText()).trim(), '较多', '删除草稿后再次用键盘选择仍能更新');
-  const onlyChanged = page.locator('.world-toolbar-sub').getByRole('switch');
+  const onlyChanged = page.getByRole('switch', { name: '只看已改动', exact: true });
   await onlyChanged.click();
   assert.equal(await page.locator('.opt-group .opt-row').count(), 2);
   await previous.click();
@@ -79,7 +82,7 @@ try {
   });
   console.log('first frame:', firstFrame);
   assert.equal(firstFrame.skeleton, false, '分类切换不再插骨架屏');
-  assert.equal(firstFrame.rows, 64, '新分类选项在同一帧内就位，不先清空');
+  assert.equal(firstFrame.rows, 24, '新分类首组在同一帧内就位，不先清空');
   assert.equal(firstFrame.selected, 'true');
   assert.equal(worldRequests, requestsBeforeSwitch, '分类切换不重复请求接口');
 
@@ -88,11 +91,22 @@ try {
     await page.evaluate(async index => { document.querySelectorAll('.seg-btn')[index].click(); await Promise.resolve(); }, index);
     assert.equal(await page.locator('.world-category-skeleton').count(), 0, '切换过程不出现骨架屏');
   }
-  assert.equal(await page.locator('.opt-group .opt-row').count(), 126);
+  assert.equal(await page.locator('.opt-group .opt-row').count(), 26);
   assert.equal(await page.locator('#opt-settings_0').inputValue(), 'unsaved-draft', '分类切换保留编辑草稿');
   assert.equal((await value.innerText()).trim(), '较多', '分类切换保留选项草稿');
   await page.evaluate(async () => { document.querySelectorAll('.seg-btn')[0].click(); await Promise.resolve(); });
-  assert.equal(await page.locator('.opt-group .opt-row').count(), 126, '重复点当前分类仍是完整列表');
+  assert.equal(await page.locator('.opt-group .opt-row').count(), 26, '重复点当前分类仍保留首组');
+  const navigation = page.getByRole('navigation', { name: '配置分组' });
+  let total = 0;
+  for (let group = 0; group < 6; group++) {
+    await navigation.getByRole('button', { name: `settings ${group}`, exact: group !== 0 }).click();
+    total += await page.locator('.opt-group .opt-row').count();
+  }
+  assert.equal(total, 126, '每个分组均可到达，未丢失任何配置项');
+  await page.getByPlaceholder('搜索选项（中英文均可）').fill('settings选项 31');
+  await page.locator('.opt-row-label').getByText('settings选项 31', { exact: true }).waitFor();
+  assert.equal(await page.locator('.opt-row').count(), 1, '搜索可自动定位其他分组的选项');
+  assert.equal(await navigation.getByRole('button', { name: 'settings 1', exact: true }).getAttribute('aria-current'), 'true');
   assert.deepEqual(errors, []);
   console.log('PASS: 箭头选值/恢复默认/键盘/改动过滤、同帧分类切换、连续切换、草稿保留、不重复请求');
   await page.close();
