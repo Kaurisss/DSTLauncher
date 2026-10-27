@@ -379,6 +379,59 @@ test('玩家身份、事件与事件时间如实显示，Steam 链接仅接受�
   } finally { await close(); }
 });
 
+test('日志复选框在不同高度行中居中，日期与时间按两行等宽字形显示', async () => {
+  for (const [width, dark] of [[1440, false], [1440, true], [375, false]]) {
+    const { page, state, close } = await openPanel({ width, dark });
+    try {
+      state.chatEntries = [
+        { id: 81, kind: 'chat', name: '日期排版', userid: 'KU_align-1', prefab: 'wilson', steamid: '76561198000000001', ip: '192.0.2.1', recordedAt: '2026-01-02T03:04:05Z', message: '短消息' },
+        { id: 82, kind: 'chat', name: '多行消息', recordedAt: '2026-10-27T09:08:07Z', message: '第一行\n第二行\n第三行\n第四行' },
+        { id: 83, kind: 'join', name: '只有时长', time: '00:02:04', message: '加入' },
+      ];
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      if (width < 768) await page.getByRole('button', { name: '切换导航', exact: true }).click();
+      await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
+      const table = page.getByRole('table', { name: '游戏聊天记录' });
+      await table.getByText('日期排版', { exact: true }).waitFor();
+      const normalRow = table.getByRole('row').filter({ hasText: '日期排版' });
+      assert.ok((await normalRow.boundingBox()).height <= 56, '包含头像和两行日期的普通记录保持紧凑');
+      const checkAlignment = async () => {
+        const positions = await table.getByRole('checkbox').evaluateAll(checkboxes => checkboxes.map(checkbox => {
+          const box = checkbox.getBoundingClientRect(), cell = checkbox.closest('td,th').getBoundingClientRect();
+          return { x: box.x + box.width / 2, dx: box.x + box.width / 2 - (cell.x + cell.width / 2), dy: box.y + box.height / 2 - (cell.y + cell.height / 2) };
+        }));
+        for (const position of positions) {
+          assert.ok(Math.abs(position.dx) < 0.5 && Math.abs(position.dy) < 0.5, '复选框相对单元格水平垂直居中：' + JSON.stringify(position));
+          assert.ok(Math.abs(position.x - positions[0].x) < 0.5, '表头与各行复选框共用中心线');
+        }
+      };
+      await checkAlignment();
+      await table.getByRole('checkbox', { name: '选择本页日志', exact: true }).click();
+      assert.equal(await table.getByRole('checkbox', { checked: true }).count(), 4);
+      await checkAlignment();
+      for (const time of await table.locator('time').all()) {
+        const parts = time.locator('span');
+        assert.equal(await parts.count(), 2);
+        assert.match(await parts.nth(0).innerText(), /^\d{4}\/\d{2}\/\d{2}$/);
+        assert.match(await parts.nth(1).innerText(), /^\d{2}:\d{2}:\d{2}$/);
+        const date = await parts.nth(0).boundingBox(), clock = await parts.nth(1).boundingBox();
+        assert.equal(date.x, clock.x);
+        assert.equal(date.height, clock.height);
+        assert.ok(clock.y >= date.y + date.height);
+        const widths = await time.evaluate(el => {
+          const canvas = document.createElement('canvas'), context = canvas.getContext('2d'), style = window.getComputedStyle(el);
+          context.font = style.fontSize + ' ' + style.fontFamily;
+          return ['1111', '0000', 'WWWW'].map(text => context.measureText(text).width);
+        });
+        assert.ok(Math.max(...widths) - Math.min(...widths) < 0.1, '日期内容使用等宽字体');
+      }
+      await table.getByText('运行时长 00:02:04', { exact: true }).waitFor();
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+      await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/log-table-aligned-${width}-${dark ? 'dark' : 'light'}.png`, import.meta.url)) });
+    } finally { await close(); }
+  }
+});
+
 test('玩家历史删除需确认、失败保留选择、批量删除后校正越界页', async () => {
   const { page, state, close } = await openPanel();
   try {

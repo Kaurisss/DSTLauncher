@@ -17,7 +17,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { useRoomsStore } from '@/stores/rooms.js';
 import { logApi, playerListApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
-import { CHARACTERS, fmtTime, roomShardLabel } from '@/lib/format.js';
+import { CHARACTERS, roomShardLabel } from '@/lib/format.js';
 import { guard, toast } from '@/lib/toast.js';
 
 const rooms = useRoomsStore();
@@ -55,6 +55,14 @@ const size = computed(() => Number(pageSize.value));
 const total = computed(() => result.value?.total || 0);
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / size.value)));
 const start = computed(() => (page.value - 1) * size.value);
+
+function recordedTimeParts(iso) {
+  const date = new Date(iso);
+  return [
+    date.toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' }),
+    date.toLocaleTimeString('zh-CN', { hour12: false }),
+  ];
+}
 
 watch(() => rooms.currentId, () => {
   const list = shards.value;
@@ -229,29 +237,37 @@ async function blockPlayer(entry) {
       <UiEmpty v-else-if="!entries.length" icon="inbox" text="历史日志中没有匹配的记录" />
       <template v-else>
         <div class="min-w-0 overflow-hidden rounded-lg border">
-          <Table class="min-w-[1760px] table-fixed" role="region" aria-label="日志表格，可横向滚动" tabindex="0">
+          <Table class="min-w-[1440px] table-fixed" role="region" aria-label="日志表格，可横向滚动" tabindex="0">
             <caption class="sr-only">游戏聊天记录</caption>
             <TableHeader class="bg-muted/50">
               <TableRow>
-                <TableHead scope="col" class="w-12 pl-4">
-                  <Checkbox aria-label="选择本页日志" :disabled="deleting || loading" :model-value="selected.size === entries.length ? true : selected.size ? 'indeterminate' : false" @update:model-value="selected = $event ? new Set(entries.map(entry => entry.id)) : new Set()" />
+                <TableHead scope="col" class="w-10 px-0">
+                  <div class="flex items-center justify-center">
+                    <Checkbox aria-label="选择本页日志" :disabled="deleting || loading" :model-value="selected.size === entries.length ? true : selected.size ? 'indeterminate' : false" @update:model-value="selected = $event ? new Set(entries.map(entry => entry.id)) : new Set()" />
+                  </div>
                 </TableHead>
-                <TableHead scope="col" class="w-44">记录时间</TableHead>
-                <TableHead scope="col" class="w-36">玩家</TableHead>
-                <TableHead scope="col" class="w-48">Klei ID</TableHead>
-                <TableHead scope="col" class="w-24">角色</TableHead>
-                <TableHead scope="col" class="w-56">Steam ID</TableHead>
-                <TableHead scope="col" class="w-36">IP</TableHead>
-                <TableHead scope="col" class="w-24">事件</TableHead>
+                <TableHead scope="col" class="w-28">记录时间</TableHead>
+                <TableHead scope="col" class="w-32">玩家</TableHead>
+                <TableHead scope="col" class="w-40">Klei ID</TableHead>
+                <TableHead scope="col" class="w-16">角色</TableHead>
+                <TableHead scope="col" class="w-48">Steam ID</TableHead>
+                <TableHead scope="col" class="w-32">IP</TableHead>
+                <TableHead scope="col" class="w-20">事件</TableHead>
                 <TableHead scope="col">内容</TableHead>
-                <TableHead scope="col" class="w-56 pr-4 text-right">操作</TableHead>
+                <TableHead scope="col" class="w-52 pr-4 text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               <TableRow v-for="entry in entries" :key="entry.id">
-                <TableCell class="pl-4"><Checkbox :aria-label="`选择日志 ${entry.id}`" :disabled="deleting || loading" :model-value="selected.has(entry.id)" @update:model-value="selectEntry(entry.id, $event)" /></TableCell>
-                <TableCell class="whitespace-normal py-3 font-mono text-xs text-muted-foreground tabular-nums">
-                  <time v-if="entry.recordedAt" :datetime="entry.recordedAt">{{ fmtTime(entry.recordedAt) }}</time>
+                <TableCell class="px-0">
+                  <div class="flex items-center justify-center">
+                    <Checkbox :aria-label="`选择日志 ${entry.id}`" :disabled="deleting || loading" :model-value="selected.has(entry.id)" @update:model-value="selectEntry(entry.id, $event)" />
+                  </div>
+                </TableCell>
+                <TableCell class="whitespace-normal py-2 font-mono text-xs text-muted-foreground tabular-nums">
+                  <time v-if="entry.recordedAt" :datetime="entry.recordedAt" class="log-timestamp inline-flex flex-col whitespace-nowrap leading-4">
+                    <span v-for="(part, index) in recordedTimeParts(entry.recordedAt)" :key="index">{{ part }}</span>
+                  </time>
                   <span v-else>运行时长 {{ entry.time }}</span>
                 </TableCell>
                 <TableCell class="whitespace-normal break-words [overflow-wrap:anywhere] font-medium">{{ entry.name || '—' }}</TableCell>
@@ -292,7 +308,7 @@ async function blockPlayer(entry) {
                 </TableCell>
                 <TableCell class="break-all whitespace-normal font-mono text-xs">{{ entry.ip || '—' }}</TableCell>
                 <TableCell><Badge variant="outline" :class="eventClasses[entry.kind]">{{ labels[entry.kind] || entry.kind }}</Badge></TableCell>
-                <TableCell class="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-6">{{ entry.message }}</TableCell>
+                <TableCell class="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-5">{{ entry.message }}</TableCell>
                 <TableCell class="pr-4 text-right">
                   <Button
                     v-if="/^KU_[A-Za-z0-9_-]{1,32}$/.test(entry.userid || '')" variant="destructive" size="sm"
@@ -329,3 +345,10 @@ async function blockPlayer(entry) {
     </div>
   </UiCard>
 </template>
+
+<style scoped>
+.log-timestamp {
+  font-family: "Cascadia Code", Consolas, "Liberation Mono", monospace;
+  font-variant-ligatures: none;
+}
+</style>
