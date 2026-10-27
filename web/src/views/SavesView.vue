@@ -14,6 +14,8 @@ import {
 } from '@tanstack/vue-table';
 
 import UiCard from '@/components/ui/UiCard.vue';
+import UiToolbar from '@/components/ui/UiToolbar.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import Icon from '@/components/ui/Icon.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -106,6 +108,14 @@ async function load() {
 
 onMounted(load);
 
+async function copyRoot() {
+  if (!window.navigator.clipboard) {
+    toast('当前连接不支持剪贴板访问，请手动复制目录路径', 'err');
+    return;
+  }
+  await guard(() => window.navigator.clipboard.writeText(root.value), { success: '目录路径已复制' });
+}
+
 function shardNames(item) {
   return (item.shards || []).map(s => s.name).join('、') || '—';
 }
@@ -138,27 +148,23 @@ async function remove(item) {
 </script>
 
 <template>
-  <UiCard>
-    <template #actions>
-      <Button variant="outline" size="sm" :disabled="loading" @click="load"><Spinner v-if="loading && items.length" aria-hidden="true" />刷新</Button>
-    </template>
+  <UiCard flush>
+    <UiToolbar aria-label="存档工具栏" leading-class="min-w-full flex-wrap lg:min-w-0">
+      <Input class="min-w-32 max-w-64 flex-1" aria-label="搜索存档" placeholder="搜索存档、房间或分片" :model-value="table.atoms.globalFilter.get() ?? ''" @update:model-value="table.setGlobalFilter" />
+      <Badge variant="secondary" class="shrink-0 whitespace-nowrap tabular-nums">共 {{ items.length }} 个存档（{{ fmtSize(totalSize) }}）</Badge>
+      <Badge v-if="orphans.length" variant="outline" class="shrink-0 whitespace-nowrap text-muted-foreground">孤儿存档 {{ orphans.length }} 个 · {{ fmtSize(orphanSize) }}</Badge>
+      <Tooltip v-if="root">
+        <TooltipTrigger as-child>
+          <Button variant="ghost" size="sm" class="text-muted-foreground" aria-label="复制存档根目录" @click="copyRoot"><Icon name="folder" size="14" />目录路径</Button>
+        </TooltipTrigger>
+        <TooltipContent class="max-w-sm break-all"><code class="bg-transparent p-0">{{ root }}</code></TooltipContent>
+      </Tooltip>
+      <template #actions>
+        <Button variant="outline" size="sm" :disabled="loading" @click="load"><Spinner v-if="loading && items.length" aria-hidden="true" />刷新</Button>
+      </template>
+    </UiToolbar>
 
-    <div class="grid min-w-0 gap-4">
-      <div class="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-muted-foreground">
-        <span>共 <b class="font-medium text-foreground">{{ items.length }}</b> 个存档</span>
-        <span>占用 <b class="font-medium text-foreground">{{ fmtSize(totalSize) }}</b></span>
-        <span v-if="orphans.length">孤儿存档 {{ orphans.length }} 个 · {{ fmtSize(orphanSize) }}</span>
-      </div>
-      <code v-if="root" class="break-all bg-transparent p-0 text-xs text-muted-foreground">{{ root }}</code>
-
-      <Input
-        class="w-full sm:max-w-sm"
-        aria-label="搜索存档"
-        placeholder="搜索存档、房间或分片"
-        :model-value="table.atoms.globalFilter.get() ?? ''"
-        @update:model-value="table.setGlobalFilter"
-      />
-
+    <div class="grid min-w-0 gap-4 p-4 pt-1 sm:px-6 sm:pb-6">
       <div class="min-w-0 overflow-hidden rounded-md border" :aria-busy="loading">
         <Table class="min-w-[760px]">
           <TableCaption class="sr-only">存档列表</TableCaption>

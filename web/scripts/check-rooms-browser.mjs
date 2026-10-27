@@ -33,13 +33,14 @@ const defaults = { ...room(0, '新的饥荒房间'), pvp: true, voteKick: true }
 for (const shard of defaults.shards) { shard.serverPort = 0; shard.masterServerPort = 0; shard.authenticationPort = 0; }
 const zip = { name: 'fixture-save.zip', mimeType: 'application/zip', buffer: Buffer.from('PK isolated fixture') };
 
-async function openRooms({ width = 1280, height = 900, delaySave = false, delayUpload = false, running = false, empty = false } = {}) {
+async function openRooms({ width = 1280, height = 900, delaySave = false, delayUpload = false, running = false, empty = false, dark = false } = {}) {
   const page = await browser.newPage({ viewport: { width, height } });
   page.setDefaultTimeout(10000);
-  await page.addInitScript(() => {
+  await page.addInitScript(dark => {
     localStorage.setItem('dst-tab', 'rooms');
     localStorage.setItem('dst-room', '2');
-  });
+    localStorage.setItem('dst-theme', dark ? 'dark' : 'light');
+  }, dark);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   const state = {
@@ -371,5 +372,122 @@ test('编辑期间房间被移除时不把编辑表单变为新建表单', async
     assert.equal(writes(state, '/api/rooms', 'POST').length, 0);
     await page.getByRole('button', { name: '返回房间列表', exact: true }).click();
     await page.getByRole('button', { name: '新建房间', exact: true }).waitFor();
+  } finally { await close(); }
+});
+
+test('房间表单吸顶合并返回与动作，垂直标签和12/4列网格对齐，分片紧凑双列', async () => {
+  for (const [width, dark] of [[1280, false], [1440, true], [375, false]]) {
+    const { page, close } = await openRooms({ width, dark });
+    try {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await page.getByRole('button', { name: '新建房间', exact: true }).click();
+      const editor = page.locator('.room-editor');
+      const toolbar = page.getByRole('region', { name: '房间编辑工具栏', exact: true });
+      await toolbar.waitFor();
+      assert.equal(await page.getByRole('navigation', { name: '房间导航', exact: true }).count(), 0);
+      assert.equal(await page.getByRole('heading', { name: '世界（分片）', exact: true }).count(), 1);
+      const cancel = await toolbar.getByRole('button', { name: '取消', exact: true }).boundingBox();
+      const save = await toolbar.getByRole('button', { name: '保存', exact: true }).boundingBox();
+      assert.ok(cancel.x < save.x && Math.abs(cancel.y - save.y) < 2);
+      const token = editor.locator('#f_token');
+      assert.equal(await token.evaluate(el => el.tagName), 'INPUT');
+      assert.equal(await token.getAttribute('type'), 'password');
+      assert.ok((await token.boundingBox()).height <= 36);
+      const link = editor.getByRole('link', { name: '前往 Klei 获取令牌（新标签页）', exact: true });
+      assert.equal(await link.getAttribute('href'), 'https://accounts.klei.com/account/game/servers?game=DontStarveTogether');
+      assert.equal(await link.getAttribute('target'), '_blank');
+      assert.match(await link.getAttribute('rel'), /noopener/);
+      assert.equal(await editor.locator('#f_tickRate').isVisible(), false, 'tick不占用基本信息网格');
+      const layout = await editor.evaluate(el => {
+        const core = el.querySelector('.room-core-grid'), coreStyle = window.getComputedStyle(core);
+        const grid = selector => window.getComputedStyle(el.querySelector(selector)).gridTemplateColumns.split(' ').length;
+        return {
+          coreWidth: core.getBoundingClientRect().width, gap: parseFloat(coreStyle.columnGap),
+          coreFields: [...core.children].map(child => child.getBoundingClientRect().width),
+          ruleColumns: grid('.room-rules-grid'), switchColumns: grid('.room-switch-grid'), shardColumns: grid('.shard-editor-grid'),
+          fieldsAligned: [...el.querySelectorAll('.field-block')].filter(field => field.getBoundingClientRect().height).every(field => {
+            const label = field.querySelector('.field-label'), control = field.querySelector('input,[role=combobox]');
+            if (!label || !control) return true;
+            const a = label.getBoundingClientRect(), b = control.getBoundingClientRect();
+            return a.bottom <= b.top && Math.abs(a.left - b.left) < 2;
+          }),
+          ports: [...el.querySelectorAll('.shard-card')].map(card => [...card.querySelectorAll('input[type=number]')].map(input => input.getBoundingClientRect().width)),
+        };
+      });
+      assert.equal(layout.fieldsAligned, true, '标签在控件上方，且左边缘对齐');
+      if (width >= 1280) {
+        const unit = (layout.coreWidth + layout.gap) / 12;
+        for (const [i, span] of [4, 5, 3].entries()) assert.ok(Math.abs(layout.coreFields[i] - (span * unit - layout.gap)) < 2);
+        assert.equal(layout.ruleColumns, 4);
+        assert.equal(layout.switchColumns, 6);
+        assert.equal(layout.shardColumns, 2);
+      } else assert.equal(layout.shardColumns, 1);
+      for (const ports of layout.ports) assert.ok(Math.max(...ports) - Math.min(...ports) < 2, '三个端口输入等宽');
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+      await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/room-editor-${width}-${dark ? 'dark' : 'light'}.png`, import.meta.url)) });
+      await editor.getByText('高级设置', { exact: true }).click();
+      await editor.locator('#f_tickRate').waitFor();
+      await page.setViewportSize({ width, height: 560 });
+      await page.locator('#page-content').evaluate(el => { el.scrollTop = el.scrollHeight; });
+      const position = await page.evaluate(() => ({
+        toolbar: document.querySelector('.room-editor .ui-toolbar').getBoundingClientRect().top,
+        main: document.querySelector('#page-content').getBoundingClientRect().top,
+        bottom: document.querySelector('.room-editor .ui-toolbar').getBoundingClientRect().bottom,
+      }));
+      assert.ok(Math.abs(position.toolbar - position.main) < 2);
+      assert.ok(position.bottom < 560);
+      assert.equal(await toolbar.getByRole('button', { name: '保存', exact: true }).isVisible(), true);
+    } finally { await close(); }
+  }
+});
+
+test('单行令牌从真实剪贴板粘贴，整张开关卡片可点击，保存保留高级参数和分片语义', async () => {
+  const { page, state, close } = await openRooms();
+  try {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']);
+    await page.getByRole('button', { name: '新建房间', exact: true }).click();
+    await page.locator('#f_name').fill('  紧凑表单测试  ');
+    await page.evaluate(() => window.navigator.clipboard.writeText('  pds-fixture-token  '));
+    await page.getByRole('button', { name: '粘贴', exact: true }).click();
+    await page.waitForFunction(() => document.querySelector('#f_token').value === 'pds-fixture-token');
+    for (const name of ['PVP', '无人时暂停', '投票', '投票踢人', '仅局域网', '离线模式']) {
+      const toggle = page.getByRole('switch', { name, exact: true });
+      const previous = await toggle.getAttribute('aria-checked');
+      const card = toggle.locator('..');
+      await card.click({ position: { x: 5, y: 5 } });
+      assert.equal(await toggle.getAttribute('aria-checked'), previous === 'true' ? 'false' : 'true');
+    }
+    await page.locator('#f_maxSnapshots').fill('20');
+    await page.getByText('高级设置', { exact: true }).click();
+    await page.getByRole('combobox', { name: 'tick 频率', exact: true }).click();
+    await page.getByRole('option', { name: /^60/ }).click();
+    await page.getByRole('button', { name: '保存', exact: true }).click();
+    await page.getByRole('button', { name: '新建房间', exact: true }).waitFor();
+    const payload = writes(state, '/api/rooms', 'POST').at(-1).body;
+    assert.equal(payload.name, '紧凑表单测试');
+    assert.equal(payload.token, 'pds-fixture-token');
+    assert.equal(payload.tickRate, 60);
+    assert.equal(payload.maxSnapshots, 20);
+    assert.deepEqual([payload.pvp, payload.pauseEmpty, payload.voteEnabled, payload.voteKick, payload.lanOnly, payload.offline], [false, false, false, false, true, true]);
+    assert.deepEqual(payload.shards.map(shard => [shard.name, shard.gameId, shard.disabled]), [['Master', 1, false], ['Caves', 2, true]]);
+  } finally { await close(); }
+});
+
+test('分片移除操作保留主世界约束，取消保留草稿，确认后只移除目标分片', async () => {
+  const { page, close } = await openRooms();
+  try {
+    await card(page).getByRole('button', { name: '编辑', exact: true }).click();
+    const shards = page.locator('.shard-card');
+    assert.equal(await shards.first().getByRole('switch', { name: '启用', exact: true }).isDisabled(), true);
+    assert.equal(await shards.first().getByRole('button', { name: '从面板移除（存档目录保留）', exact: true }).count(), 0);
+    const remove = shards.nth(1).getByRole('button', { name: '从面板移除（存档目录保留）', exact: true });
+    await remove.click();
+    const confirmation = page.getByRole('alertdialog');
+    await confirmation.getByRole('button', { name: '取消', exact: true }).click();
+    assert.equal(await shards.count(), 2);
+    await remove.click();
+    await confirmation.getByRole('button', { name: '确定', exact: true }).click();
+    assert.equal(await shards.count(), 1);
+    assert.equal(await shards.first().getByRole('textbox', { name: '世界名', exact: true }).inputValue(), 'Master');
   } finally { await close(); }
 });

@@ -86,80 +86,84 @@ async function removeShard(index) {
 </script>
 
 <template>
-  <div class="shard-list">
-    <div
-      v-for="(s, i) in shards"
-      :key="i"
-      class="shard-card"
-      :class="{ 'is-off': s.disabled }"
-    >
-      <div class="shard-card-head">
-        <Tooltip>
-          <TooltipTrigger as="span" :as-child="canRename(s)" class="shard-name-input inline-flex" :tabindex="!canRename(s) ? 0 : undefined">
-            <Input v-model.trim="s.name" class="w-full disabled:pointer-events-none" :disabled="!canRename(s)" aria-label="世界名" placeholder="世界名" />
-          </TooltipTrigger>
-          <TooltipContent>{{ canRename(s) ? '英文名，不含空格；保存后不可修改' : '存档目录名，保存后不可修改' }}</TooltipContent>
-        </Tooltip>
-        <Select
-          v-model="s.worldType"
-          :disabled="!canRename(s)"
-        >
-          <Tooltip>
-            <TooltipTrigger as="span" :as-child="canRename(s)" class="shard-type-select inline-flex" :tabindex="!canRename(s) ? 0 : undefined">
-              <SelectTrigger class="w-full disabled:pointer-events-none" aria-label="世界类型">
-                <SelectValue :placeholder="typeLabel(s.worldType)" />
-              </SelectTrigger>
-            </TooltipTrigger>
-            <SelectContent position="popper">
-              <SelectGroup>
-                <SelectItem v-for="t in WORLD_TYPES" :key="t.value" :value="t.value">
-                  {{ t.label }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-            <TooltipContent>{{ canRename(s) ? '决定世界生成预设与可用设置项' : '存档类型' }}</TooltipContent>
-          </Tooltip>
-        </Select>
-        <span v-if="s.isMaster" class="pill pill-info">主世界</span>
-        <UiSwitch
-          :model-value="!s.disabled"
-          :disabled="s.isMaster"
-          label="启用"
-          @update:model-value="v => (s.disabled = !v)"
-        />
-        <Tooltip v-if="!s.isMaster">
-          <TooltipTrigger as="span" :as-child="!removing" class="shard-del inline-flex" :tabindex="removing ? 0 : undefined">
-            <Button variant="destructive" size="sm" aria-label="从面板移除（存档目录保留）" :disabled="removing" @click="removeShard(i)">
-              <Icon name="trash" size="14" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>从面板移除（存档目录保留）</TooltipContent>
-        </Tooltip>
-      </div>
-
-      <div class="shard-ports">
-        <label v-for="p in PORTS" :key="p.key" class="shard-port">
-          <span>{{ p.label }}</span>
-          <Input
-            v-model.number="s[p.key]"
-            type="number"
-            min="1024"
-            max="65535"
-            :placeholder="s[p.key] ? '' : '自动分配'"
-          />
-        </label>
-      </div>
-
-      <p class="shard-foot">
-        世界 ID <code>{{ s.gameId || '自动' }}</code>
-        · {{ typeLabel(s.worldType) }}
-        <template v-if="s.isMaster"> · 进服落点，不可停用</template>
-        <template v-else-if="s.disabled"> · 已停用，不会启动</template>
-      </p>
+  <section class="grid gap-3">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">世界（分片）</h3>
+      <Button variant="outline" size="sm" type="button" @click="addShard">
+        <Icon name="plus" size="14" />添加世界
+      </Button>
     </div>
 
-    <Button variant="outline" size="sm" class="shard-add" type="button" @click="addShard">
-      <Icon name="plus" size="14" />添加世界
-    </Button>
-  </div>
+    <div class="shard-editor-grid grid items-start gap-4 lg:grid-cols-2">
+      <div
+        v-for="(s, i) in shards"
+        :key="i"
+        class="shard-card rounded-lg border border-border p-3 transition-opacity"
+        :class="{ 'opacity-60': s.disabled }"
+      >
+        <div class="flex flex-wrap items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger as="span" :as-child="canRename(s)" class="inline-flex min-w-24 flex-1" :tabindex="!canRename(s) ? 0 : undefined">
+              <Input v-model.trim="s.name" class="font-medium disabled:pointer-events-none" :disabled="!canRename(s)" aria-label="世界名" placeholder="世界名" />
+            </TooltipTrigger>
+            <TooltipContent>{{ canRename(s) ? '英文名，不含空格；保存后不可修改' : '存档目录名，保存后不可修改' }}</TooltipContent>
+          </Tooltip>
+          <Select v-model="s.worldType" :disabled="!canRename(s)">
+            <Tooltip>
+              <TooltipTrigger as="span" :as-child="canRename(s)" class="inline-flex w-24 shrink-0" :tabindex="!canRename(s) ? 0 : undefined">
+                <SelectTrigger class="w-full disabled:pointer-events-none" aria-label="世界类型">
+                  <SelectValue :placeholder="typeLabel(s.worldType)" />
+                </SelectTrigger>
+              </TooltipTrigger>
+              <SelectContent position="popper">
+                <SelectGroup>
+                  <SelectItem v-for="t in WORLD_TYPES" :key="t.value" :value="t.value">
+                    {{ t.label }}
+                  </SelectItem>
+                </SelectGroup>
+              </SelectContent>
+              <TooltipContent>{{ canRename(s) ? '决定世界生成预设与可用设置项' : '存档类型' }}</TooltipContent>
+            </Tooltip>
+          </Select>
+          <span v-if="s.isMaster" class="pill pill-info">主世界</span>
+          <div class="ml-auto flex items-center gap-2">
+            <UiSwitch
+              :model-value="!s.disabled"
+              :disabled="s.isMaster"
+              label="启用"
+              @update:model-value="v => (s.disabled = !v)"
+            />
+            <Tooltip v-if="!s.isMaster">
+              <TooltipTrigger as="span" :as-child="!removing" class="inline-flex" :tabindex="removing ? 0 : undefined">
+                <Button type="button" variant="destructive" size="icon-sm" aria-label="从面板移除（存档目录保留）" :disabled="removing" @click="removeShard(i)">
+                  <Icon name="trash" size="14" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>从面板移除（存档目录保留）</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+
+        <div class="mt-3 grid grid-cols-3 gap-2">
+          <label v-for="p in PORTS" :key="p.key" class="flex min-w-0 flex-col gap-1">
+            <span class="text-[11px] text-muted-foreground">{{ p.label }}</span>
+            <Input
+              v-model.number="s[p.key]"
+              class="h-8 text-sm"
+              type="number"
+              min="1024"
+              max="65535"
+              :placeholder="s[p.key] ? '' : '自动分配'"
+            />
+          </label>
+        </div>
+
+        <p class="mt-2 text-xs text-muted-foreground">
+          世界 ID <code>{{ s.gameId || '自动' }}</code>
+          <template v-if="s.isMaster"> · 进服落点，不可停用</template>
+          <template v-else-if="s.disabled">· 已停用，不会启动</template>
+        </p>
+      </div>
+    </div>
+  </section>
 </template>

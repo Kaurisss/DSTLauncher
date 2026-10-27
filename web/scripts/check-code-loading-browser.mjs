@@ -129,7 +129,7 @@ test('配置刷新保留现有 Code Block，加载过程中不切回占位', asy
     assert.equal(await page.getByRole('status', { name: '加载中', exact: true }).count(), 0);
     assert.equal(await page.getByRole('button', { name: '刷新', exact: true }).isDisabled(), true);
     release();
-    await page.waitForFunction(() => [...document.querySelectorAll('[data-slot="card-header"] button')].some(button => button.textContent.trim() === '刷新' && !button.disabled));
+    await page.waitForFunction(() => [...document.querySelectorAll('.ui-toolbar button')].some(button => button.textContent.trim() === '刷新' && !button.disabled));
     assert.deepEqual(state.errors, []);
   } finally { release(); await page.close(); }
 });

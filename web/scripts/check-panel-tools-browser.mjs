@@ -225,7 +225,7 @@ test('快进需确认，取消不请求；主分片未运行时禁用操作', as
   finally { await other.close(); }
 });
 
-test('玩家日志筛选框铺满字段宽度，菜单左对齐且选项留有内边距', async () => {
+test('玩家日志筛选和操作合并为单行，无独立字段标签，菜单左对齐且有内边距', async () => {
   for (const width of [1280, 375]) {
     const { page, close } = await openPanel({ width });
     try {
@@ -236,14 +236,8 @@ test('玩家日志筛选框铺满字段宽度，菜单左对齐且选项留有�
       await panel.getByText('房间2-Surface', { exact: true }).waitFor();
       for (const name of ['记录分片', '记录类型']) {
         const trigger = panel.getByRole('combobox', { name, exact: true });
-        const field = await trigger.evaluate(el => {
-          const box = el.getBoundingClientRect();
-          const parent = el.closest('.field');
-          return { width: box.width, fieldWidth: parent.getBoundingClientRect().width,
-            labelBottom: parent.querySelector('label').getBoundingClientRect().bottom, top: box.top };
-        });
-        assert.ok(Math.abs(field.width - field.fieldWidth) < 1, `${name}应铺满字段宽度`);
-        assert.ok(field.labelBottom <= field.top, `${name}标签应在控件上方`);
+        assert.ok((await trigger.boundingBox()).width >= 100, `${name}仍有足够点击宽度`);
+        assert.equal(await panel.locator(`label[for="${await trigger.getAttribute('id')}"]`).count(), 0, '不再用独立标签占据额外一行');
         const anchor = await trigger.boundingBox();
         await trigger.click();
         const menu = page.getByRole('listbox');

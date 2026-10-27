@@ -151,7 +151,9 @@ test('读取失败可刷新恢复，空列表有明确状态，手机只在表�
     state.items = archives();
     await page.getByRole('button', { name: '刷新', exact: true }).click();
     await rowFor(table, 'Cluster_1').waitFor();
-    const rootPath = page.getByText('D:\\DST 存档\\DST', { exact: true });
+    await page.getByRole('button', { name: '复制存档根目录', exact: true }).hover();
+    const rootPath = page.getByRole('tooltip').getByText('D:\\DST 存档\\DST', { exact: true });
+    await rootPath.waitFor();
     for (const theme of ['light', 'dark']) {
       await page.evaluate(value => document.documentElement.dataset.theme = value, theme);
       assert.equal(await rootPath.evaluate(el => window.getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');

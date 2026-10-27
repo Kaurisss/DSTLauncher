@@ -60,8 +60,11 @@ function date(value) {
 <template>
   <UiCard>
     <template #title>自动维护</template>
+    <template #actions>
+      <Button v-if="draft" type="submit" form="automation-plan-form" size="sm" :disabled="saving || !!snapshot?.running">{{ saving ? '保存中…' : '保存计划' }}</Button>
+    </template>
     <p v-if="error" role="alert" class="mb-4 text-sm text-destructive">{{ error }}</p>
-    <form v-if="draft" class="grid gap-4" @submit.prevent="save">
+    <form v-if="draft" id="automation-plan-form" class="grid gap-4" @submit.prevent="save">
       <fieldset class="grid gap-4 sm:grid-cols-2" :disabled="saving || !!snapshot?.running">
         <UiField label="所有房间备份间隔（小时，0 关闭）" for-id="auto-backup-hours" block>
           <Input id="auto-backup-hours" v-model="draft.backupHours" type="number" min="0" max="720" step="1" required />
@@ -86,7 +89,6 @@ function date(value) {
           </NativeSelect>
         </UiField>
       </fieldset>
-      <div><Button type="submit" :disabled="saving || !!snapshot?.running">{{ saving ? '保存中…' : '保存计划' }}</Button></div>
     </form>
     <p v-else-if="!error" role="status">读取计划中…</p>
     <div v-if="snapshot" class="mt-4 grid gap-3 text-sm" aria-label="维护执行状态">

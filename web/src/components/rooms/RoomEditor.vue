@@ -9,13 +9,16 @@ import { computed, reactive, ref } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
 import UiField from '@/components/ui/UiField.vue';
-import UiSwitch from '@/components/ui/UiSwitch.vue';
+import UiToolbar from '@/components/ui/UiToolbar.vue';
+import { Separator } from '@/components/ui/separator';
+import { Switch } from '@/components/ui/switch';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import Icon from '@/components/ui/Icon.vue';
 import ShardEditor from '@/components/rooms/ShardEditor.vue';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
@@ -101,6 +104,24 @@ const gameModes = computed(() => (props.meta && props.meta.gameModes) || Object.
 const tickRates = computed(() => (props.meta && props.meta.tickRates) || [15, 30, 60]);
 const languages = computed(() => (props.meta && props.meta.languages) || Object.keys(LANGUAGE_LABEL));
 
+const behaviorFlags = [
+  { key: 'pvp', label: 'PVP' },
+  { key: 'pauseEmpty', label: '无人时暂停' },
+  { key: 'voteEnabled', label: '投票' },
+  { key: 'voteKick', label: '投票踢人' },
+  { key: 'lanOnly', label: '仅局域网' },
+  { key: 'offline', label: '离线模式' },
+];
+
+async function pasteToken() {
+  if (!window.navigator.clipboard?.readText) {
+    toast('当前连接不支持读取剪贴板，请直接粘贴到令牌输入框', 'warn');
+    return;
+  }
+  const { ok, data } = await guard(() => window.navigator.clipboard.readText());
+  if (ok) form.token = data.trim();
+}
+
 /** 数字框清空后会是空字符串，必须转成后端能接的整数。 */
 function toNum(value, fallback) {
   const n = Number(value);
@@ -167,147 +188,114 @@ async function save() {
 </script>
 
 <template>
-  <UiCard class="room-editor">
-    <template #title>{{ isNew ? '新建房间' : '编辑房间 · ' + form.name }}</template>
-    <template v-if="!isNew" #hint>Cluster_{{ form.id }}</template>
-    <template #actions>
-      <Button :disabled="saving" @click="save">
-        <Icon name="check" size="14" />{{ saving ? '保存中…' : '保存' }}
-      </Button>
-      <Button variant="outline" :disabled="saving" @click="emit('close')">取消</Button>
-    </template>
+  <UiCard flush class="room-editor min-w-0">
+    <UiToolbar aria-label="房间编辑工具栏">
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <Button variant="ghost" size="icon-sm" aria-label="返回房间列表" :disabled="saving" @click="emit('close')">
+            <Icon name="chevron" class="rotate-180" size="16" />
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>返回房间列表</TooltipContent>
+      </Tooltip>
+      <Separator orientation="vertical" class="h-4 data-[orientation=vertical]:self-center" />
+      <h2 class="truncate text-sm font-semibold">{{ isNew ? '新建房间' : '编辑房间 · ' + form.name }}</h2>
+      <Badge v-if="!isNew" variant="secondary" class="hidden shrink-0 font-mono text-[10px] lg:inline-flex">{{ room.key || 'Cluster_' + form.id }}</Badge>
+      <template #actions>
+        <Button variant="outline" size="sm" :disabled="saving" @click="emit('close')">取消</Button>
+        <Button size="sm" :disabled="saving" @click="save"><Icon name="check" size="14" />{{ saving ? '保存中…' : '保存' }}</Button>
+      </template>
+    </UiToolbar>
 
-    <Alert v-if="saveError" variant="destructive" class="mb-4">
-      <AlertTitle>保存失败</AlertTitle>
-      <AlertDescription>{{ saveError }}</AlertDescription>
-    </Alert>
+    <div class="room-form grid gap-5 p-4 pt-2 sm:px-6 sm:pb-6">
+      <Alert v-if="saveError" variant="destructive">
+        <AlertTitle>保存失败</AlertTitle>
+        <AlertDescription>{{ saveError }}</AlertDescription>
+      </Alert>
 
-    <section class="form-section">
-      <h3>基本信息</h3>
-      <div class="form-grid">
-        <UiField label="房间名" for-id="f_name">
-          <Input id="f_name" v-model="form.name" type="text" placeholder="显示在服务器列表里的名字" />
-        </UiField>
-        <UiField label="描述" for-id="f_description">
-          <Input id="f_description" v-model="form.description" type="text" placeholder="一句话介绍" />
-        </UiField>
-        <UiField label="游戏模式" for-id="f_gameMode">
-          <Select v-model="form.gameMode">
-            <SelectTrigger id="f_gameMode">
-              <SelectValue :placeholder="GAME_MODE_LABEL[form.gameMode] || form.gameMode" />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              <SelectGroup>
-                <SelectItem v-for="m in gameModes" :key="m" :value="m">
-                  {{ GAME_MODE_LABEL[m] || m }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </UiField>
-        <UiField label="最大人数" for-id="f_maxPlayers">
-          <Input id="f_maxPlayers" v-model.number="form.maxPlayers" type="number" min="1" max="64" />
-        </UiField>
-        <UiField label="tick 频率" for-id="f_tickRate">
-          <Select :model-value="String(form.tickRate)" @update:model-value="(v) => form.tickRate = Number(v)">
-            <SelectTrigger id="f_tickRate">
-              <SelectValue :placeholder="TICK_RATE_LABEL[form.tickRate] || String(form.tickRate)" />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              <SelectGroup>
-                <SelectItem v-for="t in tickRates" :key="t" :value="String(t)">
-                  {{ TICK_RATE_LABEL[t] || t }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </UiField>
-        <UiField label="语言" for-id="f_language">
-          <Select v-model="form.language">
-            <SelectTrigger id="f_language">
-              <SelectValue :placeholder="LANGUAGE_LABEL[form.language] || form.language" />
-            </SelectTrigger>
-            <SelectContent position="popper">
-              <SelectGroup>
-                <SelectItem v-for="l in languages" :key="l" :value="l">
-                  {{ LANGUAGE_LABEL[l] || l }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </UiField>
-        <UiField label="房间密码" for-id="f_password">
-          <Input id="f_password" v-model="form.password" type="text" placeholder="留空表示无密码" />
-        </UiField>
-        <UiField label="回档点数" for-id="f_maxSnapshots">
-          <Input id="f_maxSnapshots" v-model.number="form.maxSnapshots" type="number" min="1" max="100" />
-        </UiField>
-      </div>
-    </section>
+      <section class="grid gap-4" aria-label="基本信息">
+        <h3 class="text-xs font-semibold text-muted-foreground">基本信息</h3>
+        <div class="room-core-grid grid gap-4 md:grid-cols-12">
+          <UiField label="房间名" for-id="f_name" block class="min-w-0 md:col-span-4">
+            <Input id="f_name" v-model="form.name" type="text" placeholder="显示在服务器列表里的名字" />
+          </UiField>
+          <UiField label="描述" for-id="f_description" block class="min-w-0 md:col-span-5">
+            <Input id="f_description" v-model="form.description" type="text" placeholder="一句话介绍" />
+          </UiField>
+          <UiField label="房间密码" for-id="f_password" block class="min-w-0 md:col-span-3">
+            <Input id="f_password" v-model="form.password" type="text" placeholder="留空表示无密码" />
+          </UiField>
+        </div>
+        <div class="room-rules-grid grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <UiField label="游戏模式" for-id="f_gameMode" block class="min-w-0">
+            <Select v-model="form.gameMode">
+              <SelectTrigger id="f_gameMode" class="w-full"><SelectValue :placeholder="GAME_MODE_LABEL[form.gameMode] || form.gameMode" /></SelectTrigger>
+              <SelectContent position="popper" align="start">
+                <SelectGroup><SelectItem v-for="m in gameModes" :key="m" :value="m">{{ GAME_MODE_LABEL[m] || m }}</SelectItem></SelectGroup>
+              </SelectContent>
+            </Select>
+          </UiField>
+          <UiField label="最大人数" for-id="f_maxPlayers" block class="min-w-0">
+            <Input id="f_maxPlayers" v-model.number="form.maxPlayers" type="number" min="1" max="64" />
+          </UiField>
+          <UiField label="语言" for-id="f_language" block class="min-w-0">
+            <Select v-model="form.language">
+              <SelectTrigger id="f_language" class="w-full"><SelectValue :placeholder="LANGUAGE_LABEL[form.language] || form.language" /></SelectTrigger>
+              <SelectContent position="popper" align="start">
+                <SelectGroup><SelectItem v-for="l in languages" :key="l" :value="l">{{ LANGUAGE_LABEL[l] || l }}</SelectItem></SelectGroup>
+              </SelectContent>
+            </Select>
+          </UiField>
+          <UiField label="回档快照上限" for-id="f_maxSnapshots" block class="min-w-0">
+            <Input id="f_maxSnapshots" v-model.number="form.maxSnapshots" type="number" min="1" max="100" />
+          </UiField>
+        </div>
+      </section>
 
-    <section class="form-section">
-      <h3>Klei 服务器令牌</h3>
-      <UiField
-        for-id="f_token"
-        block
-        tip="在线开服必需，会写入存档目录下的 cluster_token.txt；勾选「仅局域网」或「离线模式」后可以留空。"
-      >
-        <Textarea
-          id="f_token"
-          v-model="form.token"
-          rows="2"
-          spellcheck="false"
-          placeholder="pds-g^... 从 Klei 账号页复制"
-        />
+      <UiField label="Klei 服务器令牌" for-id="f_token" block :hint="form.lanOnly || form.offline ? '局域网或离线模式可留空' : '在线开服必需 · 写入 cluster_token.txt'">
+        <div class="flex min-w-0 items-center gap-1 rounded-lg border border-input pr-1 focus-within:ring-1 focus-within:ring-ring">
+          <Input id="f_token" v-model="form.token" type="password" autocomplete="off" spellcheck="false" class="min-w-0 flex-1 border-0 bg-transparent font-mono shadow-none focus-visible:ring-0" placeholder="pds-g^..." />
+          <Button type="button" variant="ghost" size="sm" :disabled="saving" @click="pasteToken">粘贴</Button>
+          <Button as="a" href="https://accounts.klei.com/account/game/servers?game=DontStarveTogether" target="_blank" rel="noopener noreferrer" variant="ghost" size="sm" class="text-muted-foreground" aria-label="前往 Klei 获取令牌（新标签页）">
+            <span class="hidden sm:inline">前往 Klei 获取令牌</span><span class="sm:hidden">Klei 令牌</span><span aria-hidden="true">↗</span>
+          </Button>
+        </div>
       </UiField>
-    </section>
 
-    <section class="form-section">
-      <h3>行为开关</h3>
-      <div class="switches">
-        <UiSwitch v-model="form.pvp" label="PVP" />
-        <UiSwitch v-model="form.pauseEmpty" label="无人时暂停" />
-        <UiSwitch v-model="form.voteEnabled" label="投票" />
-        <UiSwitch v-model="form.voteKick" label="投票踢人" />
-        <UiSwitch v-model="form.lanOnly" label="仅局域网" />
-        <UiSwitch v-model="form.offline" label="离线模式" />
-      </div>
-    </section>
+      <section class="grid gap-3" aria-label="行为开关">
+        <h3 class="text-xs font-semibold text-muted-foreground">行为开关</h3>
+        <div class="room-switch-grid grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+          <label v-for="flag in behaviorFlags" :key="flag.key" :for="'f_' + flag.key" class="flex cursor-pointer select-none items-center justify-between gap-2 rounded-lg border border-border bg-muted/20 p-3 text-sm has-data-[state=checked]:border-primary/40 has-data-[state=checked]:bg-primary/5">
+            <span>{{ flag.label }}</span>
+            <Switch :id="'f_' + flag.key" v-model="form[flag.key]" :aria-label="flag.label" />
+          </label>
+        </div>
+      </section>
 
-    <section class="form-section">
-      <h3>世界（分片）</h3>
       <ShardEditor v-model:shards="form.shards" :room-is-new="isNew" />
-    </section>
 
-    <details class="form-section details">
-      <summary>高级设置</summary>
-      <div class="form-grid form-grid-top">
-        <UiField label="主分片 IP" for-id="f_masterIp">
-          <Input id="f_masterIp" v-model="form.masterIp" type="text" />
-        </UiField>
-        <UiField label="分片协调端口" for-id="f_masterPort">
-          <Input id="f_masterPort" v-model.number="form.masterPort" type="number" min="1024" max="65535" />
-        </UiField>
-        <UiField
-          label="通信密钥"
-          for-id="f_clusterKey"
-          wide
-          tip="各分片之间的认证密钥，全部启用分片必须一致；改动后需重启全部分片。"
-        >
-          <Input id="f_clusterKey" v-model="form.clusterKey" type="text" />
-        </UiField>
-      </div>
-    </details>
+      <details class="details">
+        <summary>高级设置</summary>
+        <div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <UiField label="tick 频率" for-id="f_tickRate" block class="min-w-0">
+            <Select :model-value="String(form.tickRate)" @update:model-value="v => form.tickRate = Number(v)">
+              <SelectTrigger id="f_tickRate" class="w-full"><SelectValue :placeholder="TICK_RATE_LABEL[form.tickRate] || String(form.tickRate)" /></SelectTrigger>
+              <SelectContent position="popper" align="start">
+                <SelectGroup><SelectItem v-for="t in tickRates" :key="t" :value="String(t)">{{ TICK_RATE_LABEL[t] || t }}</SelectItem></SelectGroup>
+              </SelectContent>
+            </Select>
+          </UiField>
+          <UiField label="主分片 IP" for-id="f_masterIp" block class="min-w-0">
+            <Input id="f_masterIp" v-model="form.masterIp" type="text" />
+          </UiField>
+          <UiField label="分片协调端口" for-id="f_masterPort" block class="min-w-0">
+            <Input id="f_masterPort" v-model.number="form.masterPort" type="number" min="1024" max="65535" />
+          </UiField>
+          <UiField label="通信密钥" for-id="f_clusterKey" block class="min-w-0 sm:col-span-2 lg:col-span-3" hint="启用分片必须一致，改动后需重启全部分片">
+            <Input id="f_clusterKey" v-model="form.clusterKey" type="text" />
+          </UiField>
+        </div>
+      </details>
+    </div>
   </UiCard>
 </template>
-
-<style scoped>
-.room-editor :deep([data-slot="card-header"]) {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--card);
-  border-top-left-radius: inherit;
-  border-top-right-radius: inherit;
-}
-</style>

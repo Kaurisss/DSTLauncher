@@ -12,6 +12,8 @@ import {
   DialogTitle, DialogDescription, DialogClose,
 } from 'reka-ui';
 
+import { HugeiconsIcon } from '@hugeicons/vue';
+import { Search01Icon } from '@hugeicons/core-free-icons';
 import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
@@ -20,6 +22,7 @@ import UiLoading from '@/components/ui/UiLoading.vue';
 import { Button } from '@/components/ui/button';
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton } from '@/components/ui/code-block';
 import { Input } from '@/components/ui/input';
+import { Spinner } from '@/components/ui/spinner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ModItem from '@/components/mods/ModItem.vue';
@@ -146,6 +149,16 @@ const updateMap = computed(() => {
 });
 
 const updatesCount = computed(() => (checkResult.value?.updates || []).length);
+const statusFilters = computed(() => {
+  const missing = mods.value.filter(mod => !mod.installed).length;
+  return [
+    { value: 'all', label: '全部', count: mods.value.length },
+    { value: 'enabled', label: '已启用', count: enabledCount.value },
+    { value: 'disabled', label: '未启用', count: mods.value.length - enabledCount.value },
+    ...(missing || filter.value === 'missing' ? [{ value: 'missing', label: '未下载', count: missing }] : []),
+    ...(updatesCount.value || filter.value === 'updates' ? [{ value: 'updates', label: '可更新', count: updatesCount.value }] : []),
+  ];
+});
 
 async function checkUpdates() {
   const room = rooms.current;
@@ -381,136 +394,117 @@ watch([() => rooms.current, shard], () => {
 
 <template>
   <DialogRoot v-model:open="updateOpen">
-    <UiCard>
-      <template #actions>
-        <Select v-if="rooms.current" v-model="shard" :disabled="configOpen || busyItems.length > 0 || workshopOpen || queueing || pendingIds.length > 0">
-          <SelectTrigger aria-label="模组分片" class="w-full min-w-0 sm:w-52">
-            <SelectValue placeholder="选择分片" />
-          </SelectTrigger>
-          <SelectContent position="popper">
-            <SelectGroup>
-              <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ labelOf(item) }}</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <Button
-          variant="outline" size="sm"
-          :disabled="!rooms.current || updating || checking || queueing"
-          @click="checkUpdates"
-        >
-          <Icon name="refresh" size="14" />{{ checking ? '检查中…' : '检查更新' }}
-        </Button>
-        <Button
-          ref="addModButton"
-          size="sm"
-          :disabled="!rooms.current"
-          aria-haspopup="dialog"
-          @click="workshopOpen = true"
-        >
-          <Icon name="plus" size="14" />添加模组
-        </Button>
-        <Button
-          v-if="updating || output.length || updateError || pollError"
-          ref="updateLogButton"
-          variant="outline" size="sm"
-          aria-haspopup="dialog"
-          :aria-expanded="updateOpen"
-          @click="updateOpen = true"
-        >
-          更新日志
-        </Button>
-        <Tooltip>
-          <TooltipTrigger as="span" :as-child="!loading" class="inline-flex" :tabindex="loading ? 0 : undefined">
-            <Button variant="ghost" size="icon-sm" :disabled="loading" aria-label="刷新" @click="load"><Icon name="refresh" size="16" /></Button>
-          </TooltipTrigger>
-          <TooltipContent>刷新模组列表</TooltipContent>
-        </Tooltip>
-      </template>
-
-      <UiLoading v-if="!rooms.loaded" />
-      <UiEmpty v-else-if="!rooms.current" icon="package" text="请先在「房间」页新建一个房间" />
-      <!-- 骨架屏只给首屏：后台刷新（每 15 秒的房间轮询触发的 load）不能
-         把整个内容区（含创意工坊搜索结果、更新进度块）拆掉重建，
-         否则表现为整页周期性闪烁、搜索结果周期性消失 -->
-      <UiLoading v-else-if="loading && !mods.length" />
-      <UiEmpty v-else-if="loadError" icon="alert" :text="'读取模组失败：' + loadError" />
-
-      <template v-else>
-        <div v-if="frozen" class="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm" role="status">
-          <Icon name="info" size="16" />
-          <span>服务器运行中，模组修改已冻结。</span>
-        </div>
-        <div v-else-if="missingCount" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
-          <Icon name="download" size="16" />
-          <span>{{ missingCount }} 个已启用模组未下载</span>
-          <Button class="ml-auto" variant="outline" size="sm" :disabled="queueing || updating" @click="enqueue(mods.filter(mod => mod.enabled && !mod.installed).map(mod => mod.id))">下载缺失</Button>
-        </div>
-
-        <!-- 检查结果：明确指出是哪个模组旧了，客户端只会笼统提示「有旧版本 mod」 -->
-        <div v-if="checkResult" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3 text-sm" role="status">
-          <span>{{ updatesCount ? `${updatesCount} 个模组有新版本` : '没有可更新的模组' }}</span>
-          <Button v-if="updatesCount" class="ml-auto" size="sm" :disabled="frozen || updating || queueing" @click="updateAll">更新全部</Button>
-        </div>
-        <p
-          v-if="checkResult && (checkResult.missing || []).length"
-          class="field-tip"
-          style="margin-bottom: 14px"
-        >
-          工坊查不到以下模组（可能已下架或 ID 有误）：{{ (checkResult.missing || []).join('、') }}
-        </p>
-
-        <div v-if="updating || updateError || pollError" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3 text-sm" role="status">
-          <Icon :name="updateError || pollError ? 'alert' : 'download'" size="16" />
-          <span class="min-w-0 flex-1 break-words">{{ pollError ? '无法读取更新进度：' + pollError : updateError || progress || '正在下载模组…' }}</span>
-          <span v-if="updating && queuedCount" class="text-muted-foreground">排队 {{ queuedCount }} 个</span>
-          <Button v-if="pollError" variant="outline" size="sm" @click="pollUpdate">重试</Button>
-          <Button variant="outline" size="sm" @click="updateOpen = true">查看进度</Button>
-        </div>
-
-        <p v-if="workshopError" class="field-tip mb-3" role="status">
-          创意工坊信息暂未加载：{{ workshopError }}。当前显示本地名称或 ID，可点击「刷新」重试。
-        </p>
-        <div v-if="mods.length" class="mb-4 flex flex-wrap items-center gap-3">
-          <Input v-model="search" class="min-w-0 flex-1 sm:max-w-sm" aria-label="搜索模组" placeholder="搜索模组名称或 ID" />
-          <Select v-model="filter">
-            <SelectTrigger aria-label="模组状态" class="w-full sm:w-40">
-              <SelectValue />
+    <UiCard flush class="mods-workspace">
+      <div class="mods-toolbar sticky top-0 z-10 flex items-center justify-between gap-3" role="region" aria-label="模组工具栏">
+        <div class="mods-toolbar-left">
+          <Select v-if="rooms.current" v-model="shard" :disabled="configOpen || busyItems.length > 0 || workshopOpen || queueing || pendingIds.length > 0">
+            <SelectTrigger aria-label="模组分片" class="mods-shard">
+              <SelectValue placeholder="选择分片" />
             </SelectTrigger>
-            <SelectContent position="popper">
+            <SelectContent position="popper" align="start">
               <SelectGroup>
-                <SelectItem value="all">全部 {{ mods.length }}</SelectItem>
-                <SelectItem value="enabled">已启用 {{ enabledCount }}</SelectItem>
-                <SelectItem value="disabled">已禁用 {{ mods.length - enabledCount }}</SelectItem>
-                <SelectItem value="missing">未下载 {{ mods.filter(mod => !mod.installed).length }}</SelectItem>
-                <SelectItem value="updates">有更新 {{ updatesCount }}</SelectItem>
+                <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ labelOf(item) }}</SelectItem>
               </SelectGroup>
             </SelectContent>
           </Select>
-          <span class="ml-auto text-sm tabular-nums text-muted-foreground">已启用 {{ enabledCount }} / {{ mods.length }}</span>
+          <div class="mods-search">
+            <HugeiconsIcon :icon="Search01Icon" class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <Input v-model="search" class="w-full pl-8" aria-label="搜索模组" placeholder="搜索模组名称或 ID" />
+          </div>
+          <div class="seg mods-filters" role="group" aria-label="模组状态">
+            <button v-for="item in statusFilters" :key="item.value" type="button" class="seg-btn" :class="{ 'is-active': filter === item.value }" :aria-pressed="filter === item.value" @click="filter = item.value">
+              {{ item.label }} <span class="tabular-nums">({{ item.count }})</span>
+            </button>
+          </div>
         </div>
-        <template v-if="visibleMods.length">
-          <ModItem
-            v-for="m in visibleMods"
-            :key="`${shard}:${m.id}`"
-            :mod="m"
-            :shard="shard"
-            :update-info="updateMap[m.id] || null"
-            :downloading="busyIds.includes(m.id)"
-            :updating="updating || queueing"
-            @changed="load"
-            @update="startOne"
-            @toggled="enabled => onToggled(m.id, enabled)"
-            @cover-needed="loadWorkshopDetails([m])"
-            @config-open="configOpen = $event"
-            @busy="setItemBusy(m.id, $event)"
-          />
+        <div class="mods-toolbar-actions">
+          <Button variant="outline" size="sm" :disabled="!rooms.current || updating || checking || queueing" @click="checkUpdates">
+            <Spinner v-if="checking" aria-hidden="true" />
+            <Icon v-else name="globe" size="14" />{{ checking ? '检查中…' : '检查更新' }}
+          </Button>
+          <Button ref="addModButton" size="sm" :disabled="!rooms.current" aria-haspopup="dialog" @click="workshopOpen = true">
+            <Icon name="plus" size="14" />添加模组
+          </Button>
+          <Button v-if="updating || output.length || updateError || pollError" ref="updateLogButton" variant="outline" size="sm" aria-haspopup="dialog" :aria-expanded="updateOpen" @click="updateOpen = true">
+            更新日志
+          </Button>
+          <div class="inline-flex border-l border-border pl-2">
+            <Tooltip>
+              <TooltipTrigger as="span" :as-child="!(loading || !rooms.current)" class="inline-flex" :tabindex="loading || !rooms.current ? 0 : undefined">
+                <Button variant="ghost" size="icon-sm" class="text-muted-foreground" :disabled="loading || !rooms.current" aria-label="刷新" @click="load"><Icon name="refresh" size="16" /></Button>
+              </TooltipTrigger>
+              <TooltipContent>刷新本地模组列表</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-4 sm:p-6">
+        <UiLoading v-if="!rooms.loaded" />
+        <UiEmpty v-else-if="!rooms.current" icon="package" text="请先在「房间」页新建一个房间" />
+        <!-- 刷新保留列表，避免拆掉创意工坊窗口和更新进度。 -->
+        <UiLoading v-else-if="loading && !mods.length" />
+        <UiEmpty v-else-if="loadError" icon="alert" :text="'读取模组失败：' + loadError" />
+
+        <template v-else>
+          <div v-if="frozen" class="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm" role="status">
+            <Icon name="info" size="16" />
+            <span>服务器运行中，模组修改已冻结。</span>
+          </div>
+          <div v-else-if="missingCount" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
+            <Icon name="download" size="16" />
+            <span>{{ missingCount }} 个已启用模组未下载</span>
+            <Button class="ml-auto" variant="outline" size="sm" :disabled="queueing || updating" @click="enqueue(mods.filter(mod => mod.enabled && !mod.installed).map(mod => mod.id))">下载缺失</Button>
+          </div>
+
+          <!-- 检查结果：明确指出是哪个模组旧了，客户端只会笼统提示「有旧版本 mod」 -->
+          <div v-if="checkResult" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3 text-sm" role="status">
+            <span>{{ updatesCount ? `${updatesCount} 个模组有新版本` : '没有可更新的模组' }}</span>
+            <Button v-if="updatesCount" class="ml-auto" size="sm" :disabled="frozen || updating || queueing" @click="updateAll">更新全部</Button>
+          </div>
+          <p
+            v-if="checkResult && (checkResult.missing || []).length"
+            class="field-tip"
+            style="margin-bottom: 14px"
+          >
+            工坊查不到以下模组（可能已下架或 ID 有误）：{{ (checkResult.missing || []).join('、') }}
+          </p>
+
+          <div v-if="updating || updateError || pollError" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3 text-sm" role="status">
+            <Icon :name="updateError || pollError ? 'alert' : 'download'" size="16" />
+            <span class="min-w-0 flex-1 break-words">{{ pollError ? '无法读取更新进度：' + pollError : updateError || progress || '正在下载模组…' }}</span>
+            <span v-if="updating && queuedCount" class="text-muted-foreground">排队 {{ queuedCount }} 个</span>
+            <Button v-if="pollError" variant="outline" size="sm" @click="pollUpdate">重试</Button>
+            <Button variant="outline" size="sm" @click="updateOpen = true">查看进度</Button>
+          </div>
+
+          <p v-if="workshopError" class="field-tip mb-3" role="status">
+            创意工坊信息暂未加载：{{ workshopError }}。当前显示本地名称或 ID，可点击「刷新」重试。
+          </p>
+          <template v-if="visibleMods.length">
+            <ModItem
+              v-for="m in visibleMods"
+              :key="`${shard}:${m.id}`"
+              :mod="m"
+              :shard="shard"
+              :update-info="updateMap[m.id] || null"
+              :downloading="busyIds.includes(m.id)"
+              :updating="updating || queueing"
+              @changed="load"
+              @update="startOne"
+              @toggled="enabled => onToggled(m.id, enabled)"
+              @cover-needed="loadWorkshopDetails([m])"
+              @config-open="configOpen = $event"
+              @busy="setItemBusy(m.id, $event)"
+            />
+          </template>
+          <div v-else class="grid justify-items-center gap-3 rounded-lg border border-dashed p-10">
+            <UiEmpty icon="package" :text="mods.length ? '没有匹配的模组' : '还没有模组'" />
+            <Button v-if="mods.length" variant="outline" size="sm" @click="search = ''; filter = 'all'">清除筛选</Button>
+            <Button v-else size="sm" @click="workshopOpen = true">添加模组</Button>
+          </div>
         </template>
-        <div v-else class="grid justify-items-center gap-3 rounded-lg border border-dashed p-10">
-          <UiEmpty icon="package" :text="mods.length ? '没有匹配的模组' : '还没有模组'" />
-          <Button v-if="mods.length" variant="outline" size="sm" @click="search = ''; filter = 'all'">清除筛选</Button>
-          <Button v-else size="sm" @click="workshopOpen = true">添加模组</Button>
-        </div>
-      </template>
+      </div>
     </UiCard>
 
     <WorkshopPanel
@@ -548,6 +542,20 @@ watch([() => rooms.current, shard], () => {
 </template>
 
 <style scoped>
+.mods-workspace { min-width: 0; container-type: inline-size; }
+.mods-toolbar { padding: 12px 16px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--card); }
+.mods-toolbar-left { display: flex; flex: 1; align-items: center; gap: 12px; min-width: 0; }
+.mods-shard { width: 152px; min-width: 0; flex-shrink: 0; }
+.mods-search { position: relative; flex: 1; min-width: 96px; max-width: 256px; }
+.mods-filters { flex-shrink: 0; max-width: 100%; overflow-x: auto; border-radius: 9999px; }
+.mods-filters .seg-btn { flex-shrink: 0; padding: 4px 8px; border-radius: 9999px; white-space: nowrap; font-size: 12px; }
+.mods-toolbar-actions { display: flex; flex-shrink: 0; align-items: center; gap: 8px; margin-left: auto; }
+@container (max-width: 820px) {
+  .mods-toolbar { flex-wrap: wrap; padding: 12px; }
+  .mods-toolbar-left { flex-basis: 100%; flex-wrap: wrap; gap: 8px; }
+  .mods-search { max-width: none; }
+  .mods-toolbar-actions { flex-wrap: wrap; justify-content: flex-end; }
+}
 .mod-update-dialog {
   position: fixed;
   top: 50%;

@@ -2,6 +2,8 @@
 import { computed, nextTick, onMounted, ref } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
+import UiToolbar from '@/components/ui/UiToolbar.vue';
+import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/Icon.vue';
 import { Button } from '@/components/ui/button';
 import RoomGrid from '@/components/rooms/RoomGrid.vue';
@@ -15,7 +17,6 @@ import { confirmAction } from '@/lib/confirm.js';
 
 const rooms = useRoomsStore();
 const editor = ref({ open: false, roomId: null, key: 0 });
-const editorRef = ref(null);
 const preparing = ref(false);
 const uploader = ref({ open: false, roomId: null, key: 0 });
 const deleting = ref(false);
@@ -89,16 +90,8 @@ async function onRemove(id) {
 <template>
   <div class="stack">
     <template v-if="editor.open">
-      <nav aria-label="房间导航" class="flex min-w-0 items-center gap-2 text-sm">
-        <Button variant="ghost" size="sm" :disabled="editorRef?.saving" @click="closeEditor">
-          <Icon name="chevron" class="rotate-180" size="16" />返回房间列表
-        </Button>
-        <span aria-hidden="true" class="text-muted-foreground">/</span>
-        <span aria-current="page">{{ editor.roomId ? '编辑房间' : '新建房间' }}</span>
-      </nav>
       <RoomEditor
         v-if="!editor.roomId || editingRoom"
-        ref="editorRef"
         :key="editor.key"
         :room="editingRoom"
         :meta="rooms.meta"
@@ -107,31 +100,37 @@ async function onRemove(id) {
       />
       <UiCard v-else>
         <template #title>房间已不存在</template>
+        <template #actions><Button variant="outline" size="sm" @click="closeEditor">返回房间列表</Button></template>
       </UiCard>
       <RoomAdmins v-if="editingRoom" :key="editingRoom.id" :room="editingRoom" />
       <RoomPlayerLists v-if="editingRoom" :key="`lists-${editingRoom.id}`" :room="editingRoom" />
     </template>
 
-    <UiCard v-else>
-      <template #actions>
-        <Button id="new-room-button" size="sm" :disabled="preparing" @click="openEditor()">
-          <Icon name="plus" size="14" />新建房间
-        </Button>
-        <Button variant="outline" size="sm" @click="openUpload()">
-          <Icon name="upload" size="14" />上传存档
-        </Button>
-        <Button variant="outline" size="sm" @click="reload">
-          <Icon name="refresh" size="14" />刷新
-        </Button>
-      </template>
-      <RoomGrid
-        :rooms="rooms.list"
-        :current-id="rooms.currentId"
-        @select="onSelect"
-        @edit="openEditor"
-        @remove="onRemove"
-        @upload="openUpload"
-      />
+    <UiCard v-else flush>
+      <UiToolbar aria-label="房间工具栏" leading-class="flex-none">
+        <Badge variant="secondary" class="whitespace-nowrap tabular-nums">共 {{ rooms.list.length }} 个房间</Badge>
+        <template #actions>
+          <Button id="new-room-button" size="sm" :disabled="preparing" @click="openEditor()">
+            <Icon name="plus" size="14" />新建房间
+          </Button>
+          <Button variant="outline" size="sm" @click="openUpload()">
+            <Icon name="upload" size="14" />上传存档
+          </Button>
+          <Button variant="outline" size="sm" @click="reload">
+            <Icon name="refresh" size="14" />刷新
+          </Button>
+        </template>
+      </UiToolbar>
+      <div class="p-4 pt-1 sm:px-6 sm:pb-6">
+        <RoomGrid
+          :rooms="rooms.list"
+          :current-id="rooms.currentId"
+          @select="onSelect"
+          @edit="openEditor"
+          @remove="onRemove"
+          @upload="openUpload"
+        />
+      </div>
     </UiCard>
 
     <SaveUploadPanel

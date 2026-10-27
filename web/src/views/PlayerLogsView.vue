@@ -5,7 +5,7 @@ import { ArrowLeft01Icon, ArrowRight01Icon, Copy01Icon, RefreshIcon } from '@hug
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
-import UiField from '@/components/ui/UiField.vue';
+import UiToolbar from '@/components/ui/UiToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -189,55 +189,45 @@ async function blockPlayer(entry) {
 </script>
 
 <template>
-  <UiCard role="region" aria-label="聊天与进出记录" class="min-w-0" :aria-busy="loading">
-    <template #actions>
-      <div class="flex items-center gap-2 text-xs text-muted-foreground">
-        <Switch id="player-log-refresh" v-model="autoRefresh" aria-label="自动刷新玩家日志" />
-        <label for="player-log-refresh" class="cursor-pointer">自动刷新</label>
-      </div>
-      <Button variant="outline" size="sm" :disabled="loading || !rooms.currentId || !shard" @click="refresh">
-        <HugeiconsIcon :icon="RefreshIcon" :class="loading ? 'animate-spin motion-reduce:animate-none' : ''" aria-hidden="true" />
-        刷新记录
-      </Button>
-    </template>
-
-    <div class="min-w-0 space-y-4">
-      <form class="grid gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,2fr)_auto] lg:items-end" @submit.prevent="refresh">
-        <UiField label="记录分片" for-id="chat_shard" block class="min-w-0">
-          <Select v-model="shard" :disabled="!shards.length">
-            <SelectTrigger id="chat_shard" class="w-full min-w-0 bg-background"><SelectValue placeholder="选择分片" /></SelectTrigger>
-            <SelectContent position="popper" align="start">
-              <SelectGroup>
-                <SelectItem v-for="item in shards" :key="item.name" :value="item.name">
-                  {{ roomShardLabel(rooms.current, item) }}{{ item.disabled ? '（停用）' : '' }}
-                </SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </UiField>
-        <UiField label="记录类型" for-id="chat_kind" block class="min-w-0">
-          <Select v-model="kind">
-            <SelectTrigger id="chat_kind" class="w-full min-w-0 bg-background"><SelectValue /></SelectTrigger>
-            <SelectContent position="popper" align="start">
-              <SelectGroup>
-                <SelectItem v-for="(label, key) in labels" :key="key" :value="key">{{ label }}</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-        </UiField>
-        <UiField label="搜索历史记录" for-id="chat_search" block class="min-w-0">
-          <Input id="chat_search" v-model="search" class="bg-background" placeholder="昵称、ID、IP、角色或内容" maxlength="200" />
-        </UiField>
-        <Button type="button" variant="outline" :disabled="kind === 'all' && !search" @click="resetFilters">重置筛选</Button>
+  <UiCard flush role="region" aria-label="聊天与进出记录" class="min-w-0" :aria-busy="loading">
+    <UiToolbar aria-label="玩家日志工具栏" leading-class="min-w-full xl:min-w-0">
+      <form class="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:flex-nowrap" @submit.prevent="refresh">
+        <Select v-model="shard" :disabled="!shards.length">
+          <SelectTrigger id="chat_shard" aria-label="记录分片" class="w-32 min-w-0 shrink-0 bg-background"><SelectValue placeholder="选择分片" /></SelectTrigger>
+          <SelectContent position="popper" align="start">
+            <SelectGroup>
+              <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ roomShardLabel(rooms.current, item) }}{{ item.disabled ? '（停用）' : '' }}</SelectItem>
+            </SelectGroup>
+          </SelectContent>
+        </Select>
+        <Select v-model="kind">
+          <SelectTrigger id="chat_kind" aria-label="记录类型" class="w-28 min-w-0 shrink-0 bg-background"><SelectValue /></SelectTrigger>
+          <SelectContent position="popper" align="start">
+            <SelectGroup><SelectItem v-for="(label, key) in labels" :key="key" :value="key">{{ label }}</SelectItem></SelectGroup>
+          </SelectContent>
+        </Select>
+        <Input id="chat_search" v-model="search" aria-label="搜索历史记录" class="min-w-24 max-w-80 flex-1 bg-background" placeholder="昵称、ID、IP、角色或内容" maxlength="200" />
+        <Button type="button" variant="ghost" size="sm" :disabled="kind === 'all' && !search" @click="resetFilters">重置筛选</Button>
       </form>
+      <template #actions>
+        <Button :variant="selected.size ? 'destructive' : 'ghost'" size="sm" :disabled="!selected.size || deleting || !!blocking || loading" @click="removeEntries([...selected])">删除所选（{{ selected.size }}）</Button>
+        <div class="flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+          <Switch id="player-log-refresh" v-model="autoRefresh" aria-label="自动刷新玩家日志" />
+          <label for="player-log-refresh" class="cursor-pointer">自动刷新</label>
+        </div>
+        <Button variant="outline" size="sm" :disabled="loading || !rooms.currentId || !shard" @click="refresh">
+          <HugeiconsIcon :icon="RefreshIcon" :class="loading ? 'animate-spin motion-reduce:animate-none' : ''" aria-hidden="true" />刷新记录
+        </Button>
+      </template>
+    </UiToolbar>
 
+    <div class="min-w-0 space-y-4 p-4 pt-1 sm:px-6 sm:pb-6">
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">读取失败：{{ error }}</p>
       <UiLoading v-else-if="loading && !result" />
       <UiEmpty v-else-if="!rooms.current" icon="users" text="请先选择房间" />
       <UiEmpty v-else-if="!result?.exists" icon="inbox" text="该分片还没有聊天日志，开服并产生聊天或进出记录后显示" />
       <UiEmpty v-else-if="!entries.length" icon="inbox" text="历史日志中没有匹配的记录" />
       <template v-else>
-        <Button variant="destructive" size="sm" :disabled="!selected.size || deleting || !!blocking || loading" @click="removeEntries([...selected])">删除所选（{{ selected.size }}）</Button>
         <div class="min-w-0 overflow-hidden rounded-lg border">
           <Table class="min-w-[1760px] table-fixed" role="region" aria-label="日志表格，可横向滚动" tabindex="0">
             <caption class="sr-only">游戏聊天记录</caption>

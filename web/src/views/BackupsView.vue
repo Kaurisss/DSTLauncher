@@ -1,9 +1,12 @@
 <script setup>
 // 备份页：整房间备份、回滚、删除。
 
-import { onMounted, ref, watch } from 'vue';
+import { computed, onMounted, ref, watch } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
+import UiToolbar from '@/components/ui/UiToolbar.vue';
+import { Badge } from '@/components/ui/badge';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
 import { Button } from '@/components/ui/button';
@@ -19,6 +22,7 @@ const rooms = useRoomsStore();
 const items = ref([]);
 const loading = ref(false);
 const loadError = ref('');
+const backupDir = computed(() => (items.value[0]?.path || '').replace(/[\\/][^\\/]+$/, ''));
 
 async function load() {
   const room = rooms.current;
@@ -85,19 +89,26 @@ function exportSave(name) {
 </script>
 
 <template>
-  <UiCard>
-    <template #actions>
-      <RollbackDialog />
-      <Button size="sm" :disabled="!rooms.current" @click="create">
-        立即备份
-      </Button>
-    </template>
+  <UiCard flush>
+    <UiToolbar aria-label="备份工具栏">
+      <Badge variant="secondary" class="shrink-0 whitespace-nowrap tabular-nums">共 {{ items.length }} 个备份</Badge>
+      <Tooltip v-if="backupDir">
+        <TooltipTrigger as-child><code class="min-w-0 truncate bg-transparent p-0 text-xs text-muted-foreground" tabindex="0" aria-label="备份目录">{{ backupDir }}</code></TooltipTrigger>
+        <TooltipContent class="max-w-sm break-all">{{ backupDir }}</TooltipContent>
+      </Tooltip>
+      <template #actions>
+        <RollbackDialog />
+        <Button size="sm" :disabled="!rooms.current" @click="create">立即备份</Button>
+      </template>
+    </UiToolbar>
 
-    <UiLoading v-if="!rooms.loaded" />
-    <UiEmpty v-else-if="!rooms.current" icon="archive" text="请先在「房间」页新建一个房间" />
-    <UiLoading v-else-if="loading && !items.length" />
-    <UiEmpty v-else-if="loadError" icon="alert" :text="'读取备份失败：' + loadError" />
-    <UiEmpty v-else-if="!items.length" icon="archive" text="暂无备份" />
-    <BackupTable v-else :items="items" @restore="restore" @remove="remove" @export="exportSave" />
+    <div class="p-4 pt-1 sm:px-6 sm:pb-6">
+      <UiLoading v-if="!rooms.loaded" />
+      <UiEmpty v-else-if="!rooms.current" icon="archive" text="请先在「房间」页新建一个房间" />
+      <UiLoading v-else-if="loading && !items.length" />
+      <UiEmpty v-else-if="loadError" icon="alert" :text="'读取备份失败：' + loadError" />
+      <UiEmpty v-else-if="!items.length" icon="archive" text="暂无备份" />
+      <BackupTable v-else :items="items" @restore="restore" @remove="remove" @export="exportSave" />
+    </div>
   </UiCard>
 </template>

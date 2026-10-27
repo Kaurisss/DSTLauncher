@@ -68,8 +68,9 @@ async function saveApiKey() {
         <UiPill :tone="auth.enabled ? 'ok' : ''">
           {{ auth.envManaged ? '启动参数锁定' : (auth.enabled ? '已启用' : '未启用') }}
         </UiPill>
-        <Button v-if="auth.enabled" variant="destructive" size="sm" @click="logout">
-          退出登录
+        <Button v-if="auth.enabled" variant="destructive" size="sm" @click="logout">退出登录</Button>
+        <Button v-if="!auth.envManaged" type="submit" form="settings-password-form" size="sm" :disabled="savingPwd || (!auth.enabled && !newPwd.trim()) || (auth.enabled && !currentPwd)">
+          {{ savingPwd ? '保存中…' : '保存密码' }}
         </Button>
       </template>
 
@@ -77,7 +78,7 @@ async function saveApiKey() {
         当前密码由启动参数（<code>-password</code>）或环境变量（<code>DST_PANEL_PASSWORD</code>）指定。
       </p>
 
-      <form v-else class="grid max-w-md gap-4" @submit.prevent="savePassword">
+      <form v-else id="settings-password-form" class="grid max-w-md gap-4" @submit.prevent="savePassword">
         <UiField v-if="auth.enabled" label="当前密码" for-id="set-cur-pwd" block>
           <Input
             id="set-cur-pwd"
@@ -96,15 +97,6 @@ async function saveApiKey() {
             :placeholder="auth.enabled ? '至少 4 个字符；留空保存则关闭密码' : '至少 4 个字符'"
           />
         </UiField>
-        <div class="flex items-center gap-2">
-          <Button
-            type="submit"
-            size="sm"
-            :disabled="savingPwd || (!auth.enabled && !newPwd.trim()) || (auth.enabled && !currentPwd)"
-          >
-            {{ savingPwd ? '保存中…' : '保存密码' }}
-          </Button>
-        </div>
       </form>
     </UiCard>
 
@@ -117,11 +109,12 @@ async function saveApiKey() {
           rel="noopener noreferrer"
           class="text-xs text-primary hover:underline"
         >
-          申请 Steam Web API Key
+          申请 Key
         </a>
+        <Button type="submit" form="settings-api-key-form" size="sm" :disabled="savingKey">{{ savingKey ? '保存中…' : '保存 Key' }}</Button>
       </template>
 
-      <form class="grid max-w-md gap-4" @submit.prevent="saveApiKey">
+      <form id="settings-api-key-form" class="grid max-w-md gap-4" @submit.prevent="saveApiKey">
         <UiField label="Steam Web API Key" for-id="set-steam-key" block>
           <Input
             id="set-steam-key"
@@ -131,11 +124,6 @@ async function saveApiKey() {
             placeholder="用于创意工坊关键词搜索；按 ID 查询与下载无需配置"
           />
         </UiField>
-        <div class="flex items-center gap-2">
-          <Button type="submit" size="sm" :disabled="savingKey">
-            {{ savingKey ? '保存中…' : '保存 Key' }}
-          </Button>
-        </div>
       </form>
     </UiCard>
 

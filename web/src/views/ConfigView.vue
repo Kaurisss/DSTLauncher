@@ -16,6 +16,8 @@ const cache = new Map();
 import { onMounted, ref, watch } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
+import UiToolbar from '@/components/ui/UiToolbar.vue';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
 import { Button } from '@/components/ui/button';
@@ -70,20 +72,27 @@ watch(() => rooms.current, load);
 </script>
 
 <template>
-  <UiCard>
-    <template #actions>
-      <Button variant="outline" size="sm" :disabled="loading" @click="load"><Spinner v-if="loading && files.length" aria-hidden="true" />刷新</Button>
-    </template>
+  <UiCard flush>
+    <UiToolbar aria-label="配置预览工具栏">
+      <Tooltip v-if="clusterDir">
+        <TooltipTrigger as-child>
+          <p class="flex min-w-0 items-center gap-1 text-xs text-muted-foreground" tabindex="0"><span class="shrink-0">存档目录：</span><code class="truncate bg-transparent p-0">{{ clusterDir }}</code></p>
+        </TooltipTrigger>
+        <TooltipContent class="max-w-sm break-all">{{ clusterDir }}</TooltipContent>
+      </Tooltip>
+      <span v-else class="text-sm text-muted-foreground">存档目录</span>
+      <template #actions>
+        <Button variant="outline" size="sm" :disabled="loading || !rooms.current" @click="load"><Spinner v-if="loading && files.length" aria-hidden="true" />刷新</Button>
+      </template>
+    </UiToolbar>
 
-    <p v-if="clusterDir" class="field-tip" style="margin-bottom: 14px">
-      存档目录：{{ clusterDir }}
-    </p>
-
-    <UiLoading v-if="!rooms.loaded" />
-    <UiEmpty v-else-if="!rooms.current" icon="fileCode" text="请先在「房间」页新建一个房间" />
-    <UiLoading v-else-if="loading && !files.length" />
-    <UiEmpty v-else-if="loadError" icon="alert" :text="'读取失败：' + loadError" />
-    <UiEmpty v-else-if="!files.length" icon="fileCode" text="尚未生成配置文件" />
-    <ConfigFiles v-else :files="files" />
+    <div class="p-4 pt-1 sm:px-6 sm:pb-6">
+      <UiLoading v-if="!rooms.loaded" />
+      <UiEmpty v-else-if="!rooms.current" icon="fileCode" text="请先在「房间」页新建一个房间" />
+      <UiLoading v-else-if="loading && !files.length" />
+      <UiEmpty v-else-if="loadError" icon="alert" :text="'读取失败：' + loadError" />
+      <UiEmpty v-else-if="!files.length" icon="fileCode" text="尚未生成配置文件" />
+      <ConfigFiles v-else :files="files" />
+    </div>
   </UiCard>
 </template>

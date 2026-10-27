@@ -34,7 +34,7 @@ const details = [
 ];
 
 async function openMods({
-  failDetails = false, running = false, delayDetails = false, delayMods = false, width = 1280,
+  failDetails = false, running = false, delayDetails = false, delayMods = false, width = 1280, dark = false,
   schema = [], config = {}, ugcDir = '', serverLocked = false,
   modItems = mods, brokenIcons = [],
   shardItems = [{ name: 'Master', worldType: 'forest', isMaster: true }],
@@ -44,10 +44,11 @@ async function openMods({
 } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
   page.setDefaultTimeout(10000);
-  await page.addInitScript(() => {
+  await page.addInitScript(dark => {
     localStorage.setItem('dst-tab', 'mods');
     localStorage.setItem('dst-room', '2');
-  });
+    localStorage.setItem('dst-theme', dark ? 'dark' : 'light');
+  }, dark);
   let releaseDetails;
   let releaseMods;
   let releaseToggle;
@@ -324,7 +325,7 @@ test('保存配置后条目离开禁用筛选时释放分片选择锁', async ()
     schema: [{ name: 'amount', label: '分片数量', type: 'number', default: 1 }],
   });
   try {
-    await chooseSelect(page, '模组状态', /已禁用/);
+    await page.getByRole('group', { name: '模组状态', exact: true }).getByRole('button', { name: /^未启用/ }).click();
     await page.getByRole('button', { name: '配置', exact: true }).click();
     await page.getByRole('button', { name: '保存配置', exact: true }).click();
     await page.getByRole('dialog').waitFor({ state: 'hidden' });
@@ -625,11 +626,11 @@ test('本地搜索和状态筛选即时响应开关，刷新后仍保留筛选�
   const { page, requests } = await openMods();
   try {
     await waitForTitle(page);
-    await chooseSelect(page, '模组状态', /已启用/);
+    await page.getByRole('group', { name: '模组状态', exact: true }).getByRole('button', { name: /^已启用/ }).click();
     assert.equal(await page.locator('.mod').count(), 1);
     await page.locator('.mod').getByRole('switch').click();
     await page.getByText('没有匹配的模组', { exact: true }).waitFor();
-    await chooseSelect(page, '模组状态', /已禁用/);
+    await page.getByRole('group', { name: '模组状态', exact: true }).getByRole('button', { name: /^未启用/ }).click();
     assert.equal(await page.locator('.mod').count(), 4);
     const search = page.getByRole('textbox', { name: '搜索模组', exact: true });
     await search.fill('本地已下载名称');
@@ -910,4 +911,96 @@ test('本地图标不可用时回退到工坊封面，两者都失败时显示�
     });
     assert.equal(requests.filter(r => r.path === '/api/mods/icon' && r.params.id === mods[0].id).length, 2);
   } finally { await page.close(); }
+});
+
+test('分段统计随启用状态更新，搜索不改变总量，检查更新与本地刷新互不替代', async () => {
+  const { page, state, requests } = await openMods();
+  try {
+    await waitForTitle(page);
+    const toolbar = page.getByRole('region', { name: '模组工具栏', exact: true });
+    const filters = toolbar.getByRole('group', { name: '模组状态', exact: true });
+    assert.equal(await page.getByRole('combobox', { name: '模组状态', exact: true }).count(), 0);
+    for (const name of ['全部 (4)', '已启用 (1)', '未启用 (3)', '未下载 (2)']) await filters.getByRole('button', { name, exact: true }).waitFor();
+    assert.equal(await filters.getByRole('button', { name: /^可更新/ }).count(), 0);
+    const reads = () => requests.filter(r => r.path === '/api/mods').length;
+    const initial = reads();
+    await filters.getByRole('button', { name: '未下载 (2)', exact: true }).click();
+    assert.equal(await page.locator('.mod').count(), 2);
+    const search = toolbar.getByRole('textbox', { name: '搜索模组', exact: true });
+    await search.fill('1185229307');
+    assert.equal(await page.locator('.mod').count(), 1);
+    assert.equal(await filters.getByRole('button', { name: '全部 (4)', exact: true }).isVisible(), true);
+    assert.equal(reads(), initial);
+    await search.fill('');
+    await filters.getByRole('button', { name: '全部 (4)', exact: true }).click();
+    state.updates.updates = [{ id: mods[1].id, localTime: 1, remoteTime: 2 }];
+    await toolbar.getByRole('button', { name: '检查更新', exact: true }).click();
+    const updates = filters.getByRole('button', { name: '可更新 (1)', exact: true });
+    await updates.waitFor();
+    assert.equal(reads(), initial, '检查更新不刷新本地列表');
+    await updates.focus();
+    await page.keyboard.press('Space');
+    assert.equal(await updates.getAttribute('aria-pressed'), 'true');
+    assert.equal(await page.locator('.mod').count(), 1);
+    assert.match(await page.locator('.mod').innerText(), /1207269058/);
+    const refresh = toolbar.getByRole('button', { name: '刷新', exact: true });
+    await refresh.hover();
+    await page.getByRole('tooltip', { name: '刷新本地模组列表', exact: true }).waitFor();
+    await page.keyboard.press('Escape');
+    const checks = requests.filter(r => r.path === '/api/mods/updates').length;
+    await Promise.all([page.waitForResponse(r => new URL(r.url()).pathname === '/api/mods'), refresh.click()]);
+    assert.equal(reads(), initial + 1);
+    assert.equal(requests.filter(r => r.path === '/api/mods/updates').length, checks);
+    assert.equal(requests.filter(r => r.path === '/api/mods/update' && r.method === 'POST').length, 0);
+    assert.equal(await updates.getAttribute('aria-pressed'), 'true');
+  } finally { await page.close(); }
+});
+
+test('32个模组含五种筛选和日志入口仍保持桌面单行吸顶，手机不溢出', async () => {
+  const items = Array.from({ length: 32 }, (_, i) => ({
+    id: `workshop-${100000 + i}`, name: `测试模组 ${i + 1}`, enabled: i < 21, installed: i < 30,
+    iconUrl: `/api/mods/icon?room=2&id=workshop-${100000 + i}`,
+  }));
+  for (const [width, dark] of [[1280, false], [1440, true], [375, false]]) {
+    const { page, state } = await openMods({ width, dark, modItems: items, updateStatuses: [{ running: false, output: ['历史记录'] }] });
+    try {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      const toolbar = page.getByRole('region', { name: '模组工具栏', exact: true });
+      const filters = toolbar.getByRole('group', { name: '模组状态', exact: true });
+      await toolbar.getByRole('button', { name: '更新日志', exact: true }).waitFor();
+      state.updates.updates = items.slice(0, 2).map(item => ({ id: item.id, localTime: 1, remoteTime: 2 }));
+      await toolbar.getByRole('button', { name: '检查更新', exact: true }).click();
+      await filters.getByRole('button', { name: '可更新 (2)', exact: true }).waitFor();
+      for (const name of ['全部 (32)', '已启用 (21)', '未启用 (11)', '未下载 (2)']) await filters.getByRole('button', { name, exact: true }).waitFor();
+      const layout = await toolbar.evaluate(el => {
+        const centers = ['.mods-shard', '.mods-search', '.mods-filters', '.mods-toolbar-actions'].map(selector => {
+          const box = el.querySelector(selector).getBoundingClientRect(); return box.y + box.height / 2;
+        });
+        return { centers, height: el.getBoundingClientRect().height, noOverflow: el.scrollWidth <= el.clientWidth };
+      });
+      if (width >= 1280) {
+        assert.ok(Math.max(...layout.centers) - Math.min(...layout.centers) < 2, '所有控件在同一行');
+        assert.ok(layout.height <= 64);
+      }
+      assert.equal(layout.noOverflow, true);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+      assert.doesNotMatch(await toolbar.innerText(), /已启用\s+21\s*\/\s*32/);
+      await page.mouse.move(0, 0);
+      await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/mods-toolbar-${width}-${dark ? 'dark' : 'light'}.png`, import.meta.url)) });
+      await page.locator('.mod').last().scrollIntoViewIfNeeded();
+      const position = await page.evaluate(() => ({
+        toolbar: document.querySelector('.mods-toolbar').getBoundingClientRect().top,
+        main: document.querySelector('#page-content').getBoundingClientRect().top,
+        scrolled: document.querySelector('#page-content').scrollTop,
+      }));
+      assert.ok(position.scrolled > 0);
+      assert.ok(Math.abs(position.toolbar - position.main) < 2);
+      await filters.getByRole('button', { name: '已启用 (21)', exact: true }).click();
+      assert.equal(await page.locator('.mod').count(), 21);
+      await page.locator('.mod').first().getByRole('switch').click();
+      await filters.getByRole('button', { name: '已启用 (20)', exact: true }).waitFor();
+      assert.equal(await page.locator('.mod').count(), 20);
+      assert.equal(await filters.getByRole('button', { name: '未启用 (12)', exact: true }).isVisible(), true);
+    } finally { await page.close(); }
+  }
 });
