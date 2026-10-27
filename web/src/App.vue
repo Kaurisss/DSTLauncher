@@ -40,6 +40,7 @@ const VIEWS = {
 
 /** 兜底：万一 activeTab 与 VIEWS 不一致，也不会渲染出空白页。 */
 const currentView = computed(() => VIEWS[ui.activeTab] || OverviewView);
+const cardScroll = computed(() => ['rooms', 'mods', 'world', 'logs', 'backups', 'saves', 'config'].includes(ui.activeTab));
 // 全局管理页保留草稿；房间业务页重建实例，隔离旧房间的异步响应和草稿。
 const viewKey = computed(() => ['rooms', 'saves', 'settings'].includes(ui.activeTab)
   ? ui.activeTab : `${ui.activeTab}:${rooms.currentId}`);
@@ -142,7 +143,7 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div v-if="!auth.authenticated" class="flex min-h-svh items-center justify-center bg-sidebar p-4 text-sidebar-foreground">
+  <div v-if="!auth.authenticated" class="flex h-dvh items-center justify-center overflow-y-auto bg-sidebar p-4 text-sidebar-foreground">
     <form class="grid w-full max-w-sm gap-4 rounded-xl border border-border bg-card p-6 text-card-foreground shadow-sm" @submit.prevent="submitLogin">
       <div class="flex items-center gap-3">
         <img :src="iconUrl" alt="DST" width="40" height="40" class="size-10 shrink-0 rounded-lg object-cover shadow-xs" />
@@ -164,19 +165,19 @@ onUnmounted(() => {
     </form>
   </div>
 
-  <SidebarProvider v-else class="h-svh max-h-svh overflow-hidden bg-sidebar" style="--sidebar-width: 220px" @update:open="animateSidebarChange">
+  <SidebarProvider v-else class="h-dvh min-h-0 w-screen overflow-hidden bg-sidebar" style="--sidebar-width: 220px" @update:open="animateSidebarChange">
     <a href="#page-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:p-3 focus:text-foreground focus:shadow-md">跳到内容</a>
     <AppSidebar />
-    <div ref="workspace" data-slot="main-workspace" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
+    <div ref="workspace" data-slot="main-workspace" class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
       <TopBar />
 
       <main
         id="page-content"
         tabindex="-1"
-        class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto"
-        style="scrollbar-gutter: stable"
+        :class="['flex min-h-0 min-w-0 flex-1 flex-col', cardScroll ? 'overflow-hidden' : 'overflow-y-auto']"
+        :style="cardScroll ? undefined : { scrollbarGutter: 'stable' }"
       >
-        <div class="page-view w-full max-w-[2400px] min-w-0 p-4 md:p-6">
+        <div :class="['page-view w-full max-w-[2400px] min-w-0 p-4 md:p-6', cardScroll ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'shrink-0']">
           <!-- 不延迟旧视图卸载，快速导航和换房始终只保留一个业务实例。 -->
           <component :is="currentView" :key="viewKey" />
         </div>

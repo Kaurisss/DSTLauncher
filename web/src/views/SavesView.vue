@@ -148,7 +148,7 @@ async function remove(item) {
 </script>
 
 <template>
-  <UiCard flush>
+  <UiCard flush fill>
     <UiToolbar aria-label="存档工具栏" leading-class="min-w-full flex-wrap lg:min-w-0">
       <Input class="min-w-32 max-w-64 flex-1" aria-label="搜索存档" placeholder="搜索存档、房间或分片" :model-value="table.atoms.globalFilter.get() ?? ''" @update:model-value="table.setGlobalFilter" />
       <Badge variant="secondary" class="shrink-0 whitespace-nowrap tabular-nums">共 {{ items.length }} 个存档（{{ fmtSize(totalSize) }}）</Badge>
@@ -164,64 +164,66 @@ async function remove(item) {
       </template>
     </UiToolbar>
 
-    <div class="grid min-w-0 gap-4 p-4 pt-1 sm:px-6 sm:pb-6">
-      <div class="min-w-0 overflow-hidden rounded-md border" :aria-busy="loading">
-        <Table class="min-w-[760px]">
-          <TableCaption class="sr-only">存档列表</TableCaption>
-          <TableHeader>
-            <TableRow v-for="group in table.getHeaderGroups()" :key="group.id">
-              <TableHead
-                v-for="header in group.headers"
-                :key="header.id"
-                :class="header.column.id === 'actions' ? 'text-right' : ''"
-                :aria-sort="header.column.getIsSorted() === 'asc' ? 'ascending'
-                  : header.column.getIsSorted() === 'desc' ? 'descending' : undefined"
-              >
-                <Button
-                  v-if="header.column.getCanSort()"
-                  variant="ghost" size="sm" class="-ml-2"
-                  @click="header.column.toggleSorting()"
+    <div data-slot="page-scroll" class="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-4 pt-1 sm:px-6 sm:pb-6" tabindex="0" role="region" aria-label="存档列表">
+      <div class="grid min-w-0 gap-4">
+        <div class="min-w-0 overflow-hidden rounded-md border" :aria-busy="loading">
+          <Table class="min-w-[760px]">
+            <TableCaption class="sr-only">存档列表</TableCaption>
+            <TableHeader>
+              <TableRow v-for="group in table.getHeaderGroups()" :key="group.id">
+                <TableHead
+                  v-for="header in group.headers"
+                  :key="header.id"
+                  :class="header.column.id === 'actions' ? 'text-right' : ''"
+                  :aria-sort="header.column.getIsSorted() === 'asc' ? 'ascending'
+                    : header.column.getIsSorted() === 'desc' ? 'descending' : undefined"
                 >
-                  <FlexRender :header="header" />
-                  <span aria-hidden="true">{{ header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕' }}</span>
-                </Button>
-                <FlexRender v-else :header="header" />
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow v-if="loading && !items.length">
-              <TableCell :colspan="columns.length"><UiLoading /></TableCell>
-            </TableRow>
-            <TableEmpty v-else-if="loadError" :colspan="columns.length">
-              <span role="alert" class="text-destructive">读取失败：{{ loadError }}</span>
-            </TableEmpty>
-            <template v-else-if="table.getRowModel().rows.length">
-              <TableRow v-for="row in table.getRowModel().rows" :key="row.id">
-                <TableCell
-                  v-for="cell in row.getAllCells()" :key="cell.id"
-                  :class="cell.column.id === 'actions' ? 'text-right' : cell.column.id === 'size' ? 'font-mono tabular-nums' : ''"
-                >
-                  <FlexRender :cell="cell" />
-                </TableCell>
+                  <Button
+                    v-if="header.column.getCanSort()"
+                    variant="ghost" size="sm" class="-ml-2"
+                    @click="header.column.toggleSorting()"
+                  >
+                    <FlexRender :header="header" />
+                    <span aria-hidden="true">{{ header.column.getIsSorted() === 'asc' ? '↑' : header.column.getIsSorted() === 'desc' ? '↓' : '↕' }}</span>
+                  </Button>
+                  <FlexRender v-else :header="header" />
+                </TableHead>
               </TableRow>
-            </template>
-            <TableEmpty v-else :colspan="columns.length">
-              {{ items.length ? '没有匹配的存档' : '磁盘上还没有任何存档' }}
-            </TableEmpty>
-          </TableBody>
-        </Table>
-      </div>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-if="loading && !items.length">
+                <TableCell :colspan="columns.length"><UiLoading /></TableCell>
+              </TableRow>
+              <TableEmpty v-else-if="loadError" :colspan="columns.length">
+                <span role="alert" class="text-destructive">读取失败：{{ loadError }}</span>
+              </TableEmpty>
+              <template v-else-if="table.getRowModel().rows.length">
+                <TableRow v-for="row in table.getRowModel().rows" :key="row.id">
+                  <TableCell
+                    v-for="cell in row.getAllCells()" :key="cell.id"
+                    :class="cell.column.id === 'actions' ? 'text-right' : cell.column.id === 'size' ? 'font-mono tabular-nums' : ''"
+                  >
+                    <FlexRender :cell="cell" />
+                  </TableCell>
+                </TableRow>
+              </template>
+              <TableEmpty v-else :colspan="columns.length">
+                {{ items.length ? '没有匹配的存档' : '磁盘上还没有任何存档' }}
+              </TableEmpty>
+            </TableBody>
+          </Table>
+        </div>
 
-      <nav v-if="!loadError && items.length" aria-label="存档分页" class="flex flex-wrap items-center justify-end gap-2">
-        <span class="mr-2 text-sm text-muted-foreground" aria-live="polite">第 {{ table.atoms.pagination.get().pageIndex + 1 }} / {{ Math.max(1, table.getPageCount()) }} 页</span>
-        <Button variant="outline" size="sm" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
-          <Icon name="chevron" class="rotate-180" :size="14" />上一页
-        </Button>
-        <Button variant="outline" size="sm" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
-          下一页<Icon name="chevron" :size="14" />
-        </Button>
-      </nav>
+        <nav v-if="!loadError && items.length" aria-label="存档分页" class="flex flex-wrap items-center justify-end gap-2">
+          <span class="mr-2 text-sm text-muted-foreground" aria-live="polite">第 {{ table.atoms.pagination.get().pageIndex + 1 }} / {{ Math.max(1, table.getPageCount()) }} 页</span>
+          <Button variant="outline" size="sm" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
+            <Icon name="chevron" class="rotate-180" :size="14" />上一页
+          </Button>
+          <Button variant="outline" size="sm" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
+            下一页<Icon name="chevron" :size="14" />
+          </Button>
+        </nav>
+      </div>
     </div>
   </UiCard>
 </template>

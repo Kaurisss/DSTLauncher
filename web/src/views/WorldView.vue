@@ -53,7 +53,9 @@ let loadSeq = 0;
 const keyword = ref('');
 const onlyChanged = ref(false);
 const activeGroupId = ref('');
+const content = ref(null);
 const groupPanel = ref(null);
+const groupNav = ref(null);
 const header = ref(null);
 const { height: headerHeight } = useElementSize(header, { width: 0, height: 0 }, { box: 'border-box' });
 
@@ -216,15 +218,23 @@ const selectedGroup = computed(() =>
   visibleGroups.value.find(g => g.id === activeGroupId.value) || visibleGroups.value[0]);
 
 watch([shard, category], () => { activeGroupId.value = ''; });
-watch(selectedGroup, group => preloadIcons(group ? [group] : []), { immediate: true });
-
-async function pickGroup(id) {
-  activeGroupId.value = id;
+watch(selectedGroup, async group => {
+  preloadIcons(group ? [group] : []);
   await nextTick();
-  groupPanel.value.$el.scrollIntoView({
-    block: 'start',
-    behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth',
-  });
+  if (!groupPanel.value) return;
+  const list = content.value.$el;
+  const nav = groupNav.value;
+  const clearance = nav && window.getComputedStyle(nav).flexDirection === 'row' ? nav.offsetHeight + 12 : 12;
+  const panel = groupPanel.value.$el;
+  const origin = list.getBoundingClientRect().top - list.scrollTop;
+  const top = panel.getBoundingClientRect().top - origin - clearance;
+  // 极矮视口优先显示第一项，避免分组标题把搜索结果挤到可视区外。
+  const firstRowBottom = panel.querySelector('.opt-row').getBoundingClientRect().bottom - origin;
+  list.scrollTo({ top: Math.max(top, firstRowBottom - list.clientHeight) });
+}, { immediate: true });
+
+function pickGroup(id) {
+  activeGroupId.value = id;
 }
 
 /* ---------- 取值读写 ---------- */
@@ -483,9 +493,9 @@ onMounted(() => selectShard(rooms.shards[0]));
 
 <template>
   <TabsRoot :model-value="shard" as-child @update:model-value="selectShard">
-    <UiCard flush class="world-options-card" aria-label="世界配置" :aria-busy="loading" :style="{ '--world-header-height': headerHeight + 'px' }">
+    <UiCard flush fill class="world-options-card" aria-label="世界配置" :aria-busy="loading" :style="{ '--world-header-height': headerHeight + 'px' }">
       <h2 class="sr-only">世界配置</h2>
-      <div ref="header" class="world-control-header sticky top-0 z-10">
+      <div ref="header" class="world-control-header z-10 shrink-0">
         <div class="world-heading-row">
           <div class="world-shard-controls">
             <TabsList class="world-shard-tabs" aria-label="配置分片">
@@ -569,7 +579,7 @@ onMounted(() => selectShard(rooms.shards[0]));
         </div>
       </div>
 
-      <TabsContent :value="shard" class="outline-none">
+      <TabsContent ref="content" :value="shard" data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none" aria-label="世界配置列表">
         <div v-if="!rooms.loaded || (loading && !view)" class="p-4"><UiLoading /></div>
         <UiEmpty v-else-if="!rooms.current" icon="globe" text="请先在「房间」页新建一个房间" />
         <p v-else-if="loadError" role="alert" class="p-4 text-sm text-destructive">读取失败：{{ loadError }}</p>
@@ -583,7 +593,7 @@ onMounted(() => selectShard(rooms.shards[0]));
             </p>
           </div>
           <div class="world-workspace">
-            <nav v-if="activeGroups.length" class="world-group-nav" aria-label="配置分组">
+            <nav v-if="activeGroups.length" ref="groupNav" class="world-group-nav" aria-label="配置分组">
               <button
                 v-for="g in activeGroups"
                 :key="g.id"

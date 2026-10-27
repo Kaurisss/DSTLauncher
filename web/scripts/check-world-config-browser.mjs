@@ -427,6 +427,7 @@ test('改动计数与重置保存位于选项卡头右侧，切分片保留并�
   assert.ok(Math.abs(desktopToolbar.searchTop - desktopToolbar.swTop) < 8, '桌面端搜索与只看已改动应同行');
 
   await page.setViewportSize({ width: 375, height: 812 });
+  await page.waitForFunction(() => document.querySelector('[data-slot="sidebar-wrapper"]').getBoundingClientRect().width === window.innerWidth);
   const mobileLayout = await page.evaluate(() => {
     const h = document.querySelector('header');
     const btn = document.querySelector('header button[aria-label="切换主题"]');
@@ -515,24 +516,29 @@ test('真实选项布局紧凑，桌面两行吸顶保存搜索，浅色深色�
       assert.equal(sizes.iconHeight, 56);
       if (width === 2240) assert.equal(sizes.grid, 4);
       if (width === 1440) assert.ok(sizes.grid >= 3);
-      await page.locator('#page-content').evaluate(el => el.scrollTo({ top: 0 }));
+      await page.locator('[data-slot="page-scroll"]').evaluate(el => el.scrollTo({ top: 0 }));
       await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/world-workspace-${width}-${dark ? 'dark' : 'light'}.png`, import.meta.url)) });
       await page.setViewportSize({ width, height: 360 });
+      const headerTop = (await page.locator('.world-control-header').boundingBox()).y;
       await rows.last().scrollIntoViewIfNeeded();
       const position = await page.evaluate(() => {
         const header = document.querySelector('.world-control-header').getBoundingClientRect();
         const main = document.querySelector('#page-content').getBoundingClientRect();
-        const root = document.querySelector('#page-content');
-        return { headerTop: header.top, mainTop: main.top, headerBottom: header.bottom, viewportBottom: main.bottom, scrollTop: root.scrollTop, scrollWidth: root.scrollWidth, clientWidth: root.clientWidth };
+        const root = document.querySelector('[data-slot="page-scroll"]');
+        return { headerTop: header.top, mainScroll: document.querySelector('#page-content').scrollTop, headerBottom: header.bottom, viewportBottom: main.bottom, scrollTop: root.scrollTop, scrollWidth: root.scrollWidth, clientWidth: root.clientWidth };
       });
-      assert.ok(position.scrollTop > 0, '页面真实发生滚动');
-      assert.ok(Math.abs(position.headerTop - position.mainTop) < 2, '完整两行控制栏始终吸顶');
+      assert.ok(position.scrollTop > 0, '卡片列表真实发生滚动');
+      assert.equal(position.mainScroll, 0);
+      assert.ok(Math.abs(position.headerTop - headerTop) < 2, '完整两行控制栏保持不动');
       assert.ok(position.headerBottom < position.viewportBottom, '吸顶控件仍在视口内');
       assert.ok(position.scrollWidth <= position.clientWidth, '主工作区不横向溢出');
       assert.equal(await page.getByRole('button', { name: '保存', exact: true }).isVisible(), true);
       await page.getByRole('textbox', { name: '搜索世界配置', exact: true }).fill('活动');
       await page.locator('.opt-row-label').getByText('活动', { exact: true }).waitFor();
       assert.equal(await nav.getByRole('button', { name: '全局', exact: true }).getAttribute('aria-current'), 'true', '吸顶搜索跨组定位');
+      const listBounds = await page.locator('[data-slot="page-scroll"]').boundingBox();
+      const optionBounds = await page.locator('.opt-row-label').getByText('活动', { exact: true }).boundingBox();
+      assert.ok(optionBounds.y >= listBounds.y && optionBounds.y + optionBounds.height <= listBounds.y + listBounds.height, JSON.stringify({ width, listBounds, optionBounds }));
     } finally { await page.close(); }
   }
 });

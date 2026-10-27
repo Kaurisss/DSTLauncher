@@ -394,8 +394,8 @@ watch([() => rooms.current, shard], () => {
 
 <template>
   <DialogRoot v-model:open="updateOpen">
-    <UiCard flush class="mods-workspace">
-      <div class="mods-toolbar sticky top-0 z-10 flex items-center justify-between gap-3" role="region" aria-label="模组工具栏">
+    <UiCard flush fill class="mods-workspace">
+      <div class="mods-toolbar z-10 flex shrink-0 items-center justify-between gap-3" role="region" aria-label="模组工具栏">
         <div class="mods-toolbar-left">
           <Select v-if="rooms.current" v-model="shard" :disabled="configOpen || busyItems.length > 0 || workshopOpen || queueing || pendingIds.length > 0">
             <SelectTrigger aria-label="模组分片" class="mods-shard">
@@ -439,7 +439,7 @@ watch([() => rooms.current, shard], () => {
         </div>
       </div>
 
-      <div class="p-4 sm:p-6">
+      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6" tabindex="0" role="region" aria-label="模组列表">
         <UiLoading v-if="!rooms.loaded" />
         <UiEmpty v-else-if="!rooms.current" icon="package" text="请先在「房间」页新建一个房间" />
         <!-- 刷新保留列表，避免拆掉创意工坊窗口和更新进度。 -->

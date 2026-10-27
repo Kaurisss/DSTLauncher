@@ -107,7 +107,7 @@ test('配置 Code Block 只读并保留落盘与令牌隐藏状态，复制得�
       await page.evaluate(dark => localStorage.setItem('dst-theme', dark ? 'dark' : 'light'), dark);
       await page.reload();
       await preview.waitFor();
-      await page.locator('#page-content').evaluate(el => { el.scrollTop = 0; });
+      await page.locator('[data-slot="page-scroll"]').evaluate(el => { el.scrollTop = 0; });
       await page.mouse.move(0, 0);
       await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/code-preview-${width}-${dark ? 'dark' : 'light'}.png`, import.meta.url)) });
     }

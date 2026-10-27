@@ -16,7 +16,7 @@ before(async () => {
 });
 after(async () => { await browser?.close(); await vite?.close(); });
 
-async function openPage(tab, width = 1280) {
+async function openPage(tab, width = 1280, long = false) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(({ tab, width }) => {
@@ -37,17 +37,17 @@ async function openPage(tab, width = 1280) {
     const ok = data => route.fulfill({ json: { code: 200, data } });
     if (path === '/api/auth/status') return ok(state.auth);
     if (path === '/api/auth/password') { state.auth.enabled = !!request.postDataJSON().newPassword; return ok(state.auth); }
-    if (path === '/api/rooms') return ok([1, 2].map(id => ({ id, key: `Cluster_${id}`, name: `工具栏测试房间 ${id}`, gameMode: 'survival', maxPlayers: 2, shards: [{ name: 'Master', isMaster: true }], needToken: false })));
+    if (path === '/api/rooms') return ok(Array.from({ length: long && tab === 'rooms' ? 12 : 2 }, (_, i) => i + 1).map(id => ({ id, key: `Cluster_${id}`, name: `工具栏测试房间 ${id}`, gameMode: 'survival', maxPlayers: 2, shards: [{ name: 'Master', isMaster: true }], needToken: false })));
     if (path === '/api/rooms/meta') return ok({ panelVersion: 'v0.1.2' });
     if (path === '/api/status') return ok([{ shard: 'Master', state: 'stopped' }]);
     if (path === '/api/install') return ok({ installed: true });
     if (path === '/api/server') return ok({ installed: true, candidates: [], archOptions: ['auto'] });
-    if (path === '/api/backups') return ok([{ name: 'fixture.zip', createdAt: '2026-10-26T12:00:00Z', size: 1024, path: state.backupRoot + '/fixture.zip' }]);
-    if (path === '/api/saves') return ok({ root: 'C:\\DST\\DST', items: [1, 2].map(id => ({ cluster: `Cluster_${id}`, roomName: '测试房间', roomExists: id === 1, size: 1024, modTime: '2026-10-26T12:00:00Z', shards: [{ name: 'Master' }] })) });
-    if (path === '/api/config') return ok({ clusterDir: 'C:\\DST\\DST\\Cluster_1', files: [{ path: 'Cluster_1/cluster.ini', onDisk: true, content: '[NETWORK]\ncluster_name = fixture' }] });
-    if (path === '/api/mods') return ok([1, 2].map(id => ({ id: `local-${id}`, name: `测试模组 ${id}`, enabled: id === 1, installed: true })));
+    if (path === '/api/backups') return ok(Array.from({ length: long ? 25 : 1 }, (_, i) => ({ name: long ? `fixture-${i}.zip` : 'fixture.zip', createdAt: '2026-10-26T12:00:00Z', size: 1024, path: state.backupRoot + '/fixture.zip' })));
+    if (path === '/api/saves') return ok({ root: 'C:\\DST\\DST', items: Array.from({ length: long ? 25 : 2 }, (_, i) => i + 1).map(id => ({ cluster: `Cluster_${id}`, roomName: '测试房间', roomExists: id === 1, size: 1024, modTime: '2026-10-26T12:00:00Z', shards: [{ name: 'Master' }] })) });
+    if (path === '/api/config') return ok({ clusterDir: 'C:\\DST\\DST\\Cluster_1', files: Array.from({ length: long ? 12 : 1 }, (_, i) => ({ path: long ? `Cluster_1/config_${i}.ini` : 'Cluster_1/cluster.ini', onDisk: true, content: '[NETWORK]\ncluster_name = fixture' })) });
+    if (path === '/api/mods') return ok(Array.from({ length: long ? 32 : 2 }, (_, i) => i + 1).map(id => ({ id: `local-${id}`, name: `测试模组 ${id}`, enabled: id === 1, installed: true })));
     if (path === '/api/mods/update') return ok({ running: false, output: [] });
-    if (path === '/api/chat-log') return ok({ entries: [{ id: 1, time: '00:01:00', kind: 'chat', userid: 'KU_FIXTURE', name: '测试玩家', message: '测试聊天' }], exists: true, total: 1, page: 1, pageSize: 10 });
+    if (path === '/api/chat-log') return ok({ entries: Array.from({ length: long ? 10 : 1 }, (_, i) => ({ id: i + 1, time: '00:01:00', kind: 'chat', userid: 'KU_FIXTURE', name: '测试玩家', message: long ? '测试聊天 ' + (i + 1) : '测试聊天' })), exists: true, total: long ? 10 : 1, page: 1, pageSize: 10 });
     if (path === '/api/automation') {
       if (request.method() === 'PUT') state.automation.config = request.postDataJSON();
       return ok(state.automation);
@@ -91,6 +91,79 @@ for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '�
     }
   });
 }
+
+for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '玩家日志'], ['backups', '备份'], ['saves', '存档'], ['config', '配置预览']]) {
+  test(`${label}仅卡片列表滚动，外框、工具栏和Topbar固定，末行与底部边距可达`, async () => {
+    for (const width of [1280, 375]) {
+      const { page, state } = await openPage(tab, width, true);
+      try {
+        const list = page.locator('[data-slot="page-scroll"]');
+        await list.waitFor();
+        const last = ['rooms', 'mods'].includes(tab) ? list.getByRole('article').last()
+          : tab === 'config' ? list.locator('[data-slot="code-block"]').last() : list.locator('tbody tr').last();
+        if (tab === 'mods') await list.getByRole('article', { name: '测试模组 32', exact: true }).waitFor();
+        else if (tab === 'logs') await list.getByText('测试聊天 10', { exact: true }).waitFor();
+        else if (tab === 'rooms') await list.getByRole('heading', { name: '工具栏测试房间 12', exact: true }).waitFor();
+        else if (tab === 'backups') await page.getByText('共 25 个备份', { exact: true }).waitFor();
+        else if (tab === 'config') await list.getByText('Cluster_1/config_11.ini', { exact: true }).waitFor();
+        else await list.getByText('Cluster_10', { exact: true }).waitFor();
+        await page.setViewportSize({ width, height: 520 });
+        await page.waitForFunction(() => document.querySelector('#page-content').getBoundingClientRect().bottom === window.innerHeight);
+        const toolbar = page.getByRole('region', { name: label + '工具栏', exact: true });
+        const before = await toolbar.boundingBox();
+        const topbar = await page.locator('[data-slot="main-workspace"] > header').boundingBox();
+        const card = await list.locator('xpath=ancestor::*[@data-slot="card"]').boundingBox();
+        const main = await page.locator('#page-content').boundingBox();
+        assert.ok(card.y >= main.y + 15.5 && card.y + card.height <= main.y + main.height - 15.5, '卡片四周保留边距：' + JSON.stringify({ width, card, main }));
+        assert.ok((await list.boundingBox()).y >= before.y + before.height - 1, '滚动条起点在工具栏下方');
+        await list.hover();
+        await page.mouse.wheel(0, 400);
+        await page.waitForFunction(() => document.querySelector('[data-slot="page-scroll"]').scrollTop > 0);
+        await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
+        const after = await toolbar.boundingBox();
+        assert.equal(after.y, before.y);
+        assert.deepEqual(await page.locator('[data-slot="main-workspace"] > header').boundingBox(), topbar);
+        const final = await last.boundingBox(), bounds = await list.boundingBox();
+        assert.ok(final.y >= bounds.y && final.y + final.height <= bounds.y + bounds.height + 1, '末行完整可见');
+        const outer = await page.evaluate(() => ({
+          window: window.scrollY, body: document.body.scrollTop, main: document.querySelector('#page-content').scrollTop,
+          bodyHeight: document.body.scrollHeight, viewport: window.innerHeight,
+          overflow: window.getComputedStyle(document.querySelector('#page-content')).overflowY,
+          shellHeight: document.querySelector('[data-slot="sidebar-wrapper"]').getBoundingClientRect().height,
+        }));
+        assert.deepEqual([outer.window, outer.body, outer.main], [0, 0, 0]);
+        assert.equal(outer.bodyHeight, outer.viewport);
+        assert.equal(outer.shellHeight, outer.viewport);
+        assert.equal(outer.overflow, 'hidden');
+        assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+        await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/app-shell-${tab}-${width}.png`, import.meta.url)) });
+        assert.deepEqual(state.errors, []);
+      } finally { await page.close(); }
+    }
+  });
+}
+
+test('多卡片设置页只滚动Topbar下方main，切换列表页后无残留外层滚动', async () => {
+  const { page, state } = await openPage('settings');
+  try {
+    await page.getByRole('button', { name: '保存 Key', exact: true }).waitFor();
+    await page.setViewportSize({ width: 1280, height: 520 });
+    const topbar = page.locator('[data-slot="main-workspace"] > header');
+    const before = await topbar.boundingBox();
+    const main = page.locator('#page-content');
+    await main.hover();
+    await page.mouse.wheel(0, 600);
+    await page.waitForFunction(() => document.querySelector('#page-content').scrollTop > 0);
+    assert.deepEqual(await topbar.boundingBox(), before);
+    assert.equal(await page.evaluate(() => window.scrollY + document.body.scrollTop), 0);
+    assert.equal(await main.evaluate(el => el.getBoundingClientRect().top), before.y + before.height);
+    await page.getByRole('button', { name: '模组', exact: true }).click();
+    await page.locator('[data-slot="page-scroll"]').waitFor();
+    assert.equal(await main.evaluate(el => el.scrollTop), 0);
+    assert.deepEqual(await topbar.boundingBox(), before);
+    assert.deepEqual(state.errors, []);
+  } finally { await page.close(); }
+});
 
 test('存档目录可复制，备份目录使用真实路径并兼容两种分隔符', async () => {
   const saves = await openPage('saves');

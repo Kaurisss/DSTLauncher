@@ -44,7 +44,7 @@ function navigate(key) {
 </script>
 
 <template>
-  <Sidebar collapsible="icon" class="border-r border-sidebar-border">
+  <Sidebar collapsible="icon" class="h-full shrink-0 border-r border-sidebar-border">
     <SidebarHeader class="h-16 shrink-0 justify-center px-3 group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:justify-end group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-0">
       <div class="flex min-w-0 items-center gap-2">
         <img :src="iconUrl" alt="DST" width="32" height="32" class="size-8 shrink-0 rounded-lg object-cover group-data-[collapsible=icon]:hidden" />

@@ -189,7 +189,7 @@ async function blockPlayer(entry) {
 </script>
 
 <template>
-  <UiCard flush role="region" aria-label="聊天与进出记录" class="min-w-0" :aria-busy="loading">
+  <UiCard flush fill role="region" aria-label="聊天与进出记录" class="min-w-0" :aria-busy="loading">
     <UiToolbar aria-label="玩家日志工具栏" leading-class="min-w-full xl:min-w-0">
       <form class="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:flex-nowrap" @submit.prevent="refresh">
         <Select v-model="shard" :disabled="!shards.length">
@@ -221,7 +221,7 @@ async function blockPlayer(entry) {
       </template>
     </UiToolbar>
 
-    <div class="min-w-0 space-y-4 p-4 pt-1 sm:px-6 sm:pb-6">
+    <div data-slot="page-scroll" class="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 pt-1 sm:px-6 sm:pb-6" tabindex="0" role="region" aria-label="玩家日志列表">
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">读取失败：{{ error }}</p>
       <UiLoading v-else-if="loading && !result" />
       <UiEmpty v-else-if="!rooms.current" icon="users" text="请先选择房间" />

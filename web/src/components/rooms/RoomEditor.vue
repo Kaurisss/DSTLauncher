@@ -188,7 +188,7 @@ async function save() {
 </script>
 
 <template>
-  <UiCard flush class="room-editor min-w-0">
+  <UiCard flush fill class="room-editor min-w-0">
     <UiToolbar aria-label="房间编辑工具栏">
       <Tooltip>
         <TooltipTrigger as-child>
@@ -207,7 +207,7 @@ async function save() {
       </template>
     </UiToolbar>
 
-    <div class="room-form grid gap-5 p-4 pt-2 sm:px-6 sm:pb-6">
+    <div data-slot="page-scroll" class="room-form grid min-h-0 flex-1 content-start gap-5 overflow-y-auto overscroll-contain p-4 pt-2 sm:px-6 sm:pb-6" tabindex="0" role="region" aria-label="房间编辑内容">
       <Alert v-if="saveError" variant="destructive">
         <AlertTitle>保存失败</AlertTitle>
         <AlertDescription>{{ saveError }}</AlertDescription>
@@ -296,6 +296,7 @@ async function save() {
           </UiField>
         </div>
       </details>
+      <div v-if="$slots.default" class="stack"><slot /></div>
     </div>
   </UiCard>
 </template>

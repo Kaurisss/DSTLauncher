@@ -987,14 +987,16 @@ test('32个模组含五种筛选和日志入口仍保持桌面单行吸顶，手
       assert.doesNotMatch(await toolbar.innerText(), /已启用\s+21\s*\/\s*32/);
       await page.mouse.move(0, 0);
       await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/mods-toolbar-${width}-${dark ? 'dark' : 'light'}.png`, import.meta.url)) });
+      const toolbarTop = (await toolbar.boundingBox()).y;
       await page.locator('.mod').last().scrollIntoViewIfNeeded();
       const position = await page.evaluate(() => ({
         toolbar: document.querySelector('.mods-toolbar').getBoundingClientRect().top,
-        main: document.querySelector('#page-content').getBoundingClientRect().top,
-        scrolled: document.querySelector('#page-content').scrollTop,
+        mainScroll: document.querySelector('#page-content').scrollTop,
+        scrolled: document.querySelector('[data-slot="page-scroll"]').scrollTop,
       }));
       assert.ok(position.scrolled > 0);
-      assert.ok(Math.abs(position.toolbar - position.main) < 2);
+      assert.equal(position.mainScroll, 0);
+      assert.ok(Math.abs(position.toolbar - toolbarTop) < 2);
       await filters.getByRole('button', { name: '已启用 (21)', exact: true }).click();
       assert.equal(await page.locator('.mod').count(), 21);
       await page.locator('.mod').first().getByRole('switch').click();

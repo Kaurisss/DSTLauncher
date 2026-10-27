@@ -41,7 +41,7 @@ async function openEditor(roomId = null) {
     }
     editor.value = { open: true, roomId: roomId ? Number(roomId) : null, key: editor.value.key + 1 };
     await nextTick();
-    document.getElementById('page-content')?.scrollTo({ top: 0 });
+    document.querySelector('#page-content [data-slot="page-scroll"]')?.scrollTo({ top: 0 });
     document.getElementById('f_name')?.focus({ preventScroll: true });
   } finally {
     preparing.value = false;
@@ -51,7 +51,7 @@ async function openEditor(roomId = null) {
 async function closeEditor() {
   editor.value.open = false;
   await nextTick();
-  document.getElementById('page-content')?.scrollTo({ top: 0 });
+  document.querySelector('#page-content [data-slot="page-scroll"]')?.scrollTo({ top: 0 });
   document.getElementById('new-room-button')?.focus({ preventScroll: true });
 }
 
@@ -88,7 +88,7 @@ async function onRemove(id) {
 </script>
 
 <template>
-  <div class="stack">
+  <div class="flex min-h-0 flex-1 flex-col">
     <template v-if="editor.open">
       <RoomEditor
         v-if="!editor.roomId || editingRoom"
@@ -97,16 +97,17 @@ async function onRemove(id) {
         :meta="rooms.meta"
         @close="closeEditor"
         @saved="closeEditor"
-      />
+      >
+        <RoomAdmins v-if="editingRoom" :key="editingRoom.id" :room="editingRoom" />
+        <RoomPlayerLists v-if="editingRoom" :key="`lists-${editingRoom.id}`" :room="editingRoom" />
+      </RoomEditor>
       <UiCard v-else>
         <template #title>房间已不存在</template>
         <template #actions><Button variant="outline" size="sm" @click="closeEditor">返回房间列表</Button></template>
       </UiCard>
-      <RoomAdmins v-if="editingRoom" :key="editingRoom.id" :room="editingRoom" />
-      <RoomPlayerLists v-if="editingRoom" :key="`lists-${editingRoom.id}`" :room="editingRoom" />
     </template>
 
-    <UiCard v-else flush>
+    <UiCard v-else flush fill>
       <UiToolbar aria-label="房间工具栏" leading-class="flex-none">
         <Badge variant="secondary" class="whitespace-nowrap tabular-nums">共 {{ rooms.list.length }} 个房间</Badge>
         <template #actions>
@@ -121,7 +122,7 @@ async function onRemove(id) {
           </Button>
         </template>
       </UiToolbar>
-      <div class="p-4 pt-1 sm:px-6 sm:pb-6">
+      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pt-1 sm:px-6 sm:pb-6" tabindex="0" role="region" aria-label="房间列表">
         <RoomGrid
           :rooms="rooms.list"
           :current-id="rooms.currentId"

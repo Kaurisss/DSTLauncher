@@ -323,7 +323,7 @@ test('手机二级页和上传框不横向溢出，长文件名和结果可滚�
     await page.locator('#f_name').waitFor();
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     assert.equal(await page.getByPlaceholder('自动分配').first().inputValue(), '');
-    await page.locator('#page-content').evaluate(element => { element.scrollTop = element.scrollHeight; });
+    await page.locator('[data-slot="page-scroll"]').evaluate(element => { element.scrollTop = element.scrollHeight; });
     const saveBounds = await page.getByRole('button', { name: '保存', exact: true }).boundingBox();
     assert.ok(saveBounds.y >= 56 && saveBounds.y + saveBounds.height <= 740, '滚到表单末尾仍能保存');
     await page.getByRole('button', { name: '返回房间列表', exact: true }).click();
@@ -389,6 +389,11 @@ test('房间表单吸顶合并返回与动作，垂直标签和12/4列网格对�
       const cancel = await toolbar.getByRole('button', { name: '取消', exact: true }).boundingBox();
       const save = await toolbar.getByRole('button', { name: '保存', exact: true }).boundingBox();
       assert.ok(cancel.x < save.x && Math.abs(cancel.y - save.y) < 2);
+      const separator = await toolbar.locator('[data-slot="separator"]').boundingBox();
+      const back = await toolbar.getByRole('button', { name: '返回房间列表', exact: true }).boundingBox();
+      const title = await toolbar.getByRole('heading').boundingBox();
+      assert.ok(Math.abs(separator.y + separator.height / 2 - (back.y + back.height / 2)) < 1, '分隔线与返回按钮居中对齐');
+      assert.ok(Math.abs(separator.y + separator.height / 2 - (title.y + title.height / 2)) < 1, '分隔线与标题居中对齐');
       const token = editor.locator('#f_token');
       assert.equal(await token.evaluate(el => el.tagName), 'INPUT');
       assert.equal(await token.getAttribute('type'), 'password');
@@ -428,15 +433,58 @@ test('房间表单吸顶合并返回与动作，垂直标签和12/4列网格对�
       await editor.getByText('高级设置', { exact: true }).click();
       await editor.locator('#f_tickRate').waitFor();
       await page.setViewportSize({ width, height: 560 });
-      await page.locator('#page-content').evaluate(el => { el.scrollTop = el.scrollHeight; });
+      await page.locator('[data-slot="page-scroll"]').evaluate(el => { el.scrollTop = el.scrollHeight; });
       const position = await page.evaluate(() => ({
         toolbar: document.querySelector('.room-editor .ui-toolbar').getBoundingClientRect().top,
-        main: document.querySelector('#page-content').getBoundingClientRect().top,
+        card: document.querySelector('.room-editor').getBoundingClientRect().top,
+        list: document.querySelector('[data-slot="page-scroll"]').getBoundingClientRect().top,
         bottom: document.querySelector('.room-editor .ui-toolbar').getBoundingClientRect().bottom,
       }));
-      assert.ok(Math.abs(position.toolbar - position.main) < 2);
+      assert.ok(Math.abs(position.toolbar - position.card) < 0.1, 'Header紧贴固定卡片顶部：' + JSON.stringify(position));
+      assert.ok(Math.abs(position.bottom - position.list) < 0.1, 'Header下方直接衔接滚动区');
       assert.ok(position.bottom < 560);
       assert.equal(await toolbar.getByRole('button', { name: '保存', exact: true }).isVisible(), true);
+      await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/room-editor-sticky-${width}-${dark ? 'dark' : 'light'}.png`, import.meta.url)) });
+    } finally { await close(); }
+  }
+});
+
+test('编辑卡片及Header在连续滚动中保持原位，四边描边始终可见且名单可达', async () => {
+  for (const [width, dark] of [[1440, false], [1440, true], [375, false]]) {
+    const { page, close } = await openRooms({ width, dark });
+    try {
+      await page.emulateMedia({ reducedMotion: 'reduce' });
+      await card(page).getByRole('button', { name: '编辑', exact: true }).click();
+      await page.getByRole('heading', { name: '房间管理员', exact: true }).waitFor();
+      const editor = page.locator('.room-editor');
+      const toolbar = page.getByRole('region', { name: '房间编辑工具栏', exact: true });
+      const scroll = page.getByRole('region', { name: '房间编辑内容', exact: true });
+      const before = { card: await editor.boundingBox(), header: await toolbar.boundingBox() };
+      const viewport = await page.locator('.page-view').boundingBox();
+      assert.ok(before.card.y >= viewport.y + 1 && before.card.y + before.card.height <= viewport.y + viewport.height - 1, '卡片上下描边位于裁剪范围内');
+      assert.ok(before.card.x >= viewport.x + 1 && before.card.x + before.card.width <= viewport.x + viewport.width - 1, '卡片左右描边位于裁剪范围内');
+      assert.equal(await editor.evaluate(el => window.getComputedStyle(el).boxShadow !== 'none'), true, '外框有实际描边');
+      const maximum = await scroll.evaluate(el => el.scrollHeight - el.clientHeight);
+      assert.ok(maximum > 0);
+      for (const top of [1, 2, 8, maximum / 2, maximum, 0]) {
+        await scroll.evaluate((el, top) => new Promise(resolve => {
+          el.scrollTop = top;
+          requestAnimationFrame(() => resolve());
+        }), top);
+        assert.deepEqual(await editor.boundingBox(), before.card, '滚动时卡片四边和圆角不移动');
+        assert.deepEqual(await toolbar.boundingBox(), before.header, 'Header不经历吸顶切换或一像素抖动');
+      }
+      await scroll.hover();
+      await page.mouse.wheel(0, 300);
+      await page.waitForFunction(() => document.querySelector('[data-slot="page-scroll"]').scrollTop > 0);
+      assert.deepEqual(await toolbar.boundingBox(), before.header, '真实滚轮滚动时Header保持固定');
+      await scroll.evaluate(el => { el.scrollTop = el.scrollHeight; });
+      const last = scroll.locator('.stack > [data-slot="card"]').last();
+      const bounds = await last.boundingBox(), clip = await scroll.boundingBox();
+      assert.ok(bounds.y + bounds.height <= clip.y + clip.height - 1, '最后一张名单卡片及底部描边可达');
+      assert.equal(await page.locator('#page-content').evaluate(el => el.scrollTop), 0);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+      await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/room-editor-fixed-${width}-${dark ? 'dark' : 'light'}.png`, import.meta.url)) });
     } finally { await close(); }
   }
 });

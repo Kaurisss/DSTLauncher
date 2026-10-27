@@ -5,7 +5,7 @@ defineProps({ leadingClass: { type: String, default: '' } });
 </script>
 
 <template>
-  <div role="region" class="ui-toolbar sticky top-0 z-10 min-w-0 rounded-t-xl bg-card px-4 py-3 sm:px-6">
+  <div role="region" class="ui-toolbar relative z-10 min-w-0 shrink-0 rounded-t-xl bg-card px-4 py-3 sm:px-6">
     <div class="toolbar-layout flex min-w-0 flex-wrap items-center justify-between gap-3">
       <div :class="cn('toolbar-leading flex min-w-0 flex-1 items-center gap-2', leadingClass)"><slot /></div>
       <div v-if="$slots.actions" class="ml-auto flex shrink-0 flex-wrap items-center gap-2"><slot name="actions" /></div>
