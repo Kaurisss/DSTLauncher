@@ -146,8 +146,9 @@ for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '�
 test('多卡片设置页只滚动Topbar下方main，切换列表页后无残留外层滚动', async () => {
   const { page, state } = await openPage('settings');
   try {
-    await page.getByRole('button', { name: '保存 Key', exact: true }).waitFor();
-    await page.setViewportSize({ width: 1280, height: 520 });
+    await page.getByRole('navigation', { name: '设置导航' }).getByRole('button', { name: '自动维护', exact: true }).click();
+    await page.getByRole('button', { name: '保存计划', exact: true }).waitFor();
+    await page.setViewportSize({ width: 1280, height: 360 });
     const topbar = page.locator('header[data-slot="app-header"]');
     const before = await topbar.boundingBox();
     const main = page.locator('#page-content');
@@ -188,12 +189,15 @@ test('存档目录可复制，备份目录使用真实路径并兼容两种分�
 test('设置保存按钮位于各自Header，仍提交对应表单并保留原生校验及回车提交', async () => {
   const { page, state } = await openPage('settings');
   try {
-    for (const [name, form] of [['保存计划', 'automation-plan-form'], ['保存密码', 'settings-password-form'], ['保存 Key', 'settings-api-key-form']]) {
+    const settingsNav = page.getByRole('navigation', { name: '设置导航' });
+    for (const [nav, name, form] of [['自动维护', '保存计划', 'automation-plan-form'], ['访问密码', '保存密码', 'settings-password-form'], ['API Key', '保存 Key', 'settings-api-key-form']]) {
+      await settingsNav.getByRole('button', { name: nav, exact: true }).click();
       const button = page.getByRole('button', { name, exact: true });
       await button.waitFor();
       assert.equal(await button.evaluate(el => !!el.closest('[data-slot="card-header"]') && !el.closest('form')), true);
       assert.equal(await button.evaluate(el => el.form.id), form);
     }
+    await settingsNav.getByRole('button', { name: '自动维护', exact: true }).click();
     const hours = page.getByLabel('所有房间备份间隔（小时，0 关闭）');
     await hours.fill('-1');
     await page.getByRole('button', { name: '保存计划', exact: true }).click();
@@ -205,6 +209,7 @@ test('设置保存按钮位于各自Header，仍提交对应表单并保留原�
     await confirmation.getByRole('button', { name: '确定', exact: true }).click();
     await page.getByText('自动维护计划已保存', { exact: true }).waitFor();
     assert.equal(state.automation.config.backupHours, 6);
+    await settingsNav.getByRole('button', { name: '访问密码', exact: true }).click();
     const password = page.getByRole('button', { name: '保存密码', exact: true });
     assert.equal(await password.isDisabled(), true);
     await page.locator('#set-new-pwd').fill('fixture-password');
@@ -212,6 +217,7 @@ test('设置保存按钮位于各自Header，仍提交对应表单并保留原�
     await page.getByText('面板密码已保存', { exact: true }).waitFor();
     const savedPassword = state.requests.find(r => r.path === '/api/auth/password' && r.method === 'PUT');
     assert.deepEqual(JSON.parse(savedPassword.body), { currentPassword: '', newPassword: 'fixture-password' });
+    await settingsNav.getByRole('button', { name: 'API Key', exact: true }).click();
     await page.locator('#set-steam-key').fill('0123456789abcdef0123456789abcdef');
     await page.locator('#set-steam-key').press('Enter');
     await page.getByText('Steam API Key 已保存', { exact: true }).waitFor();
