@@ -4,8 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 
+	"dst-windows/internal/chatlog"
 	"dst-windows/internal/room"
 )
 
@@ -68,5 +70,25 @@ func (s *Server) handlePlayerLists(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]any{
 		"ids": ids, "file": path, "needRestart": s.mgr.AnyRunning(rm.Key()),
 		"reservedSlots": rm.ReservedSlots(clusterDir),
+		"seen":          s.seenPlayers(clusterDir, rm.Shards),
 	}, nil)
+}
+
+// seenPlayers matches Klei IDs to names and characters already stored in the room logs.
+// shortcut: a bad history file hides names; the ID list still loads.
+func (s *Server) seenPlayers(clusterDir string, shards []room.Shard) map[string]chatlog.Face {
+	names := make([]string, 0, len(shards))
+	for _, shard := range shards {
+		if shard.Name != "" {
+			names = append(names, shard.Name)
+		}
+	}
+	faces, err := s.playerLogs.Faces(clusterDir, names)
+	if err != nil || faces == nil {
+		if err != nil {
+			log.Printf("读取玩家身份: %v", err)
+		}
+		return map[string]chatlog.Face{}
+	}
+	return faces
 }

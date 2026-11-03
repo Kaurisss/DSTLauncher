@@ -435,6 +435,7 @@ func (s *Server) handleAdmins(w http.ResponseWriter, r *http.Request) {
 			"file":        path,
 			"admins":      list,
 			"needRestart": s.mgr.AnyRunning(rm.Key()),
+			"seen":        s.seenPlayers(clusterDir, rm.Shards),
 		}, err)
 
 	case http.MethodPost:
@@ -454,6 +455,7 @@ func (s *Server) handleAdmins(w http.ResponseWriter, r *http.Request) {
 			"file":        path,
 			"admins":      list,
 			"needRestart": s.mgr.AnyRunning(rm.Key()),
+			"seen":        s.seenPlayers(clusterDir, rm.Shards),
 		}, nil)
 
 	case http.MethodDelete:
@@ -466,6 +468,7 @@ func (s *Server) handleAdmins(w http.ResponseWriter, r *http.Request) {
 			"file":        path,
 			"admins":      list,
 			"needRestart": s.mgr.AnyRunning(rm.Key()),
+			"seen":        s.seenPlayers(clusterDir, rm.Shards),
 		}, nil)
 
 	default:

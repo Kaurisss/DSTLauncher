@@ -165,23 +165,28 @@ onUnmounted(() => {
     </form>
   </div>
 
-  <SidebarProvider v-else class="h-dvh min-h-0 w-screen overflow-hidden bg-sidebar" style="--sidebar-width: 220px" @update:open="animateSidebarChange">
+  <SidebarProvider v-else class="flex h-dvh min-h-0 w-screen flex-col overflow-hidden bg-sidebar" style="--sidebar-width: 220px" @update:open="animateSidebarChange">
     <a href="#page-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:p-3 focus:text-foreground focus:shadow-md">跳到内容</a>
-    <AppSidebar />
-    <div ref="workspace" data-slot="main-workspace" class="flex h-full min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-      <TopBar />
+    <TopBar />
 
-      <main
-        id="page-content"
-        tabindex="-1"
-        :class="['flex min-h-0 min-w-0 flex-1 flex-col', cardScroll ? 'overflow-hidden' : 'overflow-y-auto']"
-        :style="cardScroll ? undefined : { scrollbarGutter: 'stable' }"
-      >
-        <div :class="['page-view w-full max-w-[2400px] min-w-0 p-3', cardScroll ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'shrink-0']">
-          <!-- 不延迟旧视图卸载，快速导航和换房始终只保留一个业务实例。 -->
-          <component :is="currentView" :key="viewKey" />
-        </div>
-      </main>
+    <div class="relative flex flex-1 min-h-0 w-full overflow-hidden bg-sidebar">
+      <AppSidebar />
+      <div ref="workspace" data-slot="main-workspace" class="flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden">
+        <main
+          id="page-content"
+          tabindex="-1"
+          :class="[
+            'flex min-h-0 min-w-0 flex-1 flex-col bg-background md:rounded-tl-xl md:border-t md:border-l border-border/60 shadow-xs',
+            cardScroll ? 'overflow-hidden' : 'overflow-y-auto'
+          ]"
+          :style="cardScroll ? undefined : { scrollbarGutter: 'stable' }"
+        >
+          <div :class="['page-view w-full max-w-[2400px] min-w-0 p-3', cardScroll ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'shrink-0']">
+            <!-- 不延迟旧视图卸载，快速导航和换房始终只保留一个业务实例。 -->
+            <component :is="currentView" :key="viewKey" />
+          </div>
+        </main>
+      </div>
     </div>
   </SidebarProvider>
 

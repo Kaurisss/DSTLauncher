@@ -93,7 +93,7 @@ const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
       :data-side="side"
       :class="
         cn(
-          'fixed inset-y-0 z-10 hidden h-svh w-(--sidebar-width) transition-[left,right,width] duration-180 ease-[cubic-bezier(0.2,0,0,1)] md:flex overflow-clip',
+          'fixed top-14 bottom-0 z-10 hidden h-auto w-(--sidebar-width) transition-[left,right,width] duration-180 ease-[cubic-bezier(0.2,0,0,1)] md:flex overflow-clip',
           side === 'left'
             ? 'left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]'
             : 'right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]',

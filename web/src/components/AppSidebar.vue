@@ -44,13 +44,12 @@ function navigate(key) {
 </script>
 
 <template>
-  <Sidebar collapsible="icon" class="h-full shrink-0 border-r border-sidebar-border">
-    <SidebarHeader class="h-16 shrink-0 justify-center px-3 group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:justify-end group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-0">
+  <Sidebar collapsible="icon" class="shrink-0 border-none">
+    <SidebarHeader class="h-16 shrink-0 justify-center px-3 md:hidden group-data-[collapsible=icon]:h-12 group-data-[collapsible=icon]:justify-end group-data-[collapsible=icon]:px-2 group-data-[collapsible=icon]:py-0">
       <div class="flex min-w-0 items-center gap-2">
         <img :src="iconUrl" alt="DST" width="32" height="32" class="size-8 shrink-0 rounded-lg object-cover group-data-[collapsible=icon]:hidden" />
         <div class="min-w-0 flex-1 group-data-[collapsible=icon]:hidden">
           <p class="truncate text-[13px] font-semibold leading-tight">DST 开服控制台</p>
-          <Badge v-if="panelVersion" variant="secondary" class="mt-1 px-1.5 py-0 text-[10px]">{{ panelVersion }}</Badge>
         </div>
         <Tooltip>
           <TooltipTrigger as-child>
@@ -90,12 +89,15 @@ function navigate(key) {
           <span class="size-1.5 shrink-0 rounded-full" :class="connected ? 'bg-emerald-600' : 'bg-muted-foreground'" aria-hidden="true" />
           日志{{ connected ? '已连接' : '未连接' }}
         </span>
-        <Tooltip>
-          <TooltipTrigger as-child>
-            <span class="truncate" tabindex="0">{{ serverText }}</span>
-          </TooltipTrigger>
-          <TooltipContent>{{ serverText }}</TooltipContent>
-        </Tooltip>
+        <div class="flex items-center gap-1.5 min-w-0">
+          <Badge v-if="panelVersion" variant="secondary" class="h-4 px-1 text-[10px] leading-none shrink-0 font-mono">{{ panelVersion }}</Badge>
+          <Tooltip>
+            <TooltipTrigger as-child>
+              <span class="truncate" tabindex="0">{{ serverText }}</span>
+            </TooltipTrigger>
+            <TooltipContent>{{ serverText }}</TooltipContent>
+          </Tooltip>
+        </div>
       </div>
     </SidebarFooter>
   </Sidebar>

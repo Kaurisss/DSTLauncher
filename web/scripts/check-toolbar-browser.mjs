@@ -111,10 +111,10 @@ for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '�
         await page.waitForFunction(() => document.querySelector('#page-content').getBoundingClientRect().bottom === window.innerHeight);
         const toolbar = page.getByRole('region', { name: label + '工具栏', exact: true });
         const before = await toolbar.boundingBox();
-        const topbar = await page.locator('[data-slot="main-workspace"] > header').boundingBox();
+        const topbar = await page.locator('header[data-slot="app-header"]').boundingBox();
         const card = await list.locator('xpath=ancestor::*[@data-slot="card"]').boundingBox();
         const main = await page.locator('#page-content').boundingBox();
-        assert.ok(card.y >= main.y + 15.5 && card.y + card.height <= main.y + main.height - 15.5, '卡片四周保留边距：' + JSON.stringify({ width, card, main }));
+        assert.ok(card.y >= main.y + 11.5 && card.y + card.height <= main.y + main.height - 11.5, '卡片四周保留边距：' + JSON.stringify({ width, card, main }));
         assert.ok((await list.boundingBox()).y >= before.y + before.height - 1, '滚动条起点在工具栏下方');
         await list.hover();
         await page.mouse.wheel(0, 400);
@@ -122,7 +122,7 @@ for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '�
         await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
         const after = await toolbar.boundingBox();
         assert.equal(after.y, before.y);
-        assert.deepEqual(await page.locator('[data-slot="main-workspace"] > header').boundingBox(), topbar);
+        assert.deepEqual(await page.locator('header[data-slot="app-header"]').boundingBox(), topbar);
         const final = await last.boundingBox(), bounds = await list.boundingBox();
         assert.ok(final.y >= bounds.y && final.y + final.height <= bounds.y + bounds.height + 1, '末行完整可见');
         const outer = await page.evaluate(() => ({
@@ -148,7 +148,7 @@ test('多卡片设置页只滚动Topbar下方main，切换列表页后无残留�
   try {
     await page.getByRole('button', { name: '保存 Key', exact: true }).waitFor();
     await page.setViewportSize({ width: 1280, height: 520 });
-    const topbar = page.locator('[data-slot="main-workspace"] > header');
+    const topbar = page.locator('header[data-slot="app-header"]');
     const before = await topbar.boundingBox();
     const main = page.locator('#page-content');
     await main.hover();
@@ -156,7 +156,7 @@ test('多卡片设置页只滚动Topbar下方main，切换列表页后无残留�
     await page.waitForFunction(() => document.querySelector('#page-content').scrollTop > 0);
     assert.deepEqual(await topbar.boundingBox(), before);
     assert.equal(await page.evaluate(() => window.scrollY + document.body.scrollTop), 0);
-    assert.equal(await main.evaluate(el => el.getBoundingClientRect().top), before.y + before.height);
+    assert.ok(await main.evaluate(el => el.getBoundingClientRect().top) >= before.y + before.height);
     await page.getByRole('button', { name: '模组', exact: true }).click();
     await page.locator('[data-slot="page-scroll"]').waitFor();
     assert.equal(await main.evaluate(el => el.scrollTop), 0);

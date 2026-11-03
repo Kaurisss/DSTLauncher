@@ -74,3 +74,39 @@ func TestPlayerListScopeValidationAuthAndMaintenance(t *testing.T) {
 		t.Fatal("player lists exposed without auth")
 	}
 }
+
+func TestPlayerListReportsSeenPlayersWithoutWritingNames(t *testing.T) {
+	s, rm := newWorldConfigServer(t, []string{"Surface"}, nil)
+	if err := room.Generate(s.rootDir, s.confDir, rm); err != nil {
+		t.Fatal(err)
+	}
+	dir := rm.ClusterDir(s.rootDir, s.confDir)
+	log := "[00:00:00]: Current time: Mon Jan  2 15:04:05 2006\n" +
+		"[00:01:00]: Client authenticated: (KU_player-1) 张三\n" +
+		"[00:02:00]: User ID KU_player-1 assigned ownership to entity 9 - willow\n"
+	if err := os.MkdirAll(filepath.Join(dir, "Surface"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "Surface", "server_log.txt"), []byte(log), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := "/api/player-lists?room=" + itoa(rm.ID) + "&kind=blocklist"
+	_, body := doJSON(t, s.Handler(), http.MethodPost, path, map[string]string{"kleiId": "ku_player-1"}, nil)
+	if body["code"] != float64(200) {
+		t.Fatal(body)
+	}
+	data := body["data"].(map[string]any)
+	face := data["seen"].(map[string]any)["ku_player-1"].(map[string]any)
+	if face["id"] != "KU_player-1" || face["name"] != "张三" || face["prefab"] != "willow" {
+		t.Fatalf("seen: %v", data["seen"])
+	}
+	raw, err := os.ReadFile(filepath.Join(dir, "blocklist.txt"))
+	if err != nil || string(raw) != "KU_player-1\n" {
+		t.Fatalf("list file: %q %v", raw, err)
+	}
+	_, body = doJSON(t, s.Handler(), http.MethodGet, "/api/admins?room="+itoa(rm.ID), nil, nil)
+	adminFace := body["data"].(map[string]any)["seen"].(map[string]any)["ku_player-1"].(map[string]any)
+	if adminFace["name"] != "张三" {
+		t.Fatal(body)
+	}
+}

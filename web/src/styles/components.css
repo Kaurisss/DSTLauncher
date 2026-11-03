@@ -836,35 +836,6 @@ input[type="radio"] {
 @media (hover: none) { .opt-row-revert { opacity: 1; } }
 
 /* --------------------------------------------------------------------------
-   房间管理员（adminlist.txt）
-   -------------------------------------------------------------------------- */
-
-/* 管理员以胶囊形式排布，一行放多个 */
-.admin-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 12px;
-}
-.admin-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 5px 4px 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  background: var(--surface-2);
-  font-size: 12.5px;
-}
-.admin-row-icon { color: var(--text-muted); flex-shrink: 0; }
-.admin-row .mono {
-  font-family: "JetBrains Mono", ui-monospace, Consolas, monospace;
-  font-size: 12px;
-  word-break: break-all;
-}
-.admin-row .btn { padding: 2px 9px; font-size: 11.5px; }
-
-/* --------------------------------------------------------------------------
    表格
    -------------------------------------------------------------------------- */
 

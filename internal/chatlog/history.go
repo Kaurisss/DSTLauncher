@@ -108,6 +108,112 @@ func (h *History) Query(clusterDir, shard string, q Query) (Result, error) {
 	return result, nil
 }
 
+// Face is who a Klei ID was the last time this room's logs recorded them.
+type Face struct {
+	ID     string `json:"id"`
+	Name   string `json:"name,omitempty"`
+	Prefab string `json:"prefab,omitempty"`
+}
+
+type faceStamp struct {
+	Face
+	nameAt, prefabAt time.Time
+}
+
+// Faces reads each shard's player history. Keys are lowercase Klei IDs.
+// A name shared by several log lines is kept only when a later chat or join says which one is current.
+func (h *History) Faces(clusterDir string, shards []string) (map[string]Face, error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	merged := map[string]*faceStamp{}
+	for _, shard := range shards {
+		s, err := h.sync(clusterDir, shard)
+		if err != nil {
+			return nil, err
+		}
+		for key, face := range s.faces() {
+			mergeFace(merged, key, face)
+		}
+	}
+	out := make(map[string]Face, len(merged))
+	for key, face := range merged {
+		out[key] = face.Face
+	}
+	return out, nil
+}
+
+func (s *historyState) faces() map[string]faceStamp {
+	latest := map[string]faceStamp{}
+	for _, entry := range s.Entries {
+		if entry.UserID == "" || entry.Name == "" {
+			continue
+		}
+		at := entry.CollectedAt
+		if entry.RecordedAt != nil && !entry.RecordedAt.IsZero() {
+			at = *entry.RecordedAt
+		}
+		key := strings.ToLower(entry.UserID)
+		prev, ok := latest[key]
+		if ok && at.Before(prev.nameAt) {
+			continue
+		}
+		latest[key] = faceStamp{Face: Face{Name: entry.Name}, nameAt: at}
+	}
+	out := map[string]faceStamp{}
+	for id, player := range s.Players {
+		key := strings.ToLower(id)
+		face := faceStamp{Face: Face{ID: id, Prefab: player.Prefab}, prefabAt: s.prefabTime(id)}
+		if named, ok := latest[key]; ok {
+			face.Name, face.nameAt = named.Name, named.nameAt
+		} else if len(player.Names) == 1 {
+			for name := range player.Names {
+				face.Name = name
+			}
+			face.nameAt = s.StartedAt
+		}
+		if face.Name == "" && face.Prefab == "" {
+			continue
+		}
+		out[key] = face
+	}
+	return out
+}
+
+func (s *historyState) prefabTime(id string) time.Time {
+	player := s.Players[id]
+	if s.StartedAt.IsZero() || player.Prefab == "" {
+		return time.Time{}
+	}
+	at := time.Duration(-1)
+	for _, change := range player.Changes {
+		if change.Prefab != "" && change.At >= at {
+			at = change.At
+		}
+	}
+	if at < 0 {
+		return time.Time{}
+	}
+	return s.StartedAt.Add(at)
+}
+
+func mergeFace(dst map[string]*faceStamp, key string, next faceStamp) {
+	cur := dst[key]
+	if cur == nil {
+		dst[key] = &next
+		return
+	}
+	if next.Name != "" && (cur.Name == "" || later(next.nameAt, cur.nameAt)) {
+		cur.Name, cur.nameAt = next.Name, next.nameAt
+	}
+	if next.Prefab != "" && (cur.Prefab == "" || later(next.prefabAt, cur.prefabAt)) {
+		cur.Prefab, cur.prefabAt = next.Prefab, next.prefabAt
+	}
+}
+
+func later(a, b time.Time) bool {
+	return !a.IsZero() && (b.IsZero() || a.After(b))
+}
+
 func (h *History) Delete(clusterDir, shard string, ids []int64) (int, error) {
 	if len(ids) == 0 || len(ids) > 500 {
 		return 0, fmt.Errorf("请选择 1–500 条日志")

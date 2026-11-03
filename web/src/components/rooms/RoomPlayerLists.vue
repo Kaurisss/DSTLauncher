@@ -6,7 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { playerListApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
+import { lookupPlayer, playerOptionLabel, unseenPlayers } from '@/lib/format.js';
 import { toast } from '@/lib/toast.js';
+import PlayerIdentity from '@/components/rooms/PlayerIdentity.vue';
+import {
+  Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
 
 const props = defineProps({ room: { type: Object, required: true } });
 const kinds = [
@@ -16,6 +21,8 @@ const kinds = [
 const kind = ref('blocklist');
 const selected = computed(() => kinds.find(item => item.key === kind.value));
 const ids = ref([]);
+const seen = ref({});
+const picked = ref('');
 const input = ref('');
 const search = ref('');
 const loading = ref(false);
@@ -25,10 +32,23 @@ const file = ref('');
 const needRestart = ref(false);
 const slots = ref(0);
 let generation = 0;
-const filtered = computed(() => ids.value.filter(id => id.toLowerCase().includes(search.value.trim().toLowerCase())));
+const candidates = computed(() => unseenPlayers(seen.value, ids.value));
+const filtered = computed(() => {
+  const query = search.value.trim().toLowerCase();
+  return ids.value.filter(id => `${id} ${playerOptionLabel(lookupPlayer(seen.value, id))}`.toLowerCase().includes(query));
+});
+function who(id) {
+  const face = lookupPlayer(seen.value, id);
+  return face?.name ? `${face.name}（${id}）` : id;
+}
+function onPick(id) {
+  picked.value = id;
+  input.value = id;
+}
 
 function apply(data) {
   ids.value = data.ids || [];
+  seen.value = data.seen || {};
   file.value = data.file || '';
   needRestart.value = !!data.needRestart;
   slots.value = data.reservedSlots || 0;
@@ -54,6 +74,7 @@ async function load() {
 
 watch(() => [props.room.id, kind.value], () => {
   input.value = '';
+  picked.value = '';
   search.value = '';
   load();
 }, { immediate: true });
@@ -72,12 +93,13 @@ async function change(id, remove = false) {
   const ticket = generation;
   busy.value = true;
   try {
-    if (remove && !await confirmAction(`从「${roomName}」的${selected.value.title}移除 ${id}？\n修改将在下次重启房间后生效。`)) return;
+    if (remove && !await confirmAction(`从「${roomName}」的${selected.value.title}移除 ${who(id)}？\n修改将在下次重启房间后生效。`)) return;
     const data = await (remove ? playerListApi.remove : playerListApi.add)(roomId, target, id);
     // Do not overwrite data from a later refresh or a different room/list.
     if (ticket === generation) {
       apply(data);
       input.value = '';
+      picked.value = '';
     }
     toast(`「${roomName}」名单已${remove ? '移除' : '添加'}（重启后生效）`);
   } catch (err) {
@@ -111,15 +133,25 @@ async function change(id, remove = false) {
         <form class="flex flex-wrap gap-2" @submit.prevent="change(input)">
           <Input v-model="input" :aria-label="`${selected.title} Klei ID`" class="min-w-0 flex-1 basis-48 font-mono" placeholder="KU_ 开头的玩家 ID" autocomplete="off" :disabled="busy" />
           <Button type="submit" :disabled="busy || !input.trim()">添加到{{ selected.title }}</Button>
+          <Select v-if="candidates.length" :model-value="picked" :disabled="busy" @update:model-value="onPick">
+            <SelectTrigger class="w-full min-w-0 basis-full" aria-label="从进过房间的玩家选择">
+              <SelectValue placeholder="从进过房间的玩家选择" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem v-for="player in candidates" :key="player.id" :value="player.id">{{ playerOptionLabel(player) }}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
         </form>
-        <Input v-if="ids.length" v-model="search" :aria-label="`搜索${selected.title}`" placeholder="搜索玩家 ID" />
+        <Input v-if="ids.length" v-model="search" :aria-label="`搜索${selected.title}`" placeholder="搜索游戏名、角色或 ID" />
         <ul v-if="filtered.length" class="grid gap-2" :aria-label="`${selected.title}玩家`">
           <li v-for="id in filtered" :key="id" class="flex min-w-0 items-center gap-2 rounded-md border px-3 py-2">
-            <span class="min-w-0 flex-1 break-all font-mono text-sm">{{ id }}</span>
-            <Button variant="outline" size="sm" :aria-label="`从${selected.title}移除 ${id}`" :disabled="busy" @click="change(id, true)">移除</Button>
+            <PlayerIdentity class="min-w-0 flex-1" :id="id" :seen="seen" />
+            <Button variant="outline" size="sm" :aria-label="`从${selected.title}移除 ${who(id)}`" :disabled="busy" @click="change(id, true)">移除</Button>
           </li>
         </ul>
-        <UiEmpty v-else icon="users" :text="ids.length ? '没有匹配的玩家 ID' : `暂无${selected.title}玩家`" />
+        <UiEmpty v-else icon="users" :text="ids.length ? '没有匹配的玩家' : `暂无${selected.title}玩家`" />
       </template>
     </section>
   </UiCard>

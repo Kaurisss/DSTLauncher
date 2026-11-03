@@ -180,7 +180,7 @@ async function blockPlayer(entry) {
   blocking.value = entry.userid;
   try {
     if (!await confirmAction({
-      title: `将「${entry.name || entry.userid}」加入黑名单？`,
+      title: `封禁「${entry.name || entry.userid}」？`,
       description: `${entry.userid} · 房间「${room.name}」。下次重启房间后生效，不会立即踢出在线玩家。`,
       destructive: true,
     })) return;
@@ -188,7 +188,7 @@ async function blockPlayer(entry) {
     const { ok } = await guard(() => playerListApi.add(room.id, 'blocklist', entry.userid));
     if (ok) {
       if (!disposed && rooms.currentId === room.id) blocked.value.add(entry.userid);
-      toast(`已加入「${room.name}」黑名单，重启房间后生效`);
+      toast(`已封禁，重启「${room.name}」后生效`);
     }
   } finally {
     blocking.value = '';
@@ -254,7 +254,7 @@ async function blockPlayer(entry) {
                 <TableHead scope="col" class="w-32">IP</TableHead>
                 <TableHead scope="col" class="w-20">事件</TableHead>
                 <TableHead scope="col">内容</TableHead>
-                <TableHead scope="col" class="w-52 pr-4 text-right">操作</TableHead>
+                <TableHead scope="col" class="w-28 pr-4 text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -315,9 +315,8 @@ async function blockPlayer(entry) {
                     :disabled="!!blocking || deleting || blocked.has(entry.userid)"
                     @click="blockPlayer(entry)"
                   >
-                    {{ blocked.has(entry.userid) ? '已加入黑名单' : blocking === entry.userid ? '处理中…' : '加入黑名单' }}
+                    {{ blocked.has(entry.userid) ? '已封禁' : blocking === entry.userid ? '处理中…' : '封禁' }}
                   </Button>
-                  <Button variant="outline" size="sm" class="ml-2" :disabled="deleting || !!blocking || loading" :aria-label="`删除日志 ${entry.id}`" @click="removeEntries([entry.id])">删除</Button>
                 </TableCell>
               </TableRow>
             </TableBody>

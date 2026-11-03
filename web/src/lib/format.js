@@ -116,3 +116,26 @@ export const EVENT_LABEL = {
   ready: '就绪',
   warn: '警告',
 };
+
+
+export function lookupPlayer(seen, id) {
+  if (!id || !seen) return null;
+  return seen[String(id).toLowerCase()] || null;
+}
+
+export function characterName(prefab) {
+  if (!prefab) return '';
+  return CHARACTERS[prefab] || prefab;
+}
+
+export function playerOptionLabel(face) {
+  if (!face) return '';
+  return [face.name, characterName(face.prefab), face.id].filter(Boolean).join(' · ');
+}
+
+export function unseenPlayers(seen, ids) {
+  const taken = new Set((ids || []).map(id => String(id).toLowerCase()));
+  return Object.values(seen || {})
+    .filter(face => face?.id && !taken.has(face.id.toLowerCase()))
+    .sort((a, b) => playerOptionLabel(a).localeCompare(playerOptionLabel(b), 'zh'));
+}

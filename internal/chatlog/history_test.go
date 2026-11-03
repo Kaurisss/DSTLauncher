@@ -311,3 +311,36 @@ func TestHistoryKeepsMoreThanLegacyTailAndSearchesAllArchivedRows(t *testing.T) 
 		t.Fatalf("rotated log erased history search: %+v %v", r, err)
 	}
 }
+
+func TestFacesKeepsLatestNameAndCharacterAcrossShards(t *testing.T) {
+	cluster := filepath.Join(t.TempDir(), "Cluster_1")
+	start := time.Now().Add(-2 * time.Hour)
+	surface := fmt.Sprintf("[00:00:00]: Current time: %s\n", start.Format(time.ANSIC)) +
+		"[00:01:00]: Client authenticated: (KU_A-1) 旧名字\n" +
+		"[00:01:10]: Client authenticated: (KU_B) 甲\n" +
+		"[00:01:20]: Client authenticated: (KU_B) 乙\n" +
+		"[00:01:30]: User ID KU_B assigned ownership to entity 3 - wx78\n" +
+		"[00:01:40]: Client authenticated: (KU_C) 丙\n" +
+		"[00:02:00]: User ID KU_A-1 assigned ownership to entity 1 - willow\n"
+	cavesAt := start.Add(-time.Hour)
+	caves := fmt.Sprintf("[00:00:00]: Current time: %s\n", cavesAt.Format(time.ANSIC)) +
+		"[00:01:00]: Client authenticated: (KU_A-1) 洞穴名\n" +
+		"[00:02:00]: User ID KU_A-1 assigned ownership to entity 2 - wendy\n"
+	writeGameLog(t, cluster, "Surface", "server_log.txt", surface)
+	writeGameLog(t, cluster, "Surface", "server_chat_log.txt", "[00:03:00]: [Say] (KU_A-1) 旧名字: hi\n[00:04:00]: [Say] (KU_A-1) 新名字: hi\n")
+	writeGameLog(t, cluster, "Caves", "server_log.txt", caves)
+	faces, err := NewHistory(t.TempDir()).Faces(cluster, []string{"Surface", "Caves"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	alice := faces["ku_a-1"]
+	if alice.ID != "KU_A-1" || alice.Name != "新名字" || alice.Prefab != "willow" {
+		t.Fatalf("latest face: %+v", alice)
+	}
+	if faces["ku_b"].Name != "" || faces["ku_b"].Prefab != "wx78" {
+		t.Fatalf("ambiguous name: %+v", faces["ku_b"])
+	}
+	if faces["ku_c"].Name != "丙" || faces["ku_c"].Prefab != "" {
+		t.Fatalf("single name: %+v", faces["ku_c"])
+	}
+}
