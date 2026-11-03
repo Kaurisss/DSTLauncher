@@ -15,13 +15,11 @@ import {
 
 import UiCard from '@/components/ui/UiCard.vue';
 import UiToolbar from '@/components/ui/UiToolbar.vue';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import Icon from '@/components/ui/Icon.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import UiLoading from '@/components/ui/UiLoading.vue';
-import { Spinner } from '@/components/ui/spinner';
 import {
   Table, TableBody, TableCaption, TableCell, TableEmpty,
   TableHead, TableHeader, TableRow,
@@ -64,13 +62,13 @@ const columns = [
   },
   {
     id: 'actions', header: '操作', enableSorting: false,
-    cell: ({ row }) => h(Button, {
-      variant: 'destructive', size: 'sm',
+    cell: ({ row }) => h(IconAction, {
+      variant: 'destructive', icon: 'trash', label: '删除',
       disabled: row.original.roomExists || row.original.running,
-      title: row.original.roomExists ? '房间还在，请先在房间页删除房间'
+      tip: row.original.roomExists ? '房间还在，请先在房间页删除房间'
         : (row.original.running ? '正在运行，请先停服' : '永久删除这份存档'),
       onClick: () => remove(row.original),
-    }, () => '删除'),
+    }),
   },
 ];
 
@@ -153,14 +151,9 @@ async function remove(item) {
       <Input class="min-w-32 max-w-64 flex-1" aria-label="搜索存档" placeholder="搜索存档、房间或分片" :model-value="table.atoms.globalFilter.get() ?? ''" @update:model-value="table.setGlobalFilter" />
       <Badge variant="secondary" class="shrink-0 whitespace-nowrap tabular-nums">共 {{ items.length }} 个存档（{{ fmtSize(totalSize) }}）</Badge>
       <Badge v-if="orphans.length" variant="outline" class="shrink-0 whitespace-nowrap text-muted-foreground">孤儿存档 {{ orphans.length }} 个 · {{ fmtSize(orphanSize) }}</Badge>
-      <Tooltip v-if="root">
-        <TooltipTrigger as-child>
-          <Button variant="ghost" size="sm" class="text-muted-foreground" aria-label="复制存档根目录" @click="copyRoot"><Icon name="folder" size="14" />目录路径</Button>
-        </TooltipTrigger>
-        <TooltipContent class="max-w-sm break-all"><code class="bg-transparent p-0">{{ root }}</code></TooltipContent>
-      </Tooltip>
+      <IconAction v-if="root" variant="ghost" class="text-muted-foreground" icon="folder" label="复制存档根目录" :tip="root" @click="copyRoot" />
       <template #actions>
-        <Button variant="outline" size="sm" :disabled="loading" @click="load"><Spinner v-if="loading && items.length" aria-hidden="true" />刷新</Button>
+        <IconAction variant="outline" icon="refresh" label="刷新" :disabled="loading" @click="load" />
       </template>
     </UiToolbar>
 
@@ -216,12 +209,8 @@ async function remove(item) {
 
         <nav v-if="!loadError && items.length" aria-label="存档分页" class="flex flex-wrap items-center justify-end gap-2">
           <span class="mr-2 text-sm text-muted-foreground" aria-live="polite">第 {{ table.atoms.pagination.get().pageIndex + 1 }} / {{ Math.max(1, table.getPageCount()) }} 页</span>
-          <Button variant="outline" size="sm" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
-            <Icon name="chevron" class="rotate-180" :size="14" />上一页
-          </Button>
-          <Button variant="outline" size="sm" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
-            下一页<Icon name="chevron" :size="14" />
-          </Button>
+          <IconAction variant="outline" icon="chevron" icon-class="rotate-180" label="上一页" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()" />
+          <IconAction variant="outline" icon="chevron" label="下一页" :disabled="!table.getCanNextPage()" @click="table.nextPage()" />
         </nav>
       </div>
     </div>

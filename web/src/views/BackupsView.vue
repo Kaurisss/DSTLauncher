@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import BackupTable from '@/components/backups/BackupTable.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -98,7 +98,7 @@ function exportSave(name) {
       </Tooltip>
       <template #actions>
         <RollbackDialog />
-        <Button size="sm" :disabled="!rooms.current" @click="create">立即备份</Button>
+        <IconAction icon="archive" label="立即备份" :disabled="!rooms.current" @click="create" />
       </template>
     </UiToolbar>
 

@@ -5,7 +5,7 @@ import { computed } from 'vue';
 
 import UiPill from '@/components/ui/UiPill.vue';
 import Icon from '@/components/ui/Icon.vue';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { GAME_MODE_LABEL, roomShardLabel } from '@/lib/format.js';
 
 const props = defineProps({
@@ -88,15 +88,9 @@ function ports(s) {
     </div>
 
     <div class="room-actions">
-      <Button variant="outline" size="sm" @click="$emit('edit', room.id)">
-        <Icon name="pencil" size="14" />编辑
-      </Button>
-      <Button variant="outline" size="sm" @click="$emit('upload', room.id)">
-        <Icon name="upload" size="14" />上传存档
-      </Button>
-      <Button variant="destructive" size="sm" @click="$emit('remove', room.id)">
-        <Icon name="trash" size="14" />删除
-      </Button>
+      <IconAction variant="outline" icon="pencil" label="编辑" @click="$emit('edit', room.id)" />
+      <IconAction variant="outline" icon="upload" label="上传存档" @click="$emit('upload', room.id)" />
+      <IconAction variant="destructive" icon="trash" label="删除" @click="$emit('remove', room.id)" />
     </div>
   </article>
 </template>

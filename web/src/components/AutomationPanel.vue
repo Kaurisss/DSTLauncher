@@ -2,7 +2,7 @@
 import { onMounted, onUnmounted, ref } from 'vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiField from '@/components/ui/UiField.vue';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Switch } from '@/components/ui/switch';
@@ -61,7 +61,7 @@ function date(value) {
   <UiCard>
     <template #title>自动维护</template>
     <template #actions>
-      <Button v-if="draft" type="submit" form="automation-plan-form" size="sm" :disabled="saving || !!snapshot?.running">{{ saving ? '保存中…' : '保存计划' }}</Button>
+      <IconAction v-if="draft" type="submit" form="automation-plan-form" icon="save" :label="saving ? '保存中…' : '保存计划'" :disabled="saving || !!snapshot?.running" />
     </template>
     <p v-if="error" role="alert" class="mb-4 text-sm text-destructive">{{ error }}</p>
     <form v-if="draft" id="automation-plan-form" class="grid gap-4" @submit.prevent="save">

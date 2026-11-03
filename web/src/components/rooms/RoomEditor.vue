@@ -15,6 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import Icon from '@/components/ui/Icon.vue';
 import ShardEditor from '@/components/rooms/ShardEditor.vue';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -202,8 +203,8 @@ async function save() {
       <h2 class="truncate text-sm font-semibold">{{ isNew ? '新建房间' : '编辑房间 · ' + form.name }}</h2>
       <Badge v-if="!isNew" variant="secondary" class="hidden shrink-0 font-mono text-[10px] lg:inline-flex">{{ room.key || 'Cluster_' + form.id }}</Badge>
       <template #actions>
-        <Button variant="outline" size="sm" :disabled="saving" @click="emit('close')">取消</Button>
-        <Button size="sm" :disabled="saving" @click="save"><Icon name="check" size="14" />{{ saving ? '保存中…' : '保存' }}</Button>
+        <IconAction variant="outline" icon="x" label="取消" :disabled="saving" @click="emit('close')" />
+        <IconAction icon="save" :label="saving ? '保存中…' : '保存'" :disabled="saving" @click="save" />
       </template>
     </UiToolbar>
 
@@ -255,10 +256,8 @@ async function save() {
       <UiField label="Klei 服务器令牌" for-id="f_token" block :hint="form.lanOnly || form.offline ? '局域网或离线模式可留空' : '在线开服必需 · 写入 cluster_token.txt'">
         <div class="flex min-w-0 items-center gap-1 rounded-lg border border-input pr-1 focus-within:ring-1 focus-within:ring-ring">
           <Input id="f_token" v-model="form.token" type="password" autocomplete="off" spellcheck="false" class="min-w-0 flex-1 border-0 bg-transparent font-mono shadow-none focus-visible:ring-0" placeholder="pds-g^..." />
-          <Button type="button" variant="ghost" size="sm" :disabled="saving" @click="pasteToken">粘贴</Button>
-          <Button as="a" href="https://accounts.klei.com/account/game/servers?game=DontStarveTogether" target="_blank" rel="noopener noreferrer" variant="ghost" size="sm" class="text-muted-foreground" aria-label="前往 Klei 获取令牌（新标签页）">
-            <span class="hidden sm:inline">前往 Klei 获取令牌</span><span class="sm:hidden">Klei 令牌</span><span aria-hidden="true">↗</span>
-          </Button>
+          <IconAction type="button" variant="ghost" icon="clipboard" label="粘贴" :disabled="saving" @click="pasteToken" />
+          <IconAction as="a" href="https://accounts.klei.com/account/game/servers?game=DontStarveTogether" target="_blank" rel="noopener noreferrer" variant="ghost" class="text-muted-foreground" icon="external" label="前往 Klei 获取令牌（新标签页）" />
         </div>
       </UiField>
 

@@ -12,6 +12,7 @@ import { ref } from 'vue';
 import Icon from '@/components/ui/Icon.vue';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -89,9 +90,7 @@ async function removeShard(index) {
   <section class="grid gap-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h3 class="text-xs font-semibold tracking-wide text-muted-foreground uppercase">世界（分片）</h3>
-      <Button variant="outline" size="sm" type="button" @click="addShard">
-        <Icon name="plus" size="14" />添加世界
-      </Button>
+      <IconAction variant="outline" icon="plus" label="添加世界" @click="addShard" />
     </div>
 
     <div class="shard-editor-grid grid items-start gap-4 lg:grid-cols-2">

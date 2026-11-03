@@ -7,7 +7,7 @@ import UiEmpty from '@/components/ui/UiEmpty.vue';
 import WorldState from '@/components/overview/WorldState.vue';
 import { Badge } from '@/components/ui/badge';
 import { worldStateApi } from '@/lib/api.js';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
@@ -136,12 +136,10 @@ async function refreshSnapshots(id, requestGeneration) {
       <WorldState class="shard-world" :snapshot="s.snapshot" :loading="loadingSnapshots" :error="snapshotError" />
       <span class="shard-actions">
         <template v-if="isLive(s)">
-          <Button variant="destructive" size="sm" :disabled="rooms.starting" @click="proc.stop(s.shard)">停止</Button>
-          <Button variant="outline" size="sm" :disabled="rooms.starting || system.installing" @click="proc.restart(s.shard)">重启</Button>
+          <IconAction variant="destructive" icon="stop" label="停止" :disabled="rooms.starting" @click="proc.stop(s.shard)" />
+          <IconAction variant="outline" icon="restart" label="重启" :disabled="rooms.starting || system.installing" @click="proc.restart(s.shard)" />
         </template>
-        <Button v-else size="sm" :disabled="rooms.starting" @click="proc.start(s.shard)">
-          {{ rooms.starting ? '请稍候…' : (system.installed ? '启动' : '安装并启动') }}
-        </Button>
+        <IconAction v-else :icon="system.installed ? 'play' : 'download'" :label="rooms.starting ? '请稍候…' : (system.installed ? '启动' : '安装并启动')" :disabled="rooms.starting" @click="proc.start(s.shard)" />
       </span>
     </div>
   </section>

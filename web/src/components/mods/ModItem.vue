@@ -7,6 +7,7 @@ import UiPill from '@/components/ui/UiPill.vue';
 import Icon from '@/components/ui/Icon.vue';
 import { Switch } from '@/components/ui/switch';
 import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import ModConfigForm from '@/components/mods/ModConfigForm.vue';
@@ -202,16 +203,16 @@ async function setExpanded(open) {
             <span>{{ toggling ? '保存中…' : enabled ? '已启用' : '已禁用' }}</span>
           </label>
           <SheetTrigger v-if="mod.installed" as-child>
-            <Button variant="outline" size="sm">配置</Button>
+            <IconAction variant="outline" icon="sliders" label="配置" />
           </SheetTrigger>
-          <Tooltip v-if="mod.id.startsWith('workshop-')">
-            <TooltipTrigger as="span" :as-child="!(frozen || downloading || removing)" class="inline-flex" :tabindex="frozen || downloading || removing ? 0 : undefined">
-              <Button variant="outline" size="sm" :disabled="frozen || downloading || removing" @click="updateOne">
-                <Icon name="download" size="14" />{{ downloading ? '下载中…' : mod.installed ? (updateInfo ? '更新' : '重新下载') : '下载' }}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>{{ mod.installed ? '重新下载该模组' : '从创意工坊下载该模组' }}</TooltipContent>
-          </Tooltip>
+          <IconAction
+            v-if="mod.id.startsWith('workshop-')"
+            variant="outline"
+            icon="download"
+            :label="downloading ? '下载中…' : mod.installed ? (updateInfo ? '更新' : '重新下载') : '下载'"
+            :disabled="frozen || downloading || removing"
+            @click="updateOne"
+          />
           <Tooltip>
             <TooltipTrigger as="span" :as-child="!(frozen || removing || toggling || downloading || updating)" class="inline-flex" :tabindex="frozen || removing || toggling || downloading || updating ? 0 : undefined">
               <Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-destructive" aria-label="删除" :disabled="frozen || removing || toggling || downloading || updating" @click="remove">

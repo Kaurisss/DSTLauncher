@@ -2,7 +2,7 @@
 import { computed, ref } from 'vue';
 import Icon from '@/components/ui/Icon.vue';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -82,17 +82,17 @@ async function query(nextPage) {
       <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:px-6">
         <form class="flex gap-2" @submit.prevent="query()">
           <Input v-model="keyword" class="min-w-0 flex-1" aria-label="搜索创意工坊" placeholder="模组名称、ID 或创意工坊链接" />
-          <Button type="submit" :disabled="searching || !keyword.trim()">{{ searching ? '查询中…' : looksLikeId ? '查询' : '搜索' }}</Button>
+          <IconAction type="submit" icon="search" :label="searching ? '查询中…' : looksLikeId ? '查询' : '搜索'" :disabled="searching || !keyword.trim()" />
         </form>
         <div class="my-3 flex items-center justify-between gap-2">
-          <Button variant="ghost" size="sm" :aria-expanded="showKeyForm" @click="showKeyForm = !showKeyForm">Steam API Key</Button>
+          <IconAction variant="ghost" icon="key" label="Steam API Key" :aria-expanded="showKeyForm" @click="showKeyForm = !showKeyForm" />
           <span v-if="keySaved" role="status" class="text-sm text-muted-foreground">API Key 已保存</span>
         </div>
         <form v-if="showKeyForm" class="mb-4 grid gap-2 rounded-lg border bg-muted/30 p-3" @submit.prevent="saveKey">
           <Label for="workshop-api-key">Steam Web API Key</Label>
           <div class="flex gap-2">
             <Input id="workshop-api-key" v-model="apiKeyInput" type="password" autocomplete="off" class="min-w-0 flex-1" placeholder="输入新的 API Key，留空可清除" />
-            <Button variant="outline" type="submit" :disabled="savingKey">{{ savingKey ? '保存中…' : '保存' }}</Button>
+            <IconAction variant="outline" type="submit" icon="save" :label="savingKey ? '保存中…' : '保存'" :disabled="savingKey" />
           </div>
           <p v-if="keyError" role="alert" class="text-sm text-destructive">{{ keyError }}</p>
         </form>
@@ -113,28 +113,26 @@ async function query(nextPage) {
                 <Badge v-if="currentMods.get(item.id)?.enabled" variant="secondary">已启用</Badge>
               </div>
             </div>
-            <Button
+            <IconAction
               v-if="currentMods.get(item.id)?.installed || item.installed"
-              variant="outline" size="sm"
+              variant="outline"
+              icon="check"
+              :label="currentMods.get(item.id)?.enabled ? '已启用' : '启用'"
               :disabled="disabled || busyIds.includes('workshop-' + item.id) || currentMods.get(item.id)?.enabled"
               @click="emit('enable', 'workshop-' + item.id)"
-            >
-              {{ currentMods.get(item.id)?.enabled ? '已启用' : '启用' }}
-            </Button>
-            <Button v-else size="sm" :disabled="disabled || busyIds.includes('workshop-' + item.id)" @click="emit('download', { id: 'workshop-' + item.id, name: item.title, installed: false })">
-              {{ busyIds.includes('workshop-' + item.id) ? '已加入队列' : '下载' }}
-            </Button>
+            />
+            <IconAction v-else icon="download" :label="busyIds.includes('workshop-' + item.id) ? '已加入队列' : '下载'" :disabled="disabled || busyIds.includes('workshop-' + item.id)" @click="emit('download', { id: 'workshop-' + item.id, name: item.title, installed: false })" />
           </article>
         </div>
         <div v-else-if="searched && !error" class="py-10 text-center text-sm text-muted-foreground">没有查到结果</div>
         <div v-else-if="!error" class="grid justify-items-center gap-3 py-10 text-muted-foreground" aria-hidden="true"><Icon name="package" :size="32" /></div>
         <nav v-if="searched && !idQuery && !error && (page > 1 || results.length === 20)" aria-label="工坊分页" class="mt-4 flex items-center justify-end gap-2">
           <span class="mr-2 text-sm text-muted-foreground">第 {{ page }} 页</span>
-          <Button variant="outline" size="sm" :disabled="searching || page === 1" @click="query(page - 1)">上一页</Button>
-          <Button variant="outline" size="sm" :disabled="searching || results.length < 20" @click="query(page + 1)">下一页</Button>
+          <IconAction variant="outline" icon="chevron" icon-class="rotate-180" label="上一页" :disabled="searching || page === 1" @click="query(page - 1)" />
+          <IconAction variant="outline" icon="chevron" label="下一页" :disabled="searching || results.length < 20" @click="query(page + 1)" />
         </nav>
       </div>
-      <div class="flex shrink-0 justify-end border-t p-4 sm:px-6"><Button variant="outline" @click="emit('update:open', false)">完成</Button></div>
+      <div class="flex shrink-0 justify-end border-t p-4 sm:px-6"><IconAction variant="outline" icon="check" label="完成" @click="emit('update:open', false)" /></div>
     </DialogContent>
   </Dialog>
 </template>

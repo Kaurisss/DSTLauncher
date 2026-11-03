@@ -7,7 +7,7 @@
 import { computed, onMounted, reactive, ref } from 'vue';
 
 import UiLoading from '@/components/ui/UiLoading.vue';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
@@ -196,8 +196,8 @@ async function save() {
     </div>
     <div v-if="!loading && !loadError && hasOptions" class="flex shrink-0 items-center justify-end gap-2 border-t bg-background p-4">
       <span v-if="dirty" role="status" class="mr-auto text-sm text-amber-700 dark:text-amber-400">未保存</span>
-      <Button type="button" variant="ghost" :disabled="!dirty || saving || disabled" @click="reset">撤销修改</Button>
-      <Button type="submit" :disabled="saving || disabled">{{ saving ? '保存中…' : '保存配置' }}</Button>
+      <IconAction type="button" variant="ghost" icon="undo" label="撤销修改" :disabled="!dirty || saving || disabled" @click="reset" />
+      <IconAction type="submit" icon="save" :label="saving ? '保存中…' : '保存配置'" :disabled="saving || disabled" />
     </div>
   </form>
 </template>

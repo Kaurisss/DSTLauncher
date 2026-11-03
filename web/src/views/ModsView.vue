@@ -20,9 +20,9 @@ import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiPill from '@/components/ui/UiPill.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
 import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton } from '@/components/ui/code-block';
 import { Input } from '@/components/ui/input';
-import { Spinner } from '@/components/ui/spinner';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ModItem from '@/components/mods/ModItem.vue';
@@ -202,11 +202,11 @@ let polling = false;
 let disposed = false;
 
 function restoreUpdateFocus() {
-  nextTick(() => updateLogButton.value?.$el?.focus());
+  nextTick(() => updateLogButton.value?.focus());
 }
 
 function restoreWorkshopFocus() {
-  nextTick(() => addModButton.value?.$el?.focus());
+  nextTick(() => addModButton.value?.focus());
 }
 
 function stopPoll() {
@@ -418,16 +418,9 @@ watch([() => rooms.current, shard], () => {
           </div>
         </div>
         <div class="mods-toolbar-actions">
-          <Button variant="outline" size="sm" :disabled="!rooms.current || updating || checking || queueing" @click="checkUpdates">
-            <Spinner v-if="checking" aria-hidden="true" />
-            <Icon v-else name="globe" size="14" />{{ checking ? '检查中…' : '检查更新' }}
-          </Button>
-          <Button ref="addModButton" size="sm" :disabled="!rooms.current" aria-haspopup="dialog" @click="workshopOpen = true">
-            <Icon name="plus" size="14" />添加模组
-          </Button>
-          <Button v-if="updating || output.length || updateError || pollError" ref="updateLogButton" variant="outline" size="sm" aria-haspopup="dialog" :aria-expanded="updateOpen" @click="updateOpen = true">
-            更新日志
-          </Button>
+          <IconAction variant="outline" icon="refresh" :icon-class="checking ? 'animate-spin motion-reduce:animate-none' : ''" :label="checking ? '检查中…' : '检查更新'" :disabled="!rooms.current || updating || checking || queueing" @click="checkUpdates" />
+          <IconAction ref="addModButton" icon="plus" label="添加模组" :disabled="!rooms.current" aria-haspopup="dialog" @click="workshopOpen = true" />
+          <IconAction v-if="updating || output.length || updateError || pollError" ref="updateLogButton" variant="outline" icon="fileCode" label="更新日志" aria-haspopup="dialog" :aria-expanded="updateOpen" @click="updateOpen = true" />
           <div class="inline-flex border-l border-border pl-2">
             <Tooltip>
               <TooltipTrigger as="span" :as-child="!(loading || !rooms.current)" class="inline-flex" :tabindex="loading || !rooms.current ? 0 : undefined">
@@ -454,13 +447,13 @@ watch([() => rooms.current, shard], () => {
           <div v-else-if="missingCount" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
             <Icon name="download" size="16" />
             <span>{{ missingCount }} 个已启用模组未下载</span>
-            <Button class="ml-auto" variant="outline" size="sm" :disabled="queueing || updating" @click="enqueue(mods.filter(mod => mod.enabled && !mod.installed).map(mod => mod.id))">下载缺失</Button>
+            <IconAction class="ml-auto" variant="outline" icon="download" label="下载缺失" :disabled="queueing || updating" @click="enqueue(mods.filter(mod => mod.enabled && !mod.installed).map(mod => mod.id))" />
           </div>
 
           <!-- 检查结果：明确指出是哪个模组旧了，客户端只会笼统提示「有旧版本 mod」 -->
           <div v-if="checkResult" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border bg-muted/30 p-3 text-sm" role="status">
             <span>{{ updatesCount ? `${updatesCount} 个模组有新版本` : '没有可更新的模组' }}</span>
-            <Button v-if="updatesCount" class="ml-auto" size="sm" :disabled="frozen || updating || queueing" @click="updateAll">更新全部</Button>
+            <IconAction v-if="updatesCount" class="ml-auto" icon="download" label="更新全部" :disabled="frozen || updating || queueing" @click="updateAll" />
           </div>
           <p
             v-if="checkResult && (checkResult.missing || []).length"
@@ -474,8 +467,8 @@ watch([() => rooms.current, shard], () => {
             <Icon :name="updateError || pollError ? 'alert' : 'download'" size="16" />
             <span class="min-w-0 flex-1 break-words">{{ pollError ? '无法读取更新进度：' + pollError : updateError || progress || '正在下载模组…' }}</span>
             <span v-if="updating && queuedCount" class="text-muted-foreground">排队 {{ queuedCount }} 个</span>
-            <Button v-if="pollError" variant="outline" size="sm" @click="pollUpdate">重试</Button>
-            <Button variant="outline" size="sm" @click="updateOpen = true">查看进度</Button>
+            <IconAction v-if="pollError" variant="outline" icon="refresh" label="重试" @click="pollUpdate" />
+            <IconAction variant="outline" icon="activity" label="查看进度" @click="updateOpen = true" />
           </div>
 
           <p v-if="workshopError" class="field-tip mb-3" role="status">
@@ -500,8 +493,8 @@ watch([() => rooms.current, shard], () => {
           </template>
           <div v-else class="grid justify-items-center gap-3 rounded-lg border border-dashed p-10">
             <UiEmpty icon="package" :text="mods.length ? '没有匹配的模组' : '还没有模组'" />
-            <Button v-if="mods.length" variant="outline" size="sm" @click="search = ''; filter = 'all'">清除筛选</Button>
-            <Button v-else size="sm" @click="workshopOpen = true">添加模组</Button>
+            <IconAction v-if="mods.length" variant="outline" icon="clean" label="清除筛选" @click="search = ''; filter = 'all'" />
+            <IconAction v-else icon="plus" label="添加模组" @click="workshopOpen = true" />
           </div>
         </template>
       </div>
@@ -530,10 +523,10 @@ watch([() => rooms.current, shard], () => {
           <CodeBlockContent wrap class="mod-terminal" role="region" aria-label="模组更新输出">{{ output.join('\n') || (updating ? '正在等待更新输出…' : '暂无更新输出') }}</CodeBlockContent>
         </CodeBlock>
         <div class="flex justify-end gap-2">
-          <Button v-if="pollError" variant="outline" @click="pollUpdate">重试</Button>
-          <Button v-if="updating" variant="destructive" :disabled="stopping" @click="stopUpdate">{{ stopping ? '正在中止…' : '中止' }}</Button>
+          <IconAction v-if="pollError" variant="outline" icon="refresh" label="重试" @click="pollUpdate" />
+          <IconAction v-if="updating" variant="destructive" icon="stop" :label="stopping ? '正在中止…' : '中止'" :disabled="stopping" @click="stopUpdate" />
           <DialogClose as-child>
-            <Button variant="outline">关闭</Button>
+            <IconAction variant="outline" icon="x" label="关闭" />
           </DialogClose>
         </div>
       </DialogContent>

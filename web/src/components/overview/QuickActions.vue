@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue';
 import UiCard from '@/components/ui/UiCard.vue';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { procApi } from '@/lib/api.js';
@@ -75,12 +75,12 @@ async function run(action) {
     <template #title>快捷操作</template>
     <section aria-label="快捷操作" class="grid min-w-0 gap-3.5">
       <div class="flex flex-wrap gap-2">
-        <Button variant="outline" size="sm" :disabled="!!busy || !anyRunning || rooms.starting" @click="run('save')">{{ busy === 'save' ? '等待保存完成…' : '立即保存' }}</Button>
-        <Button variant="outline" size="sm" :disabled="!!busy || !masterRunning || rooms.starting" @click="run('skipday')">{{ busy === 'skipday' ? '等待游戏回执…' : '主世界快进一天' }}</Button>
+        <IconAction variant="outline" icon="save" :label="busy === 'save' ? '等待保存完成…' : '立即保存'" :disabled="!!busy || !anyRunning || rooms.starting" @click="run('save')" />
+        <IconAction variant="outline" icon="skip" :label="busy === 'skipday' ? '等待游戏回执…' : '主世界快进一天'" :disabled="!!busy || !masterRunning || rooms.starting" @click="run('skipday')" />
       </div>
       <form class="flex flex-col gap-2 sm:flex-row" @submit.prevent="run('announce')">
         <Input v-model="message" class="min-w-0 flex-1" aria-label="全服公告" placeholder="输入全服公告内容（最多 500 字）" :disabled="!!busy || !masterRunning || rooms.starting" />
-        <Button type="submit" size="sm" :disabled="!!busy || !masterRunning || !validMessage || rooms.starting">{{ busy === 'announce' ? '等待游戏回执…' : '发送全服公告' }}</Button>
+        <IconAction type="submit" icon="send" :label="busy === 'announce' ? '等待游戏回执…' : '发送全服公告'" :disabled="!!busy || !masterRunning || !validMessage || rooms.starting" />
       </form>
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">{{ error }}</p>
       <div v-if="report" role="status" class="space-y-1 break-words rounded-md bg-muted/50 px-3 py-2 text-xs">

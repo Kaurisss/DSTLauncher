@@ -9,7 +9,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { adminApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
@@ -143,9 +143,7 @@ async function remove(id) {
           spellcheck="false"
           @keydown.enter="add"
         />
-        <Button :disabled="busy || !input.trim()" @click="add">
-          <Icon name="plus" size="14" />添加
-        </Button>
+        <IconAction icon="plus" label="添加" :disabled="busy || !input.trim()" @click="add" />
       </div>
       <Select v-if="candidates.length" :model-value="picked" :disabled="busy" @update:model-value="onPick">
         <SelectTrigger class="mt-2 max-w-xl" aria-label="从进过房间的玩家选择">
@@ -169,9 +167,7 @@ async function remove(id) {
       <div v-if="admins.length" class="mt-3 grid gap-2">
         <div v-for="id in admins" :key="id" class="flex min-w-0 items-center gap-2 rounded-md border px-3 py-2">
           <PlayerIdentity class="min-w-0 flex-1" :id="id" :seen="seen" />
-          <Button variant="destructive" size="sm" :aria-label="`移除管理员 ${who(id)}`" :disabled="busy" @click="remove(id)">
-            移除
-          </Button>
+          <IconAction variant="destructive" icon="trash" :label="`移除管理员 ${who(id)}`" :disabled="busy" @click="remove(id)" />
         </div>
       </div>
       <UiEmpty v-else icon="users" text="暂无管理员。房主（服务器持有者）默认就是管理员" />

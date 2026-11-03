@@ -6,8 +6,8 @@ import {
   tableFeatures, useTable,
 } from '@tanstack/vue-table';
 
-import Icon from '@/components/ui/Icon.vue';
 import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import {
   Table, TableBody, TableCaption, TableCell,
   TableHead, TableHeader, TableRow,
@@ -29,9 +29,9 @@ const columns = [
   {
     id: 'actions', header: '操作', enableSorting: false,
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-2' }, [
-      h(Button, { variant: 'outline', size: 'sm', onClick: () => emit('restore', row.original.name) }, () => '回滚'),
-      h(Button, { variant: 'outline', size: 'sm', onClick: () => emit('export', row.original.name) }, () => '导出'),
-      h(Button, { variant: 'destructive', size: 'sm', onClick: () => emit('remove', row.original.name) }, () => '删除'),
+      h(IconAction, { variant: 'outline', icon: 'clock', label: '回滚', onClick: () => emit('restore', row.original.name) }),
+      h(IconAction, { variant: 'outline', icon: 'download', label: '导出', onClick: () => emit('export', row.original.name) }),
+      h(IconAction, { variant: 'destructive', icon: 'trash', label: '删除', onClick: () => emit('remove', row.original.name) }),
     ]),
   },
 ];
@@ -94,12 +94,8 @@ const table = useTable({
 
     <nav aria-label="备份分页" class="flex flex-wrap items-center justify-end gap-2">
       <span class="mr-2 text-sm text-muted-foreground" aria-live="polite">第 {{ table.atoms.pagination.get().pageIndex + 1 }} / {{ Math.max(1, table.getPageCount()) }} 页</span>
-      <Button variant="outline" size="sm" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()">
-        <Icon name="chevron" class="rotate-180" :size="14" />上一页
-      </Button>
-      <Button variant="outline" size="sm" :disabled="!table.getCanNextPage()" @click="table.nextPage()">
-        下一页<Icon name="chevron" :size="14" />
-      </Button>
+      <IconAction variant="outline" icon="chevron" icon-class="rotate-180" label="上一页" :disabled="!table.getCanPreviousPage()" @click="table.previousPage()" />
+      <IconAction variant="outline" icon="chevron" label="下一页" :disabled="!table.getCanNextPage()" @click="table.nextPage()" />
     </nav>
   </div>
 </template>

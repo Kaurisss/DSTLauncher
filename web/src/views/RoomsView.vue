@@ -4,8 +4,7 @@ import { computed, nextTick, onMounted, ref } from 'vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiToolbar from '@/components/ui/UiToolbar.vue';
 import { Badge } from '@/components/ui/badge';
-import Icon from '@/components/ui/Icon.vue';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import RoomGrid from '@/components/rooms/RoomGrid.vue';
 import RoomEditor from '@/components/rooms/RoomEditor.vue';
 import RoomAdmins from '@/components/rooms/RoomAdmins.vue';
@@ -103,7 +102,7 @@ async function onRemove(id) {
       </RoomEditor>
       <UiCard v-else>
         <template #title>房间已不存在</template>
-        <template #actions><Button variant="outline" size="sm" @click="closeEditor">返回房间列表</Button></template>
+        <template #actions><IconAction variant="outline" icon="chevron" icon-class="rotate-180" label="返回房间列表" @click="closeEditor" /></template>
       </UiCard>
     </template>
 
@@ -111,15 +110,9 @@ async function onRemove(id) {
       <UiToolbar aria-label="房间工具栏" leading-class="flex-none">
         <Badge variant="secondary" class="whitespace-nowrap tabular-nums">共 {{ rooms.list.length }} 个房间</Badge>
         <template #actions>
-          <Button id="new-room-button" size="sm" :disabled="preparing" @click="openEditor()">
-            <Icon name="plus" size="14" />新建房间
-          </Button>
-          <Button variant="outline" size="sm" @click="openUpload()">
-            <Icon name="upload" size="14" />上传存档
-          </Button>
-          <Button variant="outline" size="sm" @click="reload">
-            <Icon name="refresh" size="14" />刷新
-          </Button>
+          <IconAction id="new-room-button" icon="plus" label="新建房间" :disabled="preparing" @click="openEditor()" />
+          <IconAction variant="outline" icon="upload" label="上传存档" @click="openUpload()" />
+          <IconAction variant="outline" icon="refresh" label="刷新" @click="reload" />
         </template>
       </UiToolbar>
       <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" tabindex="0" role="region" aria-label="房间列表">

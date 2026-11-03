@@ -47,6 +47,19 @@ const ICONS = {
   users: '<circle cx="9" cy="8" r="3.2"/><path d="M3.2 20c0-3.2 2.6-5.8 5.8-5.8s5.8 2.6 5.8 5.8"/><path d="M16 5.4a3.2 3.2 0 0 1 0 5.2M17.6 14.4A5.8 5.8 0 0 1 20.8 20"/>',
   clock: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3.2 2"/>',
   inbox: '<path d="M3.2 13h4.6l1 2.6h6.4l1-2.6h4.6"/><path d="M5.6 4.8h12.8l2.4 8.2V19H3.2v-6z"/>',
+  clipboard: '<rect x="8" y="4" width="8" height="4" rx="1"/><path d="M8 6H6.5A1.5 1.5 0 0 0 5 7.5v12A1.5 1.5 0 0 0 6.5 21h11a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 17.5 6H16"/>',
+  search: '<circle cx="11" cy="11" r="6.5"/><path d="M16 16l4 4"/>',
+  undo: '<path d="M8 7.5H4.5V11"/><path d="M5 8a7.5 7.5 0 1 1-1.4 5.5"/>',
+  ban: '<circle cx="12" cy="12" r="8.5"/><path d="M6.8 17.2l10.4-10.4"/>',
+  heart: '<path d="M12 19.5s-6.5-4.1-6.5-8.4a3.6 3.6 0 0 1 6.5-2 3.6 3.6 0 0 1 6.5 2c0 4.3-6.5 8.4-6.5 8.4z"/>',
+  send: '<path d="M4.5 12L20 5.5l-5.8 13.2L11.5 13z"/>',
+  sliders: '<path d="M4 8h16M4 16h16"/><circle cx="9" cy="8" r="2.2"/><circle cx="15" cy="16" r="2.2"/>',
+  external: '<path d="M14 5h5v5"/><path d="M19 5l-8.5 8.5"/><path d="M16.5 13.5V19H5V7.5h5.5"/>',
+  skip: '<path d="M5.5 7l6.5 5-6.5 5z"/><path d="M12.5 7l6.5 5-6.5 5z"/>',
+  logout: '<path d="M9 7V5H4.5v14H9"/><path d="M10 12h9"/><path d="M16 8.5L19.5 12 16 15.5"/>',
+  pin: '<path d="M12 21s6-5.4 6-10a6 6 0 1 0-12 0c0 4.6 6 10 6 10z"/><circle cx="12" cy="11" r="2"/>',
+  save: '<path d="M5 4.5h10.5L19 8v11.5H5z"/><path d="M8 4.5V9h6.5"/><path d="M8 19.5v-5.5h8V19.5"/>',
+  clean: '<path d="M4 15.5l6.5-6.5 4.5 4.5-6.5 6.5H4z"/><path d="M9.2 10.3l4.5 4.5"/><path d="M3.5 20.5h17"/>',
 };
 
 const props = defineProps({

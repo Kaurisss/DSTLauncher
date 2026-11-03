@@ -6,7 +6,7 @@ import {
 } from 'reka-ui';
 
 import UiCard from '@/components/ui/UiCard.vue';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { adminApi, playerApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
@@ -148,9 +148,7 @@ function preventWhileBusy(event) {
     <UiCard>
       <template #title>在线玩家</template>
       <template #actions>
-        <Button variant="outline" size="sm" :disabled="!canQuery || loading || busy" @click="load">
-          {{ loading ? '查询中…' : '刷新玩家' }}
-        </Button>
+        <IconAction variant="outline" icon="refresh" :label="loading ? '查询中…' : '刷新玩家'" :disabled="!canQuery || loading || busy" @click="load" />
       </template>
 
       <p v-if="!rooms.current" class="text-sm text-muted-foreground">请先选择房间</p>
@@ -186,11 +184,11 @@ function preventWhileBusy(event) {
             </p>
           </div>
           <div class="flex max-w-full flex-wrap gap-1.5">
-            <Button variant="outline" size="sm" :disabled="busy" @click="act(player, 'kick')">踢出</Button>
-            <Button variant="destructive" size="sm" :disabled="busy" @click="act(player, 'ban')">封禁</Button>
-            <Button variant="outline" size="sm" :disabled="busy || !player.inWorld || !player.ghost" @click="act(player, 'revive')">复活</Button>
-            <Button variant="outline" size="sm" :disabled="busy || !canTeleport(player)" @click="openTeleport(player)">传送</Button>
-            <Button variant="outline" size="sm" :disabled="busy || player.admin || player.adminSaved || !/^KU_[A-Za-z0-9_-]{1,32}$/.test(player.userid)" @click="act(player, 'admin')">设为管理员</Button>
+            <IconAction variant="outline" icon="logout" label="踢出" :disabled="busy" @click="act(player, 'kick')" />
+            <IconAction variant="destructive" icon="ban" label="封禁" :disabled="busy" @click="act(player, 'ban')" />
+            <IconAction variant="outline" icon="heart" label="复活" :disabled="busy || !player.inWorld || !player.ghost" @click="act(player, 'revive')" />
+            <IconAction variant="outline" icon="pin" label="传送" :disabled="busy || !canTeleport(player)" @click="openTeleport(player)" />
+            <IconAction variant="outline" icon="users" label="设为管理员" :disabled="busy || player.admin || player.adminSaved || !/^KU_[A-Za-z0-9_-]{1,32}$/.test(player.userid)" @click="act(player, 'admin')" />
           </div>
         </article>
       </div>
@@ -214,8 +212,8 @@ function preventWhileBusy(event) {
             </Select>
             <p v-if="actionError" role="alert" class="break-words text-sm text-destructive">{{ actionError }}</p>
             <div class="flex justify-end gap-2">
-              <DialogClose as-child><Button type="button" variant="outline" :disabled="busy">取消</Button></DialogClose>
-              <Button type="submit" :disabled="busy || !validTarget">{{ busy ? '执行中…' : '确认传送' }}</Button>
+              <DialogClose as-child><IconAction type="button" variant="outline" icon="x" label="取消" :disabled="busy" /></DialogClose>
+              <IconAction type="submit" icon="pin" :label="busy ? '执行中…' : '确认传送'" :disabled="busy || !validTarget" />
             </div>
           </form>
         </DialogContent>

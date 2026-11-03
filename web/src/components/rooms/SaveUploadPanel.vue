@@ -14,7 +14,7 @@ import { Field, FieldGroup, FieldLabel, FieldTitle } from '@/components/ui/field
 import UiPill from '@/components/ui/UiPill.vue';
 import UiProgress from '@/components/ui/UiProgress.vue';
 import Icon from '@/components/ui/Icon.vue';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -161,9 +161,7 @@ async function submit() {
                 <b>{{ file?.name || '点击选择或将 .zip 存档拖到这里' }}</b>
                 <span v-if="file">{{ fmtSize(file.size) }}</span>
               </div>
-              <Button v-if="file" type="button" variant="outline" size="sm" :disabled="busy" @click.stop="openFilePicker">
-                重新选择
-              </Button>
+              <IconAction v-if="file" type="button" variant="outline" icon="folder" label="重新选择" :disabled="busy" @click.stop="openFilePicker" />
             </div>
             <input ref="fileInput" class="dropzone-input" type="file" accept=".zip,application/zip" :disabled="busy" aria-label="存档压缩包" @change="onPick">
           </Field>
@@ -231,12 +229,10 @@ async function submit() {
       </div>
 
       <DialogFooter class="shrink-0">
-        <DialogClose v-if="result" as-child><Button>完成</Button></DialogClose>
+        <DialogClose v-if="result" as-child><IconAction icon="check" label="完成" /></DialogClose>
         <template v-else>
-          <DialogClose as-child><Button variant="outline" :disabled="busy">取消</Button></DialogClose>
-          <Button class="min-w-0 max-w-full" :disabled="!canSubmit" @click="submit">
-            <Icon name="upload" size="14" /><span class="truncate">{{ busy ? '处理中…' : submitLabel }}</span>
-          </Button>
+          <DialogClose as-child><IconAction variant="outline" icon="x" label="取消" :disabled="busy" /></DialogClose>
+          <IconAction icon="upload" :label="busy ? '处理中…' : submitLabel" :disabled="!canSubmit" @click="submit" />
         </template>
       </DialogFooter>
     </DialogContent>

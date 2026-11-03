@@ -5,7 +5,7 @@ import { TabsContent } from 'reka-ui';
 
 import { Input } from '@/components/ui/input';
 import { CodeBlockContent, CodeBlockLine } from '@/components/ui/code-block';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { useLogs } from '@/composables/useLogs.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard } from '@/lib/toast.js';
@@ -117,7 +117,7 @@ async function submit() {
         :disabled="!running"
         :placeholder="running ? '控制台命令，如 c_save() / c_listallplayers()' : label + ' 未运行'"
       />
-      <Button type="submit" size="sm" :disabled="!running">执行</Button>
+      <IconAction type="submit" icon="terminal" label="执行" :disabled="!running" />
     </form>
   </TabsContent>
 </template>

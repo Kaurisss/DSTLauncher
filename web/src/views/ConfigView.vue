@@ -20,8 +20,7 @@ import UiToolbar from '@/components/ui/UiToolbar.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
-import { Button } from '@/components/ui/button';
-import { Spinner } from '@/components/ui/spinner';
+import IconAction from '@/components/ui/IconAction.vue';
 import ConfigFiles from '@/components/config/ConfigFiles.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { configApi } from '@/lib/api.js';
@@ -82,7 +81,7 @@ watch(() => rooms.current, load);
       </Tooltip>
       <span v-else class="text-sm text-muted-foreground">存档目录</span>
       <template #actions>
-        <Button variant="outline" size="sm" :disabled="loading || !rooms.current" @click="load"><Spinner v-if="loading && files.length" aria-hidden="true" />刷新</Button>
+        <IconAction variant="outline" icon="refresh" label="刷新" :disabled="loading || !rooms.current" @click="load" />
       </template>
     </UiToolbar>
 

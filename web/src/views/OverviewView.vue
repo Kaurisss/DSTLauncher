@@ -4,7 +4,7 @@
 import { computed } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import UiStat from '@/components/ui/UiStat.vue';
 import ShardList from '@/components/overview/ShardList.vue';
 import HostResources from '@/components/overview/HostResources.vue';
@@ -95,12 +95,8 @@ const resTone = computed(() => {
         <template #title>分片管理</template>
         <template #actions>
           <RollbackDialog />
-          <Button size="sm" :disabled="!rooms.current || rooms.starting" @click="proc.start('')">
-            {{ rooms.starting ? '准备开服中…' : (system.installed ? '全部启动' : '安装并启动') }}
-          </Button>
-          <Button variant="destructive" size="sm" :disabled="!rooms.current || rooms.starting" @click="proc.stop('')">
-            全部停止
-          </Button>
+          <IconAction :icon="system.installed ? 'play' : 'download'" :label="rooms.starting ? '准备开服中…' : (system.installed ? '全部启动' : '安装并启动')" :disabled="!rooms.current || rooms.starting" @click="proc.start('')" />
+          <IconAction variant="destructive" icon="stop" label="全部停止" :disabled="!rooms.current || rooms.starting" @click="proc.stop('')" />
         </template>
         <ShardList />
       </UiCard>

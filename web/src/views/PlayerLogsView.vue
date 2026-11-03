@@ -1,13 +1,14 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { HugeiconsIcon } from '@hugeicons/vue';
-import { ArrowLeft01Icon, ArrowRight01Icon, Copy01Icon, RefreshIcon } from '@hugeicons/core-free-icons';
+import { ArrowLeft01Icon, ArrowRight01Icon, Copy01Icon } from '@hugeicons/core-free-icons';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
 import UiToolbar from '@/components/ui/UiToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -215,17 +216,15 @@ async function blockPlayer(entry) {
           </SelectContent>
         </Select>
         <Input id="chat_search" v-model="search" aria-label="搜索历史记录" class="min-w-24 max-w-80 flex-1 bg-background" placeholder="昵称、ID、IP、角色或内容" maxlength="200" />
-        <Button type="button" variant="ghost" size="sm" :disabled="kind === 'all' && !search" @click="resetFilters">重置筛选</Button>
+        <IconAction type="button" variant="ghost" icon="x" label="重置筛选" :disabled="kind === 'all' && !search" @click="resetFilters" />
       </form>
       <template #actions>
-        <Button :variant="selected.size ? 'destructive' : 'ghost'" size="sm" :disabled="!selected.size || deleting || !!blocking || loading" @click="removeEntries([...selected])">删除所选（{{ selected.size }}）</Button>
+        <IconAction :variant="selected.size ? 'destructive' : 'ghost'" icon="trash" :label="`删除所选（${selected.size}）`" :disabled="!selected.size || deleting || !!blocking || loading" @click="removeEntries([...selected])" />
         <div class="flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
           <Switch id="player-log-refresh" v-model="autoRefresh" aria-label="自动刷新玩家日志" />
           <label for="player-log-refresh" class="cursor-pointer">自动刷新</label>
         </div>
-        <Button variant="outline" size="sm" :disabled="loading || !rooms.currentId || !shard" @click="refresh">
-          <HugeiconsIcon :icon="RefreshIcon" :class="loading ? 'animate-spin motion-reduce:animate-none' : ''" aria-hidden="true" />刷新记录
-        </Button>
+        <IconAction variant="outline" icon="refresh" :icon-class="loading ? 'animate-spin motion-reduce:animate-none' : ''" label="刷新记录" :disabled="loading || !rooms.currentId || !shard" @click="refresh" />
       </template>
     </UiToolbar>
 
@@ -310,13 +309,12 @@ async function blockPlayer(entry) {
                 <TableCell><Badge variant="outline" :class="eventClasses[entry.kind]">{{ labels[entry.kind] || entry.kind }}</Badge></TableCell>
                 <TableCell class="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-5">{{ entry.message }}</TableCell>
                 <TableCell class="pr-4 text-right">
-                  <Button
-                    v-if="/^KU_[A-Za-z0-9_-]{1,32}$/.test(entry.userid || '')" variant="destructive" size="sm"
+                  <IconAction
+                    v-if="/^KU_[A-Za-z0-9_-]{1,32}$/.test(entry.userid || '')" variant="destructive" icon="ban"
+                    :label="blocked.has(entry.userid) ? '已封禁' : blocking === entry.userid ? '处理中…' : '封禁'"
                     :disabled="!!blocking || deleting || blocked.has(entry.userid)"
                     @click="blockPlayer(entry)"
-                  >
-                    {{ blocked.has(entry.userid) ? '已封禁' : blocking === entry.userid ? '处理中…' : '封禁' }}
-                  </Button>
+                  />
                 </TableCell>
               </TableRow>
             </TableBody>

@@ -3,6 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { playerListApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
@@ -115,7 +116,7 @@ async function change(id, remove = false) {
     <template #title>玩家准入名单</template>
     <template #hint>名单属于当前编辑的房间「{{ room.name }}」，修改后需重启房间生效。</template>
     <template #actions>
-      <Button variant="outline" size="sm" :disabled="loading || busy" @click="load">刷新名单</Button>
+      <IconAction variant="outline" icon="refresh" label="刷新名单" :disabled="loading || busy" @click="load" />
     </template>
     <div role="group" aria-label="名单类型" class="mb-3 flex flex-wrap gap-2">
       <Button v-for="item in kinds" :key="item.key" size="sm" :variant="kind === item.key ? 'default' : 'outline'" :aria-pressed="kind === item.key" :disabled="busy" @click="kind = item.key">
@@ -132,7 +133,7 @@ async function change(id, remove = false) {
         <p v-if="needRestart" role="status" class="text-sm text-muted-foreground">房间正在运行，名单修改需下次重启后生效。</p>
         <form class="flex flex-wrap gap-2" @submit.prevent="change(input)">
           <Input v-model="input" :aria-label="`${selected.title} Klei ID`" class="min-w-0 flex-1 basis-48 font-mono" placeholder="KU_ 开头的玩家 ID" autocomplete="off" :disabled="busy" />
-          <Button type="submit" :disabled="busy || !input.trim()">添加到{{ selected.title }}</Button>
+          <IconAction type="submit" icon="plus" :label="`添加到${selected.title}`" :disabled="busy || !input.trim()" />
           <Select v-if="candidates.length" :model-value="picked" :disabled="busy" @update:model-value="onPick">
             <SelectTrigger class="w-full min-w-0 basis-full" aria-label="从进过房间的玩家选择">
               <SelectValue placeholder="从进过房间的玩家选择" />
@@ -148,7 +149,7 @@ async function change(id, remove = false) {
         <ul v-if="filtered.length" class="grid gap-2" :aria-label="`${selected.title}玩家`">
           <li v-for="id in filtered" :key="id" class="flex min-w-0 items-center gap-2 rounded-md border px-3 py-2">
             <PlayerIdentity class="min-w-0 flex-1" :id="id" :seen="seen" />
-            <Button variant="outline" size="sm" :aria-label="`从${selected.title}移除 ${who(id)}`" :disabled="busy" @click="change(id, true)">移除</Button>
+            <IconAction variant="outline" icon="trash" :label="`从${selected.title}移除 ${who(id)}`" :disabled="busy" @click="change(id, true)" />
           </li>
         </ul>
         <UiEmpty v-else icon="users" :text="ids.length ? '没有匹配的玩家' : `暂无${selected.title}玩家`" />

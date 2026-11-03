@@ -8,7 +8,7 @@ import {
   AlertDialogTitle, AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import IconAction from '@/components/ui/IconAction.vue';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
@@ -116,7 +116,7 @@ onMounted(async () => {
       <p v-if="system.external" class="text-sm text-muted-foreground">
         更新请在 Steam 中更新「Don't Starve Together Dedicated Server」工具，面板会自动使用最新版本。
       </p>
-      <Button v-else variant="outline" size="sm" class="self-start" :disabled="busy" @click="update">检查更新</Button>
+      <IconAction v-else variant="outline" class="self-start" icon="refresh" label="检查更新" :disabled="busy" @click="update" />
       <Alert v-if="busy">
         <AlertTitle>更新前请先停止所有分片</AlertTitle>
         <AlertDescription>运行中的服务器会占用文件，更新可能失败或只更新一半。</AlertDescription>
@@ -134,9 +134,7 @@ onMounted(async () => {
       </p>
       <AlertDialog>
         <AlertDialogTrigger as-child>
-          <Button variant="outline" size="sm" class="self-start" :disabled="busy || rooms.starting || installRequested">
-            {{ system.error ? '重试安装（支持续传）' : '仅安装服务器（约 4.5GB）' }}
-          </Button>
+          <IconAction variant="outline" class="self-start" icon="download" :label="system.error ? '重试安装（支持续传）' : '仅安装服务器（约 4.5GB）'" :disabled="busy || rooms.starting || installRequested" />
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -171,7 +169,7 @@ onMounted(async () => {
               <FieldLabel for="srv_dir">安装目录</FieldLabel>
               <Input id="srv_dir" v-model="draftDir" :disabled="locked" placeholder="留空 = 自动探测 Steam 库" />
               <FieldDescription>填「Don't Starve Together Dedicated Server」那一层，也可以粘贴里面的 bin 目录。</FieldDescription>
-              <Button size="sm" class="self-start" :disabled="locked" @click="apply(draftDir)">应用</Button>
+              <IconAction class="self-start" icon="check" label="应用" :disabled="locked" @click="apply(draftDir)" />
             </Field>
             <Field :data-disabled="locked || undefined">
               <FieldLabel for="srv_arch">架构</FieldLabel>
@@ -186,13 +184,11 @@ onMounted(async () => {
             <div v-for="candidate in server.candidates" :key="candidate.root" class="flex flex-wrap items-center gap-2">
               <span class="min-w-0 flex-1 break-all text-sm">{{ candidate.root }}</span>
               <Badge variant="secondary">{{ candidate.source }}</Badge>
-              <Button variant="outline" size="sm" :disabled="locked || candidate.root === server.root" @click="useCandidate(candidate.root)">
-                {{ candidate.root === server.root ? '使用中' : '使用' }}
-              </Button>
+              <IconAction variant="outline" icon="check" :label="candidate.root === server.root ? '使用中' : '使用'" :disabled="locked || candidate.root === server.root" @click="useCandidate(candidate.root)" />
             </div>
           </template>
           <div class="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" :disabled="locked || !server.pinned" @click="resetAuto">恢复自动探测</Button>
+            <IconAction variant="outline" icon="undo" label="恢复自动探测" :disabled="locked || !server.pinned" @click="resetAuto" />
             <span class="text-sm text-muted-foreground">{{ server.pinned ? '当前为手动指定' : '当前为自动探测' }}</span>
           </div>
           <p class="break-all text-sm text-muted-foreground">配置保存在 {{ server.configPath }}，重启面板后依然有效。</p>
