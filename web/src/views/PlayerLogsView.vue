@@ -229,7 +229,7 @@ async function blockPlayer(entry) {
       </template>
     </UiToolbar>
 
-    <div data-slot="page-scroll" class="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-4 pt-1 sm:px-6 sm:pb-6" tabindex="0" role="region" aria-label="玩家日志列表">
+    <div data-slot="page-scroll" class="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3" tabindex="0" role="region" aria-label="玩家日志列表">
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">读取失败：{{ error }}</p>
       <UiLoading v-else-if="loading && !result" />
       <UiEmpty v-else-if="!rooms.current" icon="users" text="请先选择房间" />

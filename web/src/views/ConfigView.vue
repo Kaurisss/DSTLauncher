@@ -86,7 +86,7 @@ watch(() => rooms.current, load);
       </template>
     </UiToolbar>
 
-    <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pt-1 sm:px-6 sm:pb-6" tabindex="0" role="region" aria-label="配置文件列表">
+    <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" tabindex="0" role="region" aria-label="配置文件列表">
       <UiLoading v-if="!rooms.loaded" />
       <UiEmpty v-else-if="!rooms.current" icon="fileCode" text="请先在「房间」页新建一个房间" />
       <UiLoading v-else-if="loading && !files.length" />

@@ -164,7 +164,7 @@ async function remove(item) {
       </template>
     </UiToolbar>
 
-    <div data-slot="page-scroll" class="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-4 pt-1 sm:px-6 sm:pb-6" tabindex="0" role="region" aria-label="存档列表">
+    <div data-slot="page-scroll" class="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain p-3" tabindex="0" role="region" aria-label="存档列表">
       <div class="grid min-w-0 gap-4">
         <div class="min-w-0 overflow-hidden rounded-md border" :aria-busy="loading">
           <Table class="min-w-[760px]">

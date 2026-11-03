@@ -177,7 +177,7 @@ onUnmounted(() => {
         :class="['flex min-h-0 min-w-0 flex-1 flex-col', cardScroll ? 'overflow-hidden' : 'overflow-y-auto']"
         :style="cardScroll ? undefined : { scrollbarGutter: 'stable' }"
       >
-        <div :class="['page-view w-full max-w-[2400px] min-w-0 p-4 md:p-6', cardScroll ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'shrink-0']">
+        <div :class="['page-view w-full max-w-[2400px] min-w-0 p-3', cardScroll ? 'flex min-h-0 flex-1 flex-col overflow-hidden' : 'shrink-0']">
           <!-- 不延迟旧视图卸载，快速导航和换房始终只保留一个业务实例。 -->
           <component :is="currentView" :key="viewKey" />
         </div>

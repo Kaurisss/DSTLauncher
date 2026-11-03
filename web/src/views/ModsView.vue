@@ -439,7 +439,7 @@ watch([() => rooms.current, shard], () => {
         </div>
       </div>
 
-      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6" tabindex="0" role="region" aria-label="模组列表">
+      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" tabindex="0" role="region" aria-label="模组列表">
         <UiLoading v-if="!rooms.loaded" />
         <UiEmpty v-else-if="!rooms.current" icon="package" text="请先在「房间」页新建一个房间" />
         <!-- 刷新保留列表，避免拆掉创意工坊窗口和更新进度。 -->
@@ -543,7 +543,7 @@ watch([() => rooms.current, shard], () => {
 
 <style scoped>
 .mods-workspace { min-width: 0; container-type: inline-size; }
-.mods-toolbar { padding: 12px 16px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--card); }
+.mods-toolbar { padding: 12px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--card); }
 .mods-toolbar-left { display: flex; flex: 1; align-items: center; gap: 12px; min-width: 0; }
 .mods-shard { width: 152px; min-width: 0; flex-shrink: 0; }
 .mods-search { position: relative; flex: 1; min-width: 96px; max-width: 256px; }
@@ -551,7 +551,7 @@ watch([() => rooms.current, shard], () => {
 .mods-filters .seg-btn { flex-shrink: 0; padding: 4px 8px; border-radius: 9999px; white-space: nowrap; font-size: 12px; }
 .mods-toolbar-actions { display: flex; flex-shrink: 0; align-items: center; gap: 8px; margin-left: auto; }
 @container (max-width: 820px) {
-  .mods-toolbar { flex-wrap: wrap; padding: 12px; }
+  .mods-toolbar { flex-wrap: wrap; }
   .mods-toolbar-left { flex-basis: 100%; flex-wrap: wrap; gap: 8px; }
   .mods-search { max-width: none; }
   .mods-toolbar-actions { flex-wrap: wrap; justify-content: flex-end; }

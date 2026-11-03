@@ -122,7 +122,7 @@ async function onRemove(id) {
           </Button>
         </template>
       </UiToolbar>
-      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 pt-1 sm:px-6 sm:pb-6" tabindex="0" role="region" aria-label="房间列表">
+      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" tabindex="0" role="region" aria-label="房间列表">
         <RoomGrid
           :rooms="rooms.list"
           :current-id="rooms.currentId"
