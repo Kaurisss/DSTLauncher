@@ -12,8 +12,7 @@ import {
   DialogTitle, DialogDescription, DialogClose,
 } from 'reka-ui';
 
-import { HugeiconsIcon } from '@hugeicons/vue';
-import { Search01Icon } from '@hugeicons/core-free-icons';
+import { PhMagnifyingGlass } from '@phosphor-icons/vue';
 import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
@@ -408,7 +407,7 @@ watch([() => rooms.current, shard], () => {
             </SelectContent>
           </Select>
           <div class="mods-search">
-            <HugeiconsIcon :icon="Search01Icon" class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
+            <PhMagnifyingGlass class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input v-model="search" class="w-full pl-8" aria-label="搜索模组" placeholder="搜索模组名称或 ID" />
           </div>
           <div class="seg mods-filters" role="group" aria-label="模组状态">

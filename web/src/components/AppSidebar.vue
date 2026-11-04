@@ -1,11 +1,9 @@
 <script setup>
 import { computed, onMounted } from 'vue';
 import iconUrl from '@/assets/icon.png';
-import { HugeiconsIcon } from '@hugeicons/vue';
 import {
-  Archive02Icon, CodeFolderIcon, DashboardSquare01Icon, EarthIcon,
-  Folder01Icon, Message01Icon, PackageIcon, ServerStack01Icon, Settings02Icon,
-} from '@hugeicons/core-free-icons';
+  PhArchive, PhChatCircle, PhCode, PhFolder, PhGear, PhGlobe, PhPackage, PhSquaresFour, PhStack,
+} from '@phosphor-icons/vue';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -25,9 +23,9 @@ const rooms = useRoomsStore();
 const { connected } = useLogs();
 const { setOpenMobile } = useSidebar();
 const icons = {
-  dashboard: DashboardSquare01Icon, server: ServerStack01Icon, globe: EarthIcon,
-  package: PackageIcon, message: Message01Icon, archive: Archive02Icon, folder: Folder01Icon, fileCode: CodeFolderIcon,
-  settings: Settings02Icon,
+  dashboard: PhSquaresFour, server: PhStack, globe: PhGlobe,
+  package: PhPackage, message: PhChatCircle, archive: PhArchive, folder: PhFolder, fileCode: PhCode,
+  settings: PhGear,
 };
 const panelVersion = computed(() => rooms.meta?.panelVersion || '');
 const serverText = computed(() => {
@@ -72,7 +70,7 @@ function navigate(key) {
                   :tooltip="tab.label"
                   @click="navigate(tab.key)"
                 >
-                  <HugeiconsIcon :icon="icons[tab.icon]" aria-hidden="true" />
+                  <component :is="icons[tab.icon]" aria-hidden="true" />
                   <span>{{ tab.label }}</span>
                 </SidebarMenuButton>
               </SidebarMenuItem>

@@ -1,7 +1,6 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue';
-import { HugeiconsIcon } from '@hugeicons/vue';
-import { ArrowLeft01Icon, ArrowRight01Icon, Copy01Icon } from '@hugeicons/core-free-icons';
+import { PhCaretLeft, PhCaretRight, PhCopy } from '@phosphor-icons/vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
@@ -276,7 +275,7 @@ async function blockPlayer(entry) {
                     <Tooltip>
                       <TooltipTrigger as-child>
                         <Button variant="ghost" size="icon-sm" class="shrink-0" :aria-label="`复制 Klei ID ${entry.userid}`" @click="copyId(entry.userid)">
-                          <HugeiconsIcon :icon="Copy01Icon" aria-hidden="true" />
+                          <PhCopy aria-hidden="true" />
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent>复制 Klei ID</TooltipContent>
@@ -301,7 +300,7 @@ async function blockPlayer(entry) {
                   <div v-if="entry.steamid" class="flex min-w-0 items-center gap-1">
                     <a v-if="/^\d+$/.test(entry.steamid)" :href="`https://steamcommunity.com/profiles/${entry.steamid}`" target="_blank" rel="noopener noreferrer" class="break-all whitespace-normal font-mono text-xs text-emerald-700 underline underline-offset-2 dark:text-emerald-300 hover:text-foreground">{{ entry.steamid }}</a>
                     <span v-else class="break-all whitespace-normal font-mono text-xs">{{ entry.steamid }}</span>
-                    <Button variant="ghost" size="icon-sm" class="shrink-0" :aria-label="`复制 Steam ID ${entry.steamid}`" @click="copyId(entry.steamid, 'Steam ID')"><HugeiconsIcon :icon="Copy01Icon" aria-hidden="true" /></Button>
+                    <Button variant="ghost" size="icon-sm" class="shrink-0" :aria-label="`复制 Steam ID ${entry.steamid}`" @click="copyId(entry.steamid, 'Steam ID')"><PhCopy aria-hidden="true" /></Button>
                   </div>
                   <span v-else class="text-muted-foreground">—</span>
                 </TableCell>
@@ -330,11 +329,11 @@ async function blockPlayer(entry) {
               </SelectContent>
             </Select>
             <Button variant="outline" size="icon-sm" aria-label="上一页" :disabled="loading || page === 1" @click="page--">
-              <HugeiconsIcon :icon="ArrowLeft01Icon" aria-hidden="true" />
+              <PhCaretLeft aria-hidden="true" />
             </Button>
             <span class="min-w-16 text-center tabular-nums">第 {{ page }} / {{ pageCount }} 页</span>
             <Button variant="outline" size="icon-sm" aria-label="下一页" :disabled="loading || page === pageCount" @click="page++">
-              <HugeiconsIcon :icon="ArrowRight01Icon" aria-hidden="true" />
+              <PhCaretRight aria-hidden="true" />
             </Button>
           </div>
         </nav>

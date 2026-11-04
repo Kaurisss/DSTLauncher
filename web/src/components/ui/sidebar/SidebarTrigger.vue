@@ -1,6 +1,5 @@
 <script setup>
-import { HugeiconsIcon } from '@hugeicons/vue';
-import { LayoutLeftIcon } from '@hugeicons/core-free-icons';
+import { PhSidebarSimple } from '@phosphor-icons/vue';
 import { cn } from "cn";
 import { Button } from '@/components/ui/button';
 import { useSidebar } from "./utils";
@@ -31,7 +30,7 @@ const { toggleSidebar, isMobile, openMobile, open } = useSidebar();
     :aria-expanded="isMobile ? openMobile : open"
     @click="toggleSidebar"
   >
-    <HugeiconsIcon :icon="LayoutLeftIcon" class="cn-rtl-flip" aria-hidden="true" />
+    <PhSidebarSimple class="cn-rtl-flip" aria-hidden="true" />
     <span class="sr-only">切换导航</span>
   </Button>
 </template>

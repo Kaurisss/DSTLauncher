@@ -1,6 +1,5 @@
 <script setup>
-import { HugeiconsIcon } from '@hugeicons/vue';
-import { ArrowUp01Icon } from '@hugeicons/core-free-icons';
+import { PhCaretUp } from '@phosphor-icons/vue';
 import { reactiveOmit } from "@vueuse/core";
 import { cn } from "cn";
 import { SelectScrollUpButton, useForwardProps } from "reka-ui";
@@ -32,7 +31,7 @@ const forwardedProps = useForwardProps(delegatedProps);
     "
   >
     <slot>
-      <HugeiconsIcon :icon="ArrowUp01Icon" />
+      <PhCaretUp />
     </slot>
   </SelectScrollUpButton>
 </template>

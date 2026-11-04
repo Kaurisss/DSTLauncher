@@ -1,7 +1,6 @@
 <script setup>
 import { computed, ref } from 'vue';
-import { HugeiconsIcon } from '@hugeicons/vue';
-import { ChevronLeftIcon, ChevronRightIcon, UndoIcon } from '@hugeicons/core-free-icons';
+import { PhArrowCounterClockwise, PhCaretLeft, PhCaretRight } from '@phosphor-icons/vue';
 
 import { iconOf } from '@/lib/worldIcons.js';
 import { Input } from '@/components/ui/input';
@@ -53,10 +52,10 @@ function onInput(value) {
       </div>
       <div class="opt-step-controls">
         <button type="button" class="opt-arrow" :disabled="disabled" :aria-label="label + ' 上一项'" @click="step(-1)">
-          <HugeiconsIcon :icon="ChevronLeftIcon" aria-hidden="true" />
+          <PhCaretLeft aria-hidden="true" />
         </button>
         <button type="button" class="opt-arrow" :disabled="disabled" :aria-label="label + ' 下一项'" @click="step(1)">
-          <HugeiconsIcon :icon="ChevronRightIcon" aria-hidden="true" />
+          <PhCaretRight aria-hidden="true" />
         </button>
       </div>
     </template>
@@ -67,7 +66,7 @@ function onInput(value) {
     </div>
 
     <button v-if="changed" class="opt-row-revert" type="button" :disabled="disabled" :aria-label="label + ' 恢复默认'" title="恢复默认" @click="onInput(option.default)">
-      <HugeiconsIcon :icon="UndoIcon" aria-hidden="true" />
+      <PhArrowCounterClockwise aria-hidden="true" />
     </button>
   </div>
 </template>

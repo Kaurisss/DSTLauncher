@@ -1,6 +1,5 @@
 <script setup>
-import { HugeiconsIcon } from '@hugeicons/vue';
-import { ArrowDown01Icon } from '@hugeicons/core-free-icons';
+import { PhCaretDown } from '@phosphor-icons/vue';
 import { reactiveOmit } from "@vueuse/core";
 import { cn } from "cn";
 import { SelectScrollDownButton, useForwardProps } from "reka-ui";
@@ -32,7 +31,7 @@ const forwardedProps = useForwardProps(delegatedProps);
     "
   >
     <slot>
-      <HugeiconsIcon :icon="ArrowDown01Icon" />
+      <PhCaretDown />
     </slot>
   </SelectScrollDownButton>
 </template>

@@ -1,6 +1,5 @@
 <script setup>
-import { HugeiconsIcon } from "@hugeicons/vue";
-import { Tick02Icon, Copy01Icon } from "@hugeicons/core-free-icons";
+import { PhCheck, PhCopy } from "@phosphor-icons/vue";
 import { useClipboard } from "@vueuse/core";
 import { cn } from "cn";
 import { Button } from '@/components/ui/button';
@@ -36,8 +35,8 @@ const { copy, copied } = useClipboard({ copiedDuring: 2000, legacy: true });
     :class="cn('', props.class)"
     @click="copy(props.value)"
   >
-    <HugeiconsIcon v-if="copied" :icon="Tick02Icon" />
-    <HugeiconsIcon v-else :icon="Copy01Icon" />
+    <PhCheck v-if="copied" />
+    <PhCopy v-else />
   </Button>
   <span aria-live="polite" class="sr-only">{{ copied ? "Copied" : "" }}</span>
 </template>

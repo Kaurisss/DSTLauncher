@@ -1,8 +1,7 @@
 <script setup>
 import { computed } from 'vue';
 import iconUrl from '@/assets/icon.png';
-import { HugeiconsIcon } from '@hugeicons/vue';
-import { ComputerIcon, Moon02Icon, Sun03Icon } from '@hugeicons/core-free-icons';
+import { PhDesktop, PhMoon, PhSun } from '@phosphor-icons/vue';
 
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -26,7 +25,7 @@ const roomDetails = computed(() => {
   const mode = GAME_MODE_LABEL[room.gameMode] || room.gameMode || '';
   return [room.key, mode.split(' ')[0], room.maxPlayers != null ? room.maxPlayers + '人' : ''].filter(Boolean).join(' · ');
 });
-const themeIcon = computed(() => ({ auto: ComputerIcon, light: Sun03Icon, dark: Moon02Icon })[theme.mode.value]);
+const themeIcon = computed(() => ({ auto: PhDesktop, light: PhSun, dark: PhMoon })[theme.mode.value]);
 const themeTitle = computed(() => '切换主题：' + theme.label.value);
 
 function onTheme() {
@@ -85,7 +84,7 @@ function onTheme() {
       <Tooltip>
         <TooltipTrigger as-child>
           <Button variant="outline" size="icon" class="size-9 shrink-0" aria-label="切换主题" @click="onTheme">
-            <HugeiconsIcon :icon="themeIcon" aria-hidden="true" />
+            <component :is="themeIcon" aria-hidden="true" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{{ themeTitle }}</TooltipContent>

@@ -1,13 +1,5 @@
 <script setup>
-import {
-  CheckmarkCircle01Icon,
-  InformationCircleIcon,
-  Loading03Icon,
-  CancelCircleIcon,
-  Alert02Icon,
-  Cancel01Icon,
-} from '@hugeicons/core-free-icons';
-import { HugeiconsIcon } from '@hugeicons/vue';
+import { PhCheckCircle, PhCircleNotch, PhInfo, PhWarning, PhX, PhXCircle } from '@phosphor-icons/vue';
 import { reactiveOmit } from "@vueuse/core";
 import { cn } from "cn";
 import { Toaster as Sonner } from "vue-sonner";
@@ -62,24 +54,24 @@ const delegatedProps = reactiveOmit(props, "class", "toastOptions");
     v-bind="delegatedProps"
   >
     <template #success-icon>
-      <HugeiconsIcon :icon="CheckmarkCircle01Icon" class="size-4" />
+      <PhCheckCircle class="size-4" />
     </template>
     <template #info-icon>
-      <HugeiconsIcon :icon="InformationCircleIcon" class="size-4" />
+      <PhInfo class="size-4" />
     </template>
     <template #warning-icon>
-      <HugeiconsIcon :icon="Alert02Icon" class="size-4" />
+      <PhWarning class="size-4" />
     </template>
     <template #error-icon>
-      <HugeiconsIcon :icon="CancelCircleIcon" class="size-4" />
+      <PhXCircle class="size-4" />
     </template>
     <template #loading-icon>
       <div>
-        <HugeiconsIcon :icon="Loading03Icon" class="size-4 animate-spin" />
+        <PhCircleNotch class="size-4 animate-spin" />
       </div>
     </template>
     <template #close-icon>
-      <HugeiconsIcon :icon="Cancel01Icon" class="size-4" />
+      <PhX class="size-4" />
     </template>
   </Sonner>
 </template>

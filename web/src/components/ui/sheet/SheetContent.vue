@@ -1,6 +1,5 @@
 <script setup>
-import { HugeiconsIcon } from '@hugeicons/vue';
-import { Cancel01Icon } from '@hugeicons/core-free-icons';
+import { PhX } from '@phosphor-icons/vue';
 import { reactiveOmit } from "@vueuse/core";
 import { cn } from "cn";
 import {
@@ -61,7 +60,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
 
       <DialogClose v-if="showCloseButton" data-slot="sheet-close" as-child>
         <Button variant="ghost" class="absolute top-3 right-3" size="icon-sm">
-          <HugeiconsIcon :icon="Cancel01Icon" aria-hidden="true" />
+          <PhX aria-hidden="true" />
           <span class="sr-only">关闭</span>
         </Button>
       </DialogClose>

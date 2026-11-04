@@ -1,6 +1,5 @@
 <script setup>
-import { HugeiconsIcon } from '@hugeicons/vue';
-import { Tick02Icon } from '@hugeicons/core-free-icons';
+import { PhCheck } from '@phosphor-icons/vue';
 import { reactiveOmit } from "@vueuse/core";
 import { cn } from "cn";
 import {
@@ -44,7 +43,7 @@ const forwardedProps = useForwardProps(delegatedProps);
     >
       <SelectItemIndicator>
         <slot name="indicator-icon">
-          <HugeiconsIcon :icon="Tick02Icon" class="pointer-events-none" />
+          <PhCheck class="pointer-events-none" />
         </slot>
       </SelectItemIndicator>
     </span>

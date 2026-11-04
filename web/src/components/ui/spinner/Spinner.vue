@@ -1,6 +1,5 @@
 <script setup>
-import { HugeiconsIcon } from "@hugeicons/vue";
-import { Loading03Icon } from "@hugeicons/core-free-icons";
+import { PhCircleNotch } from "@phosphor-icons/vue";
 import { cn } from "cn";
 
 const props = defineProps({
@@ -13,8 +12,7 @@ const props = defineProps({
 </script>
 
 <template>
-  <HugeiconsIcon
-    :icon="Loading03Icon"
+  <PhCircleNotch
     role="status"
     aria-label="Loading"
     :class="cn('size-4 animate-spin', props.class)"

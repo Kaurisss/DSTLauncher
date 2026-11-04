@@ -1,7 +1,6 @@
 <script setup>
 import { CheckboxIndicator, CheckboxRoot, useForwardPropsEmits } from "reka-ui";
-import { HugeiconsIcon } from "@hugeicons/vue";
-import { CheckIcon } from "@hugeicons/core-free-icons";
+import { PhCheck } from "@phosphor-icons/vue";
 import { cn } from "cn";
 
 const props = defineProps({
@@ -34,7 +33,7 @@ const forwarded = useForwardPropsEmits(props, emits);
   >
     <CheckboxIndicator class="flex items-center justify-center text-current">
       <slot>
-        <HugeiconsIcon :icon="CheckIcon" class="size-3.5 stroke-[3]" />
+        <PhCheck class="size-3.5" weight="bold" />
       </slot>
     </CheckboxIndicator>
   </CheckboxRoot>

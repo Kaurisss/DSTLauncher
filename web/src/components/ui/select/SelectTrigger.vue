@@ -1,6 +1,5 @@
 <script setup>
-import { HugeiconsIcon } from '@hugeicons/vue';
-import { ArrowDown01Icon } from '@hugeicons/core-free-icons';
+import { PhCaretDown } from '@phosphor-icons/vue';
 import { reactiveOmit } from "@vueuse/core";
 import { cn } from "cn";
 import { SelectIcon, SelectTrigger, useForwardProps } from "reka-ui";
@@ -36,7 +35,7 @@ const forwardedProps = useForwardProps(delegatedProps);
   >
     <slot />
     <SelectIcon as-child>
-      <HugeiconsIcon :icon="ArrowDown01Icon" class="text-muted-foreground size-4 pointer-events-none" />
+      <PhCaretDown class="text-muted-foreground size-4 pointer-events-none" />
     </SelectIcon>
   </SelectTrigger>
 </template>
