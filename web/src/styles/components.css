@@ -493,12 +493,11 @@ input[type="radio"] {
 
 .shard-row {
   display: grid;
-  grid-template-columns: minmax(140px, 1fr) minmax(170px, 1.2fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 12px;
-  padding: 20px 0;
+  padding: 12px 0;
 }
-.shard-row:first-child { padding-top: 0; }
 .shard-row:last-child { padding-bottom: 0; }
 .shard-main {
   display: flex;
@@ -580,8 +579,34 @@ input[type="radio"] {
 .log-tab:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .log-tab-dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--text-muted); }
 .log-tab-dot.is-connected { background: var(--ok); }
-.log-autoscroll { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text-muted); cursor: pointer; user-select: none; white-space: nowrap; }
-
+.console-view { position: relative; }
+.console-latest {
+  position: absolute;
+  right: 1.25rem;
+  bottom: 0.75rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 4px 12px color-mix(in srgb, var(--text) 12%, transparent);
+  cursor: pointer;
+}
+.console-latest:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) {
+  .console-latest { transition: transform 160ms ease, background-color 160ms ease; }
+  .console-latest:hover { transform: translateY(-2px); }
+  .console-latest:active { transform: translateY(0) scale(0.94); }
+  .console-latest-enter-active,
+  .console-latest-leave-active { transition: opacity 180ms ease, transform 180ms ease; }
+  .console-latest-enter-from,
+  .console-latest-leave-to { opacity: 0; transform: translateY(8px) scale(0.92); }
+}
 .console {
   height: clamp(16rem, 36vh, 24rem);
   scrollbar-gutter: stable;
@@ -967,8 +992,6 @@ input[type="radio"] {
 }
 
 @media (max-width: 720px) {
-  .shard-row { grid-template-columns: minmax(0, 1fr) auto; }
-  .shard-world { grid-column: 1 / -1; grid-row: 2; }
   .field { grid-template-columns: 1fr; gap: 5px; }
   /* 单列时标签跑到输入框上方，右对齐会显得别扭 */
   .field-label-row { justify-content: flex-start; }

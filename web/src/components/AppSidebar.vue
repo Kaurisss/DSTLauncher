@@ -1,38 +1,27 @@
 <script setup>
-import { computed, onMounted } from 'vue';
+import { onMounted } from 'vue';
 import iconUrl from '@/assets/icon.png';
 import {
   PhArchive, PhChatCircle, PhCode, PhFolder, PhGear, PhGlobe, PhPackage, PhSquaresFour, PhStack,
 } from '@phosphor-icons/vue';
-import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
   SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarTrigger,
-  SidebarSeparator, useSidebar,
+  useSidebar,
 } from '@/components/ui/sidebar';
 import { useUiStore } from '@/stores/ui.js';
 import { useSystemStore } from '@/stores/system.js';
-import { useRoomsStore } from '@/stores/rooms.js';
-import { useLogs } from '@/composables/useLogs.js';
 import { guard } from '@/lib/toast.js';
 
 const ui = useUiStore();
 const system = useSystemStore();
-const rooms = useRoomsStore();
-const { connected } = useLogs();
 const { setOpenMobile } = useSidebar();
 const icons = {
   dashboard: PhSquaresFour, server: PhStack, globe: PhGlobe,
   package: PhPackage, message: PhChatCircle, archive: PhArchive, folder: PhFolder, fileCode: PhCode,
   settings: PhGear,
 };
-const panelVersion = computed(() => rooms.meta?.panelVersion || '');
-const serverText = computed(() => {
-  if (system.installing) return '正在安装…';
-  if (!system.installed) return '未安装服务器';
-  return '游戏版本 ' + (system.version || '未知');
-});
 onMounted(() => guard(() => system.refresh()));
 
 function navigate(key) {
@@ -79,24 +68,5 @@ function navigate(key) {
         </SidebarGroupContent>
       </SidebarGroup>
     </SidebarContent>
-
-    <SidebarSeparator />
-    <SidebarFooter class="px-3 py-3 group-data-[collapsible=icon]:hidden">
-      <div class="flex min-w-0 items-center justify-between gap-2 text-[10px] text-muted-foreground">
-        <span role="status" class="inline-flex shrink-0 items-center gap-1.5">
-          <span class="size-1.5 shrink-0 rounded-full" :class="connected ? 'bg-emerald-600' : 'bg-muted-foreground'" aria-hidden="true" />
-          日志{{ connected ? '已连接' : '未连接' }}
-        </span>
-        <div class="flex items-center gap-1.5 min-w-0">
-          <Badge v-if="panelVersion" variant="secondary" class="h-4 px-1 text-[10px] leading-none shrink-0 font-mono">{{ panelVersion }}</Badge>
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <span class="truncate" tabindex="0">{{ serverText }}</span>
-            </TooltipTrigger>
-            <TooltipContent>{{ serverText }}</TooltipContent>
-          </Tooltip>
-        </div>
-      </div>
-    </SidebarFooter>
   </Sidebar>
 </template>

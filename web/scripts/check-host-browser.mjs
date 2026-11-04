@@ -166,10 +166,7 @@ test('Unified App Shell：Header 横跨顶部，Sidebar 位于左侧无缝连接
     assert.equal(headerBox.width, 1440);
 
     const sidebar = page.locator('[data-slot="sidebar-container"]');
-    const footer = sidebar.locator('[data-slot="sidebar-footer"]');
     await header.getByText('DST 开服控制台', { exact: true }).waitFor();
-    await footer.getByText('v0.1.2', { exact: true }).waitFor();
-    await footer.getByText('游戏版本 759671', { exact: true }).waitFor();
 
     const sidebarBox = await sidebar.boundingBox();
     assert.equal(sidebarBox.x, 0);
@@ -186,9 +183,6 @@ test('Unified App Shell：Header 横跨顶部，Sidebar 位于左侧无缝连接
     const title = header.getByRole('heading', { level: 1, name: '配置预览', exact: true });
     assert.equal(await card.getByRole('heading', { name: '配置预览', exact: true }).count(), 0);
 
-    const logStatus = footer.getByRole('status');
-    const version = footer.getByText('游戏版本 759671', { exact: true });
-    assert.ok(Math.abs((await logStatus.boundingBox()).y - (await version.boundingBox()).y) < 2, '底部状态保持单行');
 
     const selector = header.getByRole('combobox', { name: '房间', exact: true });
     assert.match(await selector.innerText(), /Skr Wu的世界 单人 双穿/);

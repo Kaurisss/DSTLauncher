@@ -6,7 +6,6 @@ import UiEmpty from '@/components/ui/UiEmpty.vue';
 import LogPane from '@/components/overview/LogPane.vue';
 import { CodeBlock, CodeBlockActions, CodeBlockHeader } from '@/components/ui/code-block';
 import IconAction from '@/components/ui/IconAction.vue';
-import { Switch } from '@/components/ui/switch';
 import { useLogs } from '@/composables/useLogs.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { shardLabel } from '@/lib/format.js';
@@ -14,7 +13,6 @@ import { shardLabel } from '@/lib/format.js';
 const rooms = useRoomsStore();
 const { channels, clear } = useLogs();
 const active = ref('');
-const pane = ref(null);
 const label = shard => shardLabel(shard, rooms.current?.locations?.[shard]);
 watch([() => rooms.currentId, () => rooms.shards.join(',')], ([roomId], [previousRoomId]) => {
   if (roomId !== previousRoomId || !rooms.shards.includes(active.value)) active.value = rooms.shards[0] || '';
@@ -37,15 +35,11 @@ watch([() => rooms.currentId, () => rooms.shards.join(',')], ([roomId], [previou
             </TabsTrigger>
           </TabsList>
           <CodeBlockActions class="log-pane-tools">
-            <label class="log-autoscroll">
-              <Switch :model-value="pane?.autoscroll ?? true" :aria-label="`${label(active)} 自动滚动`" @update:model-value="value => pane.autoscroll = value" />
-              <span>自动滚动</span>
-            </label>
             <IconAction variant="ghost" icon="clean" label="清屏" @click="clear(active)" />
           </CodeBlockActions>
         </CodeBlockHeader>
         <KeepAlive :key="rooms.currentId">
-          <LogPane :key="active" ref="pane" :shard="active" />
+          <LogPane :key="active" :shard="active" />
         </KeepAlive>
       </CodeBlock>
     </TabsRoot>

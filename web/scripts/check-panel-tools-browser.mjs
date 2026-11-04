@@ -31,6 +31,7 @@ async function openPanel({ tab = 'overview', width = 1280, stopped = false, dark
     localStorage.setItem('dst-tab', tab);
     localStorage.setItem('dst-room', '2');
     localStorage.setItem('dst-theme', dark ? 'dark' : 'light');
+    localStorage.removeItem('dst-log-refresh');
   }, { tab, dark });
   const rooms = [room(2), room(3)];
   if (stopped) rooms.forEach(r => { r.statuses.forEach(s => { s.state = 'stopped'; }); });
@@ -473,6 +474,10 @@ test('玩家历史删除需确认、失败保留选择、批量删除后校正�
 test('删除等待期间禁用操作，切房间或筛选不携带选择且迟到结果不刷新新查询', async () => {
   const { page, state, close } = await openPanel();
   try {
+    await page.locator('#app-navigation').getByRole('button', { name: '设置', exact: true }).click();
+    await page.getByRole('navigation', { name: '设置导航' }).getByRole('button', { name: '玩家日志', exact: true }).click();
+    await page.getByRole('switch', { name: '自动刷新玩家日志' }).click();
+
     await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
     const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
     await panel.getByRole('checkbox', { name: '选择日志 1', exact: true }).click();
@@ -483,7 +488,6 @@ test('删除等待期间禁用操作，切房间或筛选不携带选择且迟�
     await page.getByRole('option', { name: 'Below', exact: true }).click();
     await panel.getByText('房间2-Below', { exact: true }).waitFor();
     assert.equal(await panel.getByRole('checkbox', { name: '选择日志 1', exact: true }).isChecked(), false);
-    await panel.getByRole('switch', { name: '自动刷新玩家日志' }).click();
     const pending = state.hold('delayChatWrite');
     await panel.getByRole('button', { name: '删除日志 1', exact: true }).click();
     const sent = page.waitForRequest(r => r.url().includes('/api/chat-log') && r.method() === 'DELETE');
@@ -541,21 +545,29 @@ test('玩家日志首次和筛选加载用 Spinner，刷新时保留已有记录
 test('自动刷新可暂停，暂停期间仍可手动刷新，恢复后立即取新记录', async () => {
   const { page, state, close } = await openPanel();
   try {
+    await page.locator('#app-navigation').getByRole('button', { name: '设置', exact: true }).click();
+    const settingsNav = page.getByRole('navigation', { name: '设置导航' });
+    const logsSetting = settingsNav.getByRole('button', { name: '玩家日志', exact: true });
+    const toggle = page.getByRole('switch', { name: '自动刷新玩家日志' });
+    await logsSetting.click();
+    await toggle.click();
+    assert.equal(await toggle.getAttribute('aria-checked'), 'false');
     await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
     const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
     await panel.getByText('房间2-Surface', { exact: true }).waitFor();
-    const toggle = page.getByRole('switch', { name: '自动刷新玩家日志' });
-    await toggle.click();
     const response = page.waitForResponse(r => r.url().includes('/api/chat-log'));
-    await page.getByRole('button', { name: '刷新记录', exact: true }).click();
+    await panel.getByRole('button', { name: '刷新记录', exact: true }).click();
     await response;
     const count = state.reads.length;
     await page.waitForTimeout(5200);
     assert.equal(state.reads.length, count);
-    const resumed = page.waitForRequest(r => r.url().includes('/api/chat-log'));
+    await page.locator('#app-navigation').getByRole('button', { name: '设置', exact: true }).click();
+    await logsSetting.click();
     await toggle.click();
-    await resumed;
     assert.equal(await toggle.getAttribute('aria-checked'), 'true');
+    const resumed = page.waitForRequest(r => r.url().includes('/api/chat-log'));
+    await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
+    await resumed;
     assert.equal(state.reads.length, count + 1);
   } finally { await close(); }
 });

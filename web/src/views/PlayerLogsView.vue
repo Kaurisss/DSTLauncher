@@ -11,13 +11,13 @@ import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { logApi, playerListApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
 import { CHARACTERS, roomShardLabel } from '@/lib/format.js';
+import { playerLogRefresh } from '@/lib/playerLogRefresh.js';
 import { guard, toast } from '@/lib/toast.js';
 
 const rooms = useRoomsStore();
@@ -27,7 +27,6 @@ const search = ref('');
 const result = ref(null);
 const error = ref('');
 const loading = ref(false);
-const autoRefresh = ref(true);
 const page = ref(1);
 const pageSize = ref('10');
 const blocking = ref('');
@@ -80,7 +79,7 @@ watch(() => shards.value.map(item => item.name).join(','), () => {
 watch(() => [rooms.currentId, shard.value, kind.value, search.value, pageSize.value], () => {
   page.value = 1;
 }, { flush: 'sync' });
-watch(autoRefresh, enabled => {
+watch(playerLogRefresh, enabled => {
   if (enabled) refresh();
   else if (!loading.value) clearTimeout(timer);
 });
@@ -122,7 +121,7 @@ async function load(ticket) {
   } finally {
     if (ticket === generation) {
       loading.value = false;
-      if (autoRefresh.value) timer = setTimeout(() => load(ticket), 5000);
+      if (playerLogRefresh.value) timer = setTimeout(() => load(ticket), 5000);
     }
   }
 }
@@ -219,10 +218,6 @@ async function blockPlayer(entry) {
       </form>
       <template #actions>
         <IconAction :variant="selected.size ? 'destructive' : 'ghost'" icon="trash" :label="`删除所选（${selected.size}）`" :disabled="!selected.size || deleting || !!blocking || loading" @click="removeEntries([...selected])" />
-        <div class="flex items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
-          <Switch id="player-log-refresh" v-model="autoRefresh" aria-label="自动刷新玩家日志" />
-          <label for="player-log-refresh" class="cursor-pointer">自动刷新</label>
-        </div>
         <IconAction variant="outline" icon="refresh" :icon-class="loading ? 'animate-spin motion-reduce:animate-none' : ''" label="刷新记录" :disabled="loading || !rooms.currentId || !shard" @click="refresh" />
       </template>
     </UiToolbar>

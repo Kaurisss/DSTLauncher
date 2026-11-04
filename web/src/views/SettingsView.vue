@@ -8,8 +8,10 @@ import UiField from '@/components/ui/UiField.vue';
 import UiPill from '@/components/ui/UiPill.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
 import { useTheme } from '@/composables/useTheme.js';
 import { hostApi, workshopApi } from '@/lib/api.js';
+import { playerLogRefresh } from '@/lib/playerLogRefresh.js';
 import { guard } from '@/lib/toast.js';
 import { useAuthStore } from '@/stores/auth.js';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -28,6 +30,7 @@ const groups = [
   { label: '服务器', items: [{ key: 'server', label: '文件与架构' }] },
   { label: '界面', items: [
     { key: 'theme', label: '主题' },
+    { key: 'logs', label: '玩家日志' },
     { key: 'about', label: '运行信息' },
   ] },
 ];
@@ -187,6 +190,17 @@ async function saveApiKey() {
           >
             {{ opt.label }}
           </button>
+        </div>
+      </UiCard>
+
+      <UiCard v-show="section === 'logs'">
+        <template #title>玩家日志</template>
+        <div class="flex items-center justify-between gap-4">
+          <div class="grid gap-1">
+            <label for="player-log-refresh" class="text-sm">自动刷新</label>
+            <p class="text-sm text-muted-foreground">打开玩家日志后，每 5 秒更新当前房间、分片和筛选下的记录。</p>
+          </div>
+          <Switch id="player-log-refresh" v-model="playerLogRefresh" aria-label="自动刷新玩家日志" />
         </div>
       </UiCard>
 

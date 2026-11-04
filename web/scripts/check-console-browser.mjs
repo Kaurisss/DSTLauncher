@@ -102,21 +102,21 @@ test('单窗口 Tabs 切换不重连，后台分片持续接收，草稿、自�
     const master = console.getByRole('tab', { name: /森林 Master/ });
     const caves = console.getByRole('tab', { name: /洞穴 Caves/ });
     await console.getByRole('textbox', { name: '森林 控制台命令', exact: true }).fill('c_save()');
-    await console.getByRole('switch', { name: '森林 自动滚动', exact: true }).click();
     await console.getByRole('region', { name: '森林 日志输出', exact: true }).evaluate(el => {
       el.scrollTop = 100;
       el.dispatchEvent(new window.Event('scroll'));
     });
+    await console.getByRole('button', { name: '森林 回到最新日志', exact: true }).waitFor();
     await caves.click();
     await console.getByText('房间 1 Caves 第 79 行', { exact: true }).waitFor();
     assert.equal(await console.getByText('房间 1 Master 第 79 行', { exact: true }).count(), 0);
-    assert.equal(await console.getByRole('switch', { name: '洞穴 自动滚动', exact: true }).getAttribute('aria-checked'), 'true');
+    assert.equal(await console.getByRole('button', { name: '洞穴 回到最新日志', exact: true }).count(), 0);
     await console.getByRole('textbox', { name: '洞穴 控制台命令', exact: true }).fill('c_listallplayers()');
     emit('1', 'Master', '森林后台仍在接收');
     await master.click();
     await console.getByText('森林后台仍在接收', { exact: true }).waitFor();
     assert.equal(await console.getByRole('textbox', { name: '森林 控制台命令', exact: true }).inputValue(), 'c_save()');
-    assert.equal(await console.getByRole('switch', { name: '森林 自动滚动', exact: true }).getAttribute('aria-checked'), 'false');
+    await console.getByRole('button', { name: '森林 回到最新日志', exact: true }).waitFor();
     await page.waitForFunction(() => document.querySelector('.console').scrollTop === 100);
     assert.equal(opened.length, count, '换 Tab 不改变 SSE 连接');
     await caves.click();
@@ -161,40 +161,29 @@ test('清屏只作用于当前分片，命令发送到选定分片，失败保�
   } finally { await page.close(); }
 });
 
-test('自动滚动在浅色深色主题下开关底色可区分，悬停与键盘切换保持正确', async () => {
-  for (const dark of [false, true]) {
-    const { page, console, state } = await openPanel(1440, dark);
-    try {
-      const toggle = console.getByRole('switch', { name: '森林 自动滚动', exact: true });
-      const styles = () => toggle.evaluate(async el => {
-        await Promise.all(el.getAnimations({ subtree: true }).map(animation => animation.finished));
-        return {
-          track: window.getComputedStyle(el).backgroundColor,
-          thumb: window.getComputedStyle(el.firstElementChild).backgroundColor,
-          thumbX: el.firstElementChild.getBoundingClientRect().x - el.getBoundingClientRect().x,
-        };
-      });
-      await toggle.hover();
-      await toggle.focus();
-      assert.equal(await toggle.getAttribute('aria-checked'), 'true');
-      const enabled = await styles();
-      await console.locator('[data-slot="code-block-header"]').screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/log-autoscroll-${dark ? 'dark' : 'light'}-on.png`, import.meta.url)) });
-      await page.keyboard.press('Space');
-      assert.equal(await toggle.getAttribute('aria-checked'), 'false');
-      const disabled = await styles();
-      assert.notEqual(enabled.track, disabled.track);
-      assert.notEqual(enabled.track, 'rgba(0, 0, 0, 0)');
-      assert.notEqual(disabled.track, 'rgba(0, 0, 0, 0)');
-      assert.notEqual(enabled.track, enabled.thumb);
-      assert.notEqual(disabled.track, disabled.thumb);
-      assert.ok(enabled.thumbX - disabled.thumbX > 8, '开关圆点有明确的位置变化');
-      await console.locator('[data-slot="code-block-header"]').screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/log-autoscroll-${dark ? 'dark' : 'light'}-off.png`, import.meta.url)) });
-      await page.keyboard.press('Space');
-      assert.equal(await toggle.getAttribute('aria-checked'), 'true');
-      assert.equal((await styles()).track, enabled.track);
-      assert.deepEqual(state.errors, []);
-    } finally { await page.close(); }
-  }
+test('离开底部后暂停跟随，回到最新滚到末行并恢复自动滚动', async () => {
+  const { page, console, state } = await openPanel();
+  try {
+    const output = console.getByRole('region', { name: '森林 日志输出', exact: true });
+    const latest = console.getByRole('button', { name: '森林 回到最新日志', exact: true });
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.console');
+      return el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+    });
+    assert.equal(await latest.count(), 0);
+    await output.evaluate(el => {
+      el.scrollTop = 0;
+      el.dispatchEvent(new window.Event('scroll'));
+    });
+    await latest.waitFor();
+    await latest.click();
+    await latest.waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => {
+      const el = document.querySelector('.console');
+      return el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+    });
+    assert.deepEqual(state.errors, []);
+  } finally { await page.close(); }
 });
 
 test('手机 Tabs 可键盘切换且无横向溢出，连接断开在对应 Tab 报告', async () => {

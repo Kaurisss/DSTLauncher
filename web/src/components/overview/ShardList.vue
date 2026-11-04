@@ -114,9 +114,8 @@ async function refreshSnapshots(id, requestGeneration) {
 
   <section v-else aria-label="分片状态" class="divide-y divide-border">
     <div v-for="s in rows" :key="s.shard" class="shard-row" :aria-label="label(s)">
-      <div class="min-w-0 space-y-1.5">
+      <div class="min-w-0 space-y-2">
         <div class="shard-main">
-          <span class="dot" :class="s.state" aria-hidden="true" />
           <span class="shard-name">{{ label(s) }}</span>
           <Tooltip :disabled="!meta(s) && !isLive(s)">
             <TooltipTrigger as-child>
@@ -132,8 +131,8 @@ async function refreshSnapshots(id, requestGeneration) {
             <TooltipContent>{{ staleTip(s) }}</TooltipContent>
           </Tooltip>
         </div>
+        <WorldState :snapshot="s.snapshot" :loading="loadingSnapshots" :error="snapshotError" />
       </div>
-      <WorldState class="shard-world" :snapshot="s.snapshot" :loading="loadingSnapshots" :error="snapshotError" />
       <span class="shard-actions">
         <template v-if="isLive(s)">
           <IconAction variant="destructive" icon="stop" label="停止" :disabled="rooms.starting" @click="proc.stop(s.shard)" />

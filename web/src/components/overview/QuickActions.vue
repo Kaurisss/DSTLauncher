@@ -73,11 +73,11 @@ async function run(action) {
 <template>
   <UiCard>
     <template #title>快捷操作</template>
+    <template #actions>
+      <IconAction variant="outline" icon="save" :label="busy === 'save' ? '等待保存完成…' : '立即保存'" :disabled="!!busy || !anyRunning || rooms.starting" @click="run('save')" />
+      <IconAction variant="outline" icon="skip" :label="busy === 'skipday' ? '等待游戏回执…' : '主世界快进一天'" :disabled="!!busy || !masterRunning || rooms.starting" @click="run('skipday')" />
+    </template>
     <section aria-label="快捷操作" class="grid min-w-0 gap-3.5">
-      <div class="flex flex-wrap gap-2">
-        <IconAction variant="outline" icon="save" :label="busy === 'save' ? '等待保存完成…' : '立即保存'" :disabled="!!busy || !anyRunning || rooms.starting" @click="run('save')" />
-        <IconAction variant="outline" icon="skip" :label="busy === 'skipday' ? '等待游戏回执…' : '主世界快进一天'" :disabled="!!busy || !masterRunning || rooms.starting" @click="run('skipday')" />
-      </div>
       <form class="flex flex-col gap-2 sm:flex-row" @submit.prevent="run('announce')">
         <Input v-model="message" class="min-w-0 flex-1" aria-label="全服公告" placeholder="输入全服公告内容（最多 500 字）" :disabled="!!busy || !masterRunning || rooms.starting" />
         <IconAction type="submit" icon="send" :label="busy === 'announce' ? '等待游戏回执…' : '发送全服公告'" :disabled="!!busy || !masterRunning || !validMessage || rooms.starting" />

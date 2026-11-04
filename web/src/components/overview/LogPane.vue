@@ -1,10 +1,11 @@
 <script setup>
-// KeepAlive 保留各分片的命令草稿、滚动位置和自动滚动开关。
+// KeepAlive 保留各分片的命令草稿、滚动位置和是否跟随最新日志。
 import { computed, onActivated, ref, watch } from 'vue';
 import { TabsContent } from 'reka-ui';
 
 import { Input } from '@/components/ui/input';
 import { CodeBlockContent, CodeBlockLine } from '@/components/ui/code-block';
+import Icon from '@/components/ui/Icon.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import { useLogs } from '@/composables/useLogs.js';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -35,19 +36,38 @@ const running = computed(() => {
 
 const box = ref(null);
 const input = ref('');
-/** 是否自动跟随最新日志。关掉后可以安静地往上翻历史。 */
+/** 贴在底部时跟随新日志。用户离开底部后暂停，直到回到底部或点悬浮按钮。 */
 const autoscroll = ref(true);
 const scrollTop = ref(0);
-defineExpose({ autoscroll });
+let adjusting = false;
+let settling = false;
+
+function atBottom(el) {
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - 30;
+}
 
 function onScroll() {
-  // 用户手动滚到底部时重新打开跟随，省得再去点开关
   const el = box.value?.$el;
   if (!el?.isConnected) return;
+  const moved = el.scrollTop !== scrollTop.value;
   scrollTop.value = el.scrollTop;
-  if (el.scrollTop + el.clientHeight >= el.scrollHeight - 30 && !autoscroll.value) {
+  if (adjusting) return;
+  if (atBottom(el)) {
     autoscroll.value = true;
-  }
+    settling = false;
+  } else if (moved && !settling) autoscroll.value = false;
+}
+
+function stopSettle() {
+  if (!settling) return;
+  settling = false;
+  const el = box.value?.$el;
+  if (!el?.isConnected) return;
+  scrollGen += 1;
+  adjusting = true;
+  el.scrollTo({ top: el.scrollTop, behavior: 'auto' });
+  scrollTop.value = el.scrollTop;
+  adjusting = false;
 }
 
 /**
@@ -59,15 +79,31 @@ function onScroll() {
  * 与 useLogs 的批量落账配合后，布局次数与日志量彻底解耦。
  */
 let scrollQueued = false;
+let scrollGen = 0;
 
 function restoreScroll() {
   if (scrollQueued) return;
   scrollQueued = true;
+  const gen = scrollGen;
   requestAnimationFrame(() => {
     scrollQueued = false;
+    if (gen !== scrollGen) return;
     const el = box.value?.$el;
-    if (el?.isConnected) el.scrollTop = autoscroll.value ? el.scrollHeight : scrollTop.value;
+    if (!el?.isConnected) return;
+    if (settling && autoscroll.value) {
+      el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+      return;
+    }
+    adjusting = true;
+    el.scrollTop = autoscroll.value ? el.scrollHeight : scrollTop.value;
+    adjusting = false;
   });
+}
+
+function follow() {
+  autoscroll.value = true;
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) settling = true;
+  restoreScroll();
 }
 
 watch(lines, () => {
@@ -84,28 +120,37 @@ async function submit() {
   if (ok && roomId === rooms.currentId) {
     appendCmd(props.shard, cmd);
     input.value = '';
-    autoscroll.value = true;
-    restoreScroll();
+    follow();
   }
 }
 </script>
 
 <template>
   <TabsContent :value="shard" force-mount class="min-w-0 outline-none">
-    <CodeBlockContent
-      ref="box"
-      wrap
-      class="console"
-      tabindex="0"
-      role="region"
-      :aria-label="`${label} 日志输出`"
-      @scroll="onScroll"
-    >
-      <CodeBlockLine v-if="!lines.length" class="text-muted-foreground">暂无 {{ label }} 的日志输出。</CodeBlockLine>
-      <CodeBlockLine v-for="l in lines" :key="l.id" class="log-line" :class="'k-' + l.kind">
-        <span class="log-text">{{ l.text }}</span>
-      </CodeBlockLine>
-    </CodeBlockContent>
+    <div class="console-view">
+      <CodeBlockContent
+        ref="box"
+        wrap
+        class="console"
+        tabindex="0"
+        role="region"
+        :aria-label="`${label} 日志输出`"
+        @scroll="onScroll"
+        @wheel="stopSettle"
+        @pointerdown="stopSettle"
+        @keydown="stopSettle"
+      >
+        <CodeBlockLine v-if="!lines.length" class="text-muted-foreground">暂无 {{ label }} 的日志输出。</CodeBlockLine>
+        <CodeBlockLine v-for="l in lines" :key="l.id" class="log-line" :class="'k-' + l.kind">
+          <span class="log-text">{{ l.text }}</span>
+        </CodeBlockLine>
+      </CodeBlockContent>
+      <Transition name="console-latest">
+        <button v-if="!autoscroll" type="button" class="console-latest" :aria-label="`${label} 回到最新日志`" @click="follow">
+          <Icon name="chevron" class="rotate-90" size="16" />
+        </button>
+      </Transition>
+    </div>
 
     <form class="console-form" @submit.prevent="submit">
       <span class="console-prompt" aria-hidden="true">$</span>
