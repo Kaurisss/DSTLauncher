@@ -12,8 +12,10 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"sync"
 	"testing"
 	"testing/fstest"
+	"testing/synctest"
 	"time"
 
 	"dst-windows/internal/panelcfg"
@@ -140,17 +142,81 @@ func TestAuthLifecycleAndCookieInvalidation(t *testing.T) {
 func TestAuthLoginLockout(t *testing.T) {
 	srv := newAuthTestServer(t, "fixedpass")
 	h := srv.Handler()
+	synctest.Test(t, func(t *testing.T) {
+		for i := 1; i < maxLoginFailures; i++ {
+			rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "wrong"}, nil)
+			if rec.Code != http.StatusOK || body["message"] != "密码错误" {
+				t.Fatalf("未达阈值时应允许重试: %d %v", rec.Code, body)
+			}
+		}
+		for _, wait := range []int{30, 60, 120, 240, 480, 900, 900} {
+			rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "wrong"}, nil)
+			if rec.Code != http.StatusTooManyRequests || body["code"] != float64(429) || rec.Header().Get("Retry-After") != strconv.Itoa(wait) {
+				t.Fatalf("应返回递增冷却 %ds: status=%d headers=%v body=%v", wait, rec.Code, rec.Header(), body)
+			}
+			deadline := srv.lockUntil
+			time.Sleep(8 * time.Second)
+			for _, password := range []string{"wrong", "fixedpass"} {
+				rec, _ = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": password}, nil)
+				if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != strconv.Itoa(wait-8) || len(rec.Result().Cookies()) != 0 || !srv.lockUntil.Equal(deadline) {
+					t.Fatalf("冷却期请求必须拒绝且不能重置截止时间: %d %v", rec.Code, rec.Header())
+				}
+			}
+			_, status := doJSON(t, h, http.MethodGet, "/api/auth/status", nil, nil)
+			if status["data"].(map[string]interface{})["retryAfter"] != float64(wait-8) {
+				t.Fatalf("刷新应能读取剩余冷却: %v", status)
+			}
+			time.Sleep(time.Duration(wait-8) * time.Second)
+		}
+		rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "fixedpass"}, nil)
+		if body["code"] != float64(200) || len(rec.Result().Cookies()) == 0 {
+			t.Fatalf("冷却结束后应可正确登录: %v", body)
+		}
+		for i := 0; i < maxLoginFailures; i++ {
+			rec, _ = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "wrong"}, nil)
+		}
+		if rec.Header().Get("Retry-After") != "30" {
+			t.Fatalf("成功登录后应清零惩罚: %v", rec.Header())
+		}
+	})
+}
 
-	for i := 0; i < maxLoginFailures; i++ {
-		_, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "wrong"}, nil)
-		if body["code"] == float64(200) {
-			t.Fatal("错误密码不应登录成功")
+func TestAuthConcurrentLoginLockout(t *testing.T) {
+	srv := newAuthTestServer(t, "")
+	hash, err := HashPassword("fixedpass")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := panelcfg.Save(srv.workDir, panelcfg.Config{PasswordHash: hash}); err != nil {
+		t.Fatal(err)
+	}
+	h := srv.Handler()
+	start := make(chan struct{})
+	var pending sync.WaitGroup
+	responses := make(chan int, 50)
+	for i := 0; i < cap(responses); i++ {
+		pending.Add(1)
+		go func() {
+			defer pending.Done()
+			<-start
+			rec, _ := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "wrong"}, nil)
+			responses <- rec.Code
+		}()
+	}
+	close(start)
+	pending.Wait()
+	close(responses)
+	blocked := 0
+	for status := range responses {
+		if status == http.StatusTooManyRequests {
+			blocked++
 		}
 	}
-	// 达到锁定阈值后，即使输入正确密码也会提示冷却
-	_, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "fixedpass"}, nil)
-	if body["code"] == float64(200) {
-		t.Fatal("锁定期间不应允许登录")
+	if blocked != cap(responses)-maxLoginFailures+1 {
+		t.Fatalf("达到阈值及后续并发请求都应返回 429: got=%d", blocked)
+	}
+	if srv.loginDelay != loginLockDuration || srv.failCount != maxLoginFailures {
+		t.Fatalf("冷却期并发请求不得继续计数或加重惩罚: delay=%s failures=%d", srv.loginDelay, srv.failCount)
 	}
 }
 

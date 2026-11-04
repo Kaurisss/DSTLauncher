@@ -223,7 +223,7 @@ watch(selectedGroup, async group => {
   preloadIcons(group ? [group] : []);
   await nextTick();
   if (!groupPanel.value) return;
-  const list = content.value.$el;
+  const list = content.value.$el.querySelector('[data-slot="world-options-scroll"]');
   const nav = groupNav.value;
   const clearance = nav && window.getComputedStyle(nav).flexDirection === 'row' ? nav.offsetHeight + 12 : 12;
   const panel = groupPanel.value.$el;
@@ -580,12 +580,12 @@ onMounted(() => selectShard(rooms.shards[0]));
         </div>
       </div>
 
-      <TabsContent ref="content" :value="shard" data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain outline-none" aria-label="世界配置列表">
+      <TabsContent ref="content" :value="shard" class="min-h-0 flex-1 overflow-hidden outline-none" aria-label="世界配置列表">
         <div v-if="!rooms.loaded || (loading && !view)" class="p-4"><UiLoading /></div>
         <UiEmpty v-else-if="!rooms.current" icon="globe" text="请先在「房间」页新建一个房间" />
         <p v-else-if="loadError" role="alert" class="p-4 text-sm text-destructive">读取失败：{{ loadError }}</p>
-        <template v-else-if="view">
-          <div v-if="frozen || (!enabled && !levelDataInUse) || presetMismatch" class="world-notices">
+        <div v-else-if="view" data-slot="page-scroll" class="flex h-full min-h-0 flex-col overflow-hidden">
+          <div v-if="frozen || (!enabled && !levelDataInUse) || presetMismatch" class="world-notices shrink-0">
             <p v-if="frozen" role="status">服务器运行中，配置已冻结。请先在「总览」关闭服务器再修改。</p>
             <p v-if="!enabled && !levelDataInUse">已关闭 override_enabled，本文件中的设置不会应用。</p>
             <p v-if="presetMismatch" role="alert">
@@ -608,7 +608,7 @@ onMounted(() => selectShard(rooms.shards[0]));
                 <span v-if="g.options.some(isChanged)" class="world-group-changes" :aria-label="g.options.filter(isChanged).length + ' 项已修改'">{{ g.options.filter(isChanged).length }}</span>
               </button>
             </nav>
-            <div class="world-group-content">
+            <div class="world-group-content" data-slot="world-options-scroll" tabindex="0" role="region" aria-label="世界配置选项">
               <UiEmpty v-if="!selectedGroup" icon="inbox" :text="onlyChanged ? '没有匹配的已改动选项' : '没有匹配的选项'" />
               <OptionGroupPanel
                 v-else
@@ -623,7 +623,7 @@ onMounted(() => selectShard(rooms.shards[0]));
               />
             </div>
           </div>
-        </template>
+        </div>
       </TabsContent>
     </UiCard>
   </TabsRoot>

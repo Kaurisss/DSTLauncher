@@ -433,6 +433,44 @@ test('日志复选框在不同高度行中居中，日期与时间按两行等�
   }
 });
 
+test('玩家日志工具栏在中等宽度自适应换行，不溢出卡片', async () => {
+  for (const width of [1440, 1068, 695, 375]) {
+    const { page, state, close } = await openPanel({ width });
+    try {
+      state.chatEntries = [{ id: 1, kind: 'chat', name: '工具栏玩家', message: '测试' }];
+      await page.locator('#app-navigation').getByRole('button', { name: '玩家日志', exact: true }).click();
+      const toolbar = page.getByRole('region', { name: '玩家日志工具栏', exact: true });
+      await toolbar.getByLabel('搜索历史记录').waitFor();
+      assert.equal(await toolbar.getByRole('combobox', { name: '记录分片', exact: true }).evaluate(el => el.getBoundingClientRect().width), 96);
+      const searchReset = await toolbar.evaluate(el => {
+        const input = el.querySelector('#chat_search'), reset = input.parentElement.querySelector('button');
+        const inputBox = input.getBoundingClientRect(), resetBox = reset.getBoundingClientRect();
+        return { sharedParent: reset.parentElement === input.parentElement, insideInput: resetBox.right <= inputBox.right && resetBox.left >= inputBox.left };
+      });
+      assert.deepEqual(searchReset, { sharedParent: true, insideInput: true });
+      const layout = await toolbar.evaluate(el => {
+        const card = el.closest('[data-slot="card"]');
+        const controls = [...el.querySelectorAll('button,input,combobox')].filter(control => control.getBoundingClientRect().width);
+        const toolbarBox = el.getBoundingClientRect(), cardBox = card.getBoundingClientRect();
+        return {
+          overflow: el.scrollWidth > el.clientWidth || document.documentElement.scrollWidth > window.innerWidth,
+          controlsInside: controls.every(control => control.getBoundingClientRect().right <= toolbarBox.right + .5),
+          toolbarInside: toolbarBox.right <= cardBox.right + .5,
+        };
+      });
+      assert.equal(layout.overflow, false, JSON.stringify({ width, layout }));
+      assert.equal(layout.controlsInside, true, JSON.stringify({ width, layout }));
+      assert.equal(layout.toolbarInside, true, JSON.stringify({ width, layout }));
+      if (width === 1440) {
+        const search = await toolbar.getByLabel('搜索历史记录').boundingBox();
+        const kind = await toolbar.getByRole('combobox', { name: '记录类型', exact: true }).boundingBox();
+        assert.ok(search.y < kind.y + kind.height, '宽屏工具栏保持单行');
+      }
+      await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/log-toolbar-${width}.png`, import.meta.url)) });
+    } finally { await close(); }
+  }
+});
+
 test('玩家历史删除需确认、失败保留选择、批量删除后校正越界页', async () => {
   const { page, state, close } = await openPanel();
   try {

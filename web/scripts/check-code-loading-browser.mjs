@@ -80,6 +80,12 @@ test('配置 Code Block 只读并保留落盘与令牌隐藏状态，复制得�
     const preview = page.getByRole('region', { name: files[0].path, exact: true });
     await preview.waitFor();
     assert.equal(await page.locator('[data-slot="code-block"]').count(), 3);
+    const blockStyle = await preview.locator('xpath=ancestor::*[@data-slot="code-block"]').evaluate(el => {
+      const style = window.getComputedStyle(el);
+      return { radius: style.borderRadius, border: style.borderWidth, ring: style.boxShadow };
+    });
+    assert.deepEqual({ radius: blockStyle.radius, border: blockStyle.border }, { radius: '12px', border: '0px' });
+    assert.match(blockStyle.ring, /0px 0px 0px 1px/);
     assert.equal(await preview.getAttribute('data-numbered'), 'true');
     assert.match(await preview.innerText(), /cluster_name = <img src=x onerror=alert\(1\)>/);
     assert.equal(await preview.locator('img, textarea, input, [contenteditable="true"]').count(), 0);

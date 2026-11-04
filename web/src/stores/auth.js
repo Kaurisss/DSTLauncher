@@ -22,7 +22,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function load() {
     try {
-      apply(await authApi.status());
+      const status = await authApi.status();
+      apply(status);
+      return status;
     } catch (_) {
       // 忽略探活失败，交由具体业务请求处理
     }

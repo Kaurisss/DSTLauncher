@@ -203,13 +203,13 @@ test('分片独立启用和保存配置，抽屉锁定分片，停用世界仍�
   });
   try {
     const select = page.locator('[data-slot="select-trigger"][aria-label="模组分片"]');
-    assert.match(await select.innerText(), /森林 · Surface/);
+    assert.equal(await select.innerText(), '森林');
     await select.click();
-    await page.getByRole('option', { name: /洞穴 · Below/ }).waitFor();
+    await page.getByRole('option', { name: '洞穴', exact: true }).waitFor();
     await page.keyboard.press('Escape');
     await Promise.all([
       page.waitForResponse(response => new URL(response.url()).pathname === '/api/mods' && new URL(response.url()).searchParams.get('shard') === 'Below'),
-      chooseSelect(page, '模组分片', /Below/),
+      chooseSelect(page, '模组分片', /洞穴/),
     ]);
     const entry = page.getByRole('article', { name: '独立参数测试' });
     await entry.getByRole('switch').click();
@@ -223,7 +223,7 @@ test('分片独立启用和保存配置，抽屉锁定分片，停用世界仍�
     await page.getByText('模组配置已保存，重启后生效', { exact: true }).waitFor();
     await page.getByRole('button', { name: '关闭配置', exact: true }).click();
     await page.getByRole('dialog').waitFor({ state: 'hidden' });
-    await chooseSelect(page, '模组分片', /Surface/);
+    await chooseSelect(page, '模组分片', /森林/);
     await entry.getByRole('button', { name: '配置', exact: true }).click();
     assert.equal(await input.inputValue(), '1');
     await input.fill('2');
@@ -234,7 +234,7 @@ test('分片独立启用和保存配置，抽屉锁定分片，停用世界仍�
     await page.getByRole('button', { name: '关闭配置', exact: true }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: '放弃修改', exact: true }).click();
     await page.getByRole('dialog').waitFor({ state: 'hidden' });
-    await chooseSelect(page, '模组分片', /Dormant/);
+    await chooseSelect(page, '模组分片', /森林（已停用）/);
     await entry.getByRole('switch').click();
     await page.waitForFunction(() => document.querySelector('.mod [role="switch"]')?.getAttribute('aria-checked') === 'true');
     assert.equal(state.shardMods.Surface[0].config.amount, 1);
@@ -243,7 +243,7 @@ test('分片独立启用和保存配置，抽屉锁定分片，停用世界仍�
     assert.deepEqual(requests.filter(request => request.path === '/api/mods/config').map(request => request.params.shard), ['Below']);
     await page.reload();
     await entry.waitFor();
-    await chooseSelect(page, '模组分片', /Below/);
+    await chooseSelect(page, '模组分片', /洞穴/);
     await entry.getByRole('button', { name: '配置', exact: true }).click();
     assert.equal(await input.inputValue(), '4');
   } finally { await page.close(); }
@@ -257,9 +257,9 @@ test('分片慢列表和更新响应不会覆盖新选择', async () => {
     state.shardDelays.Below = new Promise(resolve => { releaseList = resolve; });
     await Promise.all([
       page.waitForRequest(request => new URL(request.url()).pathname === '/api/mods' && new URL(request.url()).searchParams.get('shard') === 'Below'),
-      chooseSelect(page, '模组分片', /Below/),
+      chooseSelect(page, '模组分片', /洞穴/),
     ]);
-    await chooseSelect(page, '模组分片', /Surface/);
+    await chooseSelect(page, '模组分片', /森林/);
     await page.getByRole('article', { name: '独立参数测试' }).waitFor();
     const oldResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/mods' && new URL(response.url()).searchParams.get('shard') === 'Below');
     releaseList();
@@ -271,7 +271,7 @@ test('分片慢列表和更新响应不会覆盖新选择', async () => {
       page.waitForRequest(request => new URL(request.url()).pathname === '/api/mods/updates'),
       page.getByRole('button', { name: '检查更新', exact: true }).click(),
     ]);
-    await chooseSelect(page, '模组分片', /Below/);
+    await chooseSelect(page, '模组分片', /洞穴/);
     await page.getByRole('article', { name: '独立参数测试' }).waitFor();
     const updateResponse = page.waitForResponse(response => new URL(response.url()).pathname === '/api/mods/updates');
     releaseUpdate();
@@ -287,7 +287,7 @@ test('停止中的房间冻结各分片启用和配置', async () => {
   });
   try {
     await page.getByText('服务器运行中，模组修改已冻结。', { exact: true }).waitFor();
-    await chooseSelect(page, '模组分片', /Below/);
+    await chooseSelect(page, '模组分片', /洞穴/);
     const entry = page.getByRole('article', { name: '独立参数测试' });
     assert.equal(await entry.getByRole('switch').isDisabled(), true);
     await entry.getByRole('button', { name: '配置', exact: true }).click();
@@ -302,7 +302,7 @@ test('工坊添加后的启用操作只写所选分片', async () => {
     shardMods: { Surface: globalThis.structuredClone(mods), Below: globalThis.structuredClone(mods) },
   });
   try {
-    await chooseSelect(page, '模组分片', /Below/);
+    await chooseSelect(page, '模组分片', /洞穴/);
     await page.locator('.mod').nth(1).waitFor();
     await page.getByRole('button', { name: '添加模组', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '添加模组', exact: true });
@@ -608,7 +608,10 @@ test('历史更新输出只通过日志入口查看，进入页面不自动弹�
 test('工坊查询失败保留本地名称、ID 和操作，刷新可以重试', async () => {
   const { page, requests } = await openMods({ failDetails: true });
   try {
-    await page.getByText(/创意工坊信息暂未加载/).waitFor();
+    const warning = page.getByRole('alert').filter({ hasText: '创意工坊信息暂未加载' });
+    await warning.waitFor();
+    assert.equal(await warning.locator('[data-slot="alert-title"]').count(), 1);
+    assert.equal(await warning.locator('[data-slot="alert-description"]').count(), 1);
     assert.match(await page.locator('.mod').nth(1).innerText(), /本地已下载名称/);
     assert.equal(await page.locator('.mod').first().getByRole('button', { name: '下载', exact: true }).isEnabled(), true);
     assert.equal(await page.locator('.mod').first().getByRole('link').getAttribute('href'), 'https://steamcommunity.com/sharedfiles/filedetails/?id=1185229307');

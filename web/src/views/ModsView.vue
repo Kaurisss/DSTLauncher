@@ -18,6 +18,7 @@ import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiPill from '@/components/ui/UiPill.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton } from '@/components/ui/code-block';
@@ -41,7 +42,7 @@ function setItemBusy(id, busy) {
   busyItems.value = busy ? [...new Set([...busyItems.value, id])] : busyItems.value.filter(value => value !== id);
 }
 function labelOf(item) {
-  return `${shardLabel(item.name, rooms.current?.locations?.[item.name] || item.worldType)} · ${item.name}${item.disabled ? '（已停用）' : ''}`;
+  return `${shardLabel(item.name, rooms.current?.locations?.[item.name] || item.worldType)}${item.disabled ? '（已停用）' : ''}`;
 }
 
 /** 服务器运行中冻结：模组改动重启后才生效 */
@@ -470,9 +471,13 @@ watch([() => rooms.current, shard], () => {
             <IconAction variant="outline" icon="activity" label="查看进度" @click="updateOpen = true" />
           </div>
 
-          <p v-if="workshopError" class="field-tip mb-3" role="status">
-            创意工坊信息暂未加载：{{ workshopError }}。当前显示本地名称或 ID，可点击「刷新」重试。
-          </p>
+          <Alert v-if="workshopError" class="mb-3">
+            <Icon name="alert" size="16" />
+            <AlertTitle>创意工坊信息暂未加载</AlertTitle>
+            <AlertDescription class="break-words">
+              {{ workshopError }}。当前显示本地名称或 ID，可点击「刷新」重试。
+            </AlertDescription>
+          </Alert>
           <template v-if="visibleMods.length">
             <ModItem
               v-for="m in visibleMods"
@@ -537,7 +542,7 @@ watch([() => rooms.current, shard], () => {
 .mods-workspace { min-width: 0; container-type: inline-size; }
 .mods-toolbar { padding: 12px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--card); }
 .mods-toolbar-left { display: flex; flex: 1; align-items: center; gap: 12px; min-width: 0; }
-.mods-shard { width: 152px; min-width: 0; flex-shrink: 0; }
+.mods-shard { width: 112px; min-width: 0; flex-shrink: 0; }
 .mods-search { position: relative; flex: 1; min-width: 96px; max-width: 256px; }
 .mods-filters { flex-shrink: 0; max-width: 100%; overflow-x: auto; border-radius: 9999px; }
 .mods-filters .seg-btn { flex-shrink: 0; padding: 4px 8px; border-radius: 9999px; white-space: nowrap; font-size: 12px; }

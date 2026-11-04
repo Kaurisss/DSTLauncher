@@ -533,6 +533,22 @@ test('真实选项布局紧凑，桌面两行吸顶保存搜索，浅色深色�
       assert.ok(position.headerBottom < position.viewportBottom, '吸顶控件仍在视口内');
       assert.ok(position.scrollWidth <= position.clientWidth, '主工作区不横向溢出');
       assert.equal(await page.getByRole('button', { name: '保存', exact: true }).isVisible(), true);
+      const scroller = page.getByRole('region', { name: '世界配置选项', exact: true });
+      await scroller.evaluate(el => { el.scrollTop = el.scrollHeight; });
+      const scrolled = await page.evaluate(() => {
+        const nav = document.querySelector('.world-group-nav').getBoundingClientRect();
+        const list = document.querySelector('[data-slot="page-scroll"]').getBoundingClientRect();
+        const options = document.querySelector('.world-group-content');
+        return {
+          navTop: nav.top, listTop: list.top, optionsScroll: options.scrollTop,
+          outerScroll: document.querySelector('[data-slot="page-scroll"]').scrollTop,
+          pageScroll: document.querySelector('#page-content').scrollTop,
+        };
+      });
+      assert.ok(scrolled.optionsScroll > 0, '选项容器独立滚动');
+      assert.ok(Math.abs(scrolled.navTop - scrolled.listTop) < 16, '分组导航不随选项滚走');
+      assert.equal(scrolled.outerScroll, 0);
+      assert.equal(scrolled.pageScroll, 0);
       await page.getByRole('textbox', { name: '搜索世界配置', exact: true }).fill('活动');
       await page.locator('.opt-row-label').getByText('活动', { exact: true }).waitFor();
       assert.equal(await nav.getByRole('button', { name: '全局', exact: true }).getAttribute('aria-current'), 'true', '吸顶搜索跨组定位');

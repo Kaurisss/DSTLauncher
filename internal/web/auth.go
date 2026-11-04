@@ -19,11 +19,12 @@ import (
 )
 
 const (
-	sessionCookieName = "dst_session"
-	sessionMaxAge     = 30 * 24 * 3600 // 30 天
-	hashIterations    = 10000
-	maxLoginFailures  = 5
-	loginLockDuration = 30 * time.Second
+	sessionCookieName    = "dst_session"
+	sessionMaxAge        = 30 * 24 * 3600 // 30 天
+	hashIterations       = 10000
+	maxLoginFailures     = 5
+	loginLockDuration    = 30 * time.Second
+	maxLoginLockDuration = 15 * time.Minute
 )
 
 func generateSecret() []byte {
@@ -199,11 +200,24 @@ func rejectAPI(w http.ResponseWriter, status int, message string) {
 }
 
 func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
+	s.loginMu.Lock()
+	retryAfter := s.loginRetryAfter()
+	s.loginMu.Unlock()
 	respond(w, 200, map[string]interface{}{
 		"enabled":       s.authEnabled(),
 		"authenticated": s.isAuthenticated(r),
 		"envManaged":    s.envPassword != "",
+		"retryAfter":    retryAfter,
 	}, nil)
+}
+
+func (s *Server) loginRetryAfter() int {
+	return max(0, int((time.Until(s.lockUntil)+time.Second-1)/time.Second))
+}
+
+func rejectLoginCooldown(w http.ResponseWriter, wait int) {
+	w.Header().Set("Retry-After", strconv.Itoa(wait))
+	rejectAPI(w, http.StatusTooManyRequests, fmt.Sprintf("密码错误次数过多，请 %d 秒后再试", wait))
 }
 
 func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
@@ -219,14 +233,12 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	s.authMu.Lock()
-	if time.Now().Before(s.lockUntil) {
-		wait := int(time.Until(s.lockUntil).Seconds()) + 1
-		s.authMu.Unlock()
-		respond(w, 200, nil, fmt.Errorf("密码错误次数过多，请 %d 秒后再试", wait))
+	s.loginMu.Lock()
+	defer s.loginMu.Unlock()
+	if wait := s.loginRetryAfter(); wait > 0 {
+		rejectLoginCooldown(w, wait)
 		return
 	}
-	s.authMu.Unlock()
 
 	factor, err := s.activePasswordFactor()
 	if err != nil {
@@ -240,21 +252,22 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		valid = VerifyPassword(factor, body.Password)
 	}
 	if !valid {
-		s.authMu.Lock()
-		s.failCount++
-		if s.failCount >= maxLoginFailures {
-			s.lockUntil = time.Now().Add(loginLockDuration)
-			s.failCount = 0
+		if s.failCount < maxLoginFailures {
+			s.failCount++
 		}
-		s.authMu.Unlock()
+		if s.failCount >= maxLoginFailures {
+			s.loginDelay = min(max(s.loginDelay*2, loginLockDuration), maxLoginLockDuration)
+			s.lockUntil = time.Now().Add(s.loginDelay)
+			rejectLoginCooldown(w, s.loginRetryAfter())
+			return
+		}
 		respond(w, 200, nil, fmt.Errorf("密码错误"))
 		return
 	}
 
-	s.authMu.Lock()
 	s.failCount = 0
 	s.lockUntil = time.Time{}
-	s.authMu.Unlock()
+	s.loginDelay = 0
 
 	if factor != "" {
 		s.setSessionCookie(w, factor)

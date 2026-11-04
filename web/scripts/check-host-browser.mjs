@@ -26,6 +26,69 @@ before(async () => {
 });
 after(async () => { await browser?.close(); await vite?.close(); });
 
+test('登录限流后禁用提交并倒计时，刷新保留冷却，到期后可重新登录', async () => {
+  const page = await browser.newPage();
+  let attempts = 0;
+  let retryAfter = 0;
+  let authenticated = false;
+  const errors = [];
+  page.on('pageerror', error => errors.push(error.message));
+  try {
+    const start = new Date('2026-11-04T00:00:00Z');
+    await page.clock.install({ time: start });
+    await page.clock.pauseAt(new Date(start.getTime() + 1000));
+    await page.route('**/api/**', route => {
+      const path = new URL(route.request().url()).pathname;
+      const status = { enabled: true, authenticated, envManaged: true, retryAfter };
+      const ok = data => route.fulfill({ json: { code: 200, data } });
+      if (path === '/api/auth/status') return ok(status);
+      if (path === '/api/auth/login') {
+        attempts++;
+        if (route.request().postDataJSON().password === 'fixture-correct') {
+          authenticated = true;
+          return ok({ ...status, authenticated: true });
+        }
+        if (attempts === 1) return route.fulfill({ json: { code: 500, message: '密码错误' } });
+        retryAfter = attempts === 2 ? 30 : 60;
+        return route.fulfill({ status: 429, headers: { 'Retry-After': String(retryAfter) }, json: { code: 429, message: '密码错误次数过多' } });
+      }
+      if (!authenticated) return route.fulfill({ status: 401, json: { code: 401, message: '请先登录面板' } });
+      if (path === '/api/logs/stream') return route.fulfill({ contentType: 'text/event-stream', body: '' });
+      return ok([]);
+    });
+    await page.goto(origin);
+    const password = page.getByRole('textbox', { name: '面板访问密码' });
+    await password.fill('wrong');
+    await page.getByRole('button', { name: '登录', exact: true }).click();
+    await page.getByRole('alert').filter({ hasText: '密码错误' }).waitFor();
+    assert.equal(await page.getByRole('button', { name: '登录', exact: true }).isEnabled(), true);
+    await password.press('Enter');
+    const locked = page.getByRole('button', { name: '30 秒后重试', exact: true });
+    await locked.waitFor();
+    assert.equal(await locked.isDisabled(), true);
+    await password.press('Enter');
+    await page.locator('form').dispatchEvent('submit');
+    await page.waitForTimeout(100);
+    assert.equal(attempts, 2, '冷却中回车或直接提交表单均不发起登录请求');
+    await page.clock.fastForward(8000);
+    await page.getByRole('button', { name: '22 秒后重试', exact: true }).waitFor();
+    await page.clock.fastForward(22000);
+    await page.getByRole('button', { name: '登录', exact: true }).click();
+    await page.getByRole('button', { name: '60 秒后重试', exact: true }).waitFor();
+    retryAfter = 22;
+    await page.reload();
+    const restored = page.getByRole('button', { name: '22 秒后重试', exact: true });
+    await restored.waitFor();
+    await password.fill('fixture-correct');
+    assert.equal(await restored.isDisabled(), true);
+    await page.clock.fastForward(22000);
+    await page.getByRole('button', { name: '登录', exact: true }).click();
+    await page.getByRole('navigation', { name: '主导航', exact: true }).waitFor();
+    assert.equal(attempts, 4);
+    assert.deepEqual(errors, []);
+  } finally { await page.close(); }
+});
+
 async function openPanel({ data = healthy, width = 1280, room = null, roomList = null, running = false, dark = false, tab = 'overview' } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
   page.setDefaultTimeout(12000);

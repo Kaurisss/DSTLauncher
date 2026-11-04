@@ -62,7 +62,14 @@ async function request(path, { method = 'GET', params, body } = {}) {
     if (unauthorizedHandler) unauthorizedHandler();
     throw makeUnauthorizedError(json.message);
   }
-  if (json.code !== 200) throw new Error(json.message || '请求失败');
+  if (json.code !== 200) {
+    const error = new Error(json.message || '请求失败');
+    if (res.status === 429) {
+      const retryAfter = Number(res.headers.get('Retry-After'));
+      if (Number.isFinite(retryAfter) && retryAfter > 0) error.retryAfter = retryAfter;
+    }
+    throw error;
+  }
   return json.data;
 }
 

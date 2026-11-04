@@ -782,15 +782,16 @@ input[type="radio"] {
 .world-presets .field { min-width: 0; }
 .world-enabled, .world-only-changed { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .world-notices { padding: 10px 16px 0; font-size: 12px; color: var(--warn); }
-.world-workspace { display: grid; grid-template-columns: 160px minmax(0, 1fr); align-items: start; gap: 20px; padding: 12px; }
-.world-group-nav { position: sticky; top: 0; display: flex; flex-direction: column; gap: 3px; max-height: calc(100svh - var(--world-header-height) - 100px); overflow-y: auto; }
+.world-workspace { display: grid; grid-template-columns: 160px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); flex: 1; min-height: 0; gap: 20px; padding: 12px; }
+.world-workspace > .world-notices { grid-column: 1 / -1; }
+.world-group-nav { display: flex; min-height: 0; flex-direction: column; gap: 3px; overflow-y: auto; overscroll-behavior: contain; }
 .world-group-nav button { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted-foreground); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .world-group-nav button[aria-current="true"] { background: color-mix(in srgb, var(--primary) 9%, var(--card)); color: var(--primary); font-weight: 600; }
 .world-group-nav button:hover:not(:disabled) { background: var(--surface-2); color: var(--foreground); }
 .world-group-nav button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .world-group-nav button:disabled { opacity: .4; cursor: default; }
 .world-group-changes { min-width: 20px; padding: 0 5px; border-radius: 5px; background: color-mix(in srgb, var(--primary) 12%, var(--card)); color: var(--primary); font-size: 11px; line-height: 20px; text-align: center; }
-.world-group-content { min-width: 0; container-type: inline-size; }
+.world-group-content { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; container-type: inline-size; }
 
 /* 类别切换（世界规则 / 世界生成） */
 .seg {
@@ -1008,8 +1009,8 @@ input[type="radio"] {
   .world-toolbar .seg-btn { justify-content: center; padding: 4px 8px; font-size: 12px; }
   .world-search { height: 30px; }
   .world-only-changed { gap: 5px; font-size: 11px; }
-  .world-workspace { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 12px; }
-  .world-group-nav { z-index: 5; top: 0; flex-direction: row; max-height: none; overflow-x: auto; padding: 4px 0; background: var(--card); }
+  .world-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 12px; padding: 12px; }
+  .world-group-nav { z-index: 5; flex-direction: row; max-height: none; overflow-x: auto; overflow-y: hidden; padding: 4px 0; background: var(--card); }
   .world-group-nav button { flex-shrink: 0; padding: 6px 9px; font-size: 12px; }
   /* 分片卡片：窄屏下端口单列，名字与类型各占一行 */
   .shard-ports { grid-template-columns: 1fr; }

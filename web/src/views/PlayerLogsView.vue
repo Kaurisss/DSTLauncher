@@ -197,10 +197,10 @@ async function blockPlayer(entry) {
 
 <template>
   <UiCard flush fill role="region" aria-label="聊天与进出记录" class="min-w-0" :aria-busy="loading">
-    <UiToolbar aria-label="玩家日志工具栏" leading-class="min-w-full xl:min-w-0">
-      <form class="flex min-w-0 flex-1 flex-wrap items-center gap-2 sm:flex-nowrap" @submit.prevent="refresh">
+    <UiToolbar aria-label="玩家日志工具栏" leading-class="min-w-full 2xl:min-w-0">
+      <form class="flex min-w-0 flex-1 flex-wrap items-center gap-2" @submit.prevent="refresh">
         <Select v-model="shard" :disabled="!shards.length">
-          <SelectTrigger id="chat_shard" aria-label="记录分片" class="w-32 min-w-0 shrink-0 bg-background"><SelectValue placeholder="选择分片" /></SelectTrigger>
+          <SelectTrigger id="chat_shard" aria-label="记录分片" class="w-24 min-w-0 shrink-0 bg-background"><SelectValue placeholder="选择分片" /></SelectTrigger>
           <SelectContent position="popper" align="start">
             <SelectGroup>
               <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ roomShardLabel(rooms.current, item) }}{{ item.disabled ? '（停用）' : '' }}</SelectItem>
@@ -213,8 +213,10 @@ async function blockPlayer(entry) {
             <SelectGroup><SelectItem v-for="(label, key) in labels" :key="key" :value="key">{{ label }}</SelectItem></SelectGroup>
           </SelectContent>
         </Select>
-        <Input id="chat_search" v-model="search" aria-label="搜索历史记录" class="min-w-24 max-w-80 flex-1 bg-background" placeholder="昵称、ID、IP、角色或内容" maxlength="200" />
-        <IconAction type="button" variant="ghost" icon="x" label="重置筛选" :disabled="kind === 'all' && !search" @click="resetFilters" />
+        <div class="relative min-w-0 flex-1 basis-64">
+          <Input id="chat_search" v-model="search" aria-label="搜索历史记录" class="bg-background pr-10" placeholder="昵称、ID、IP、角色或内容" maxlength="200" />
+          <IconAction type="button" variant="ghost" class="absolute end-0 top-1/2 -translate-y-1/2" icon="x" label="重置筛选" :disabled="kind === 'all' && !search" @click="resetFilters" />
+        </div>
       </form>
       <template #actions>
         <IconAction :variant="selected.size ? 'destructive' : 'ghost'" icon="trash" :label="`删除所选（${selected.size}）`" :disabled="!selected.size || deleting || !!blocking || loading" @click="removeEntries([...selected])" />

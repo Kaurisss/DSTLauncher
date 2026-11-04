@@ -53,6 +53,8 @@ const logs = useLogs();
 const loginPwd = ref('');
 const loggingIn = ref(false);
 const loginError = ref('');
+const loginWait = ref(0);
+let loginTimer;
 const workspace = ref(null);
 let sidebarAnimation;
 
@@ -82,7 +84,7 @@ onUnauthorized(() => {
 });
 
 async function submitLogin() {
-  if (!loginPwd.value || loggingIn.value) return;
+  if (!loginPwd.value || loggingIn.value || loginWait.value) return;
   loggingIn.value = true;
   loginError.value = '';
   try {
@@ -93,10 +95,22 @@ async function submitLogin() {
     logs.openRoom(rooms.currentId, rooms.shards);
     rooms.refreshStatus().catch(() => {});
   } catch (err) {
-    loginError.value = err.message || '登录失败';
+    if (err.retryAfter) startLoginCooldown(err.retryAfter);
+    else loginError.value = err.message || '登录失败';
   } finally {
     loggingIn.value = false;
   }
+}
+
+function startLoginCooldown(seconds) {
+  clearInterval(loginTimer);
+  loginError.value = '';
+  const deadline = Date.now() + seconds * 1000;
+  loginWait.value = Math.ceil(seconds);
+  loginTimer = setInterval(() => {
+    loginWait.value = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
+    if (!loginWait.value) clearInterval(loginTimer);
+  }, 250);
 }
 
 // 换房间要重连日志；启停洞穴会改变分片列表，也要跟着增删对应分片的连接
@@ -115,7 +129,9 @@ watch(
 );
 
 onMounted(async () => {
-  auth.load();
+  auth.load().then(status => {
+    if (status?.retryAfter) startLoginCooldown(status.retryAfter);
+  });
   // 首次加载会设置 currentId，从而触发上面的 watcher 完成状态刷新与日志连接
   const { ok } = await guard(() => rooms.load());
   if (disposed) return;
@@ -138,6 +154,7 @@ onUnmounted(() => {
   sidebarAnimation?.cancel();
   clearInterval(statusTimer);
   clearInterval(roomsTimer);
+  clearInterval(loginTimer);
   logs.disconnect();
 });
 </script>
@@ -158,9 +175,10 @@ onUnmounted(() => {
         placeholder="面板访问密码"
         aria-label="面板访问密码"
       />
-      <p v-if="loginError" role="alert" class="text-xs text-destructive">{{ loginError }}</p>
-      <Button type="submit" :disabled="loggingIn || !loginPwd">
-        {{ loggingIn ? '验证中…' : '登录' }}
+      <p v-if="loginWait" role="status" class="text-xs text-destructive">密码错误次数过多，请 {{ loginWait }} 秒后再试</p>
+      <p v-else-if="loginError" role="alert" class="text-xs text-destructive">{{ loginError }}</p>
+      <Button type="submit" :disabled="loggingIn || !loginPwd || loginWait > 0">
+        {{ loggingIn ? '验证中…' : loginWait ? `${loginWait} 秒后重试` : '登录' }}
       </Button>
     </form>
   </div>
