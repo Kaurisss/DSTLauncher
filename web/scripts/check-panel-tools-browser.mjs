@@ -113,7 +113,7 @@ async function openPanel({ tab = 'overview', width = 1280, stopped = false, dark
   });
   await page.goto(origin);
   if (tab === 'rooms') await page.getByRole('button', { name: '新建房间', exact: true }).waitFor();
-  else await page.getByRole('heading', { name: '快捷操作', exact: true }).waitFor();
+  else await page.getByRole('heading', { name: '分片管理', exact: true }).waitFor();
   return { page, state, close: async () => {
     state.pending.forEach(d => d.release());
     await page.close();
@@ -187,10 +187,10 @@ test('快捷保存如实报告部分失败；公告只提交一次且绑定原�
   try {
     state.quickResult = { action: 'save', shards: ['Surface'], skipped: [], errors: { Below: '存档写入失败' } };
     await page.getByRole('button', { name: '立即保存', exact: true }).click();
-    const panel = page.getByRole('region', { name: '快捷操作', exact: true });
-    await panel.getByText(/存档写入失败/).waitFor();
+    await page.getByText(/存档写入失败/).waitFor();
     assert.deepEqual(quickWrites(state)[0].body, { action: 'save' });
     state.quickResult = null;
+    await page.getByRole('button', { name: '全服公告', exact: true }).click();
     const text = '欢迎 "quoted" \\ 中文 😀';
     await page.getByRole('textbox', { name: '全服公告', exact: true }).fill(text);
     const pending = state.hold('delayQuick');
@@ -201,11 +201,11 @@ test('快捷保存如实报告部分失败；公告只提交一次且绑定原�
     await selectRoom(page, 3);
     const arrived = page.waitForResponse(r => r.url().includes('/api/quick-action'));
     pending.release(); await arrived;
-    await page.getByRole('button', { name: '发送全服公告', exact: true }).waitFor();
+    await page.getByRole('button', { name: '全服公告', exact: true }).waitFor();
     assert.equal(quickWrites(state).length, 2);
     assert.equal(quickWrites(state)[1].id, 2);
     assert.equal(quickWrites(state)[1].body.message, text);
-    assert.equal(await panel.getByText(/公告已提交/).count(), 0);
+    assert.equal(await page.getByText(/公告已交给游戏广播/).count(), 0);
   } finally { await close(); }
 });
 
@@ -218,11 +218,11 @@ test('快进需确认，取消不请求；主分片未运行时禁用操作', as
     assert.equal(quickWrites(state).length, 0);
     await page.getByRole('button', { name: '主世界快进一天', exact: true }).click();
     await page.getByRole('alertdialog').getByRole('button', { name: '确定', exact: true }).click();
-    await page.getByRole('region', { name: '快捷操作', exact: true }).getByText(/已执行快进/).waitFor();
+    await page.getByText(/主世界已执行快进/).waitFor();
     assert.deepEqual(quickWrites(state)[0].body, { action: 'skipday' });
   } finally { await close(); }
   const other = await openPanel({ stopped: true });
-  try { for (const name of ['立即保存', '主世界快进一天', '发送全服公告']) assert.equal(await other.page.getByRole('button', { name, exact: true }).isDisabled(), true); }
+  try { for (const name of ['立即保存', '主世界快进一天', '全服公告']) assert.equal(await other.page.getByRole('button', { name, exact: true }).isDisabled(), true); }
   finally { await other.close(); }
 });
 

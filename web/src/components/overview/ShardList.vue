@@ -138,7 +138,7 @@ async function refreshSnapshots(id, requestGeneration) {
           <IconAction variant="destructive" icon="stop" label="停止" :disabled="rooms.starting" @click="proc.stop(s.shard)" />
           <IconAction variant="outline" icon="restart" label="重启" :disabled="rooms.starting || system.installing" @click="proc.restart(s.shard)" />
         </template>
-        <IconAction v-else :icon="system.installed ? 'play' : 'download'" :label="rooms.starting ? '请稍候…' : (system.installed ? '启动' : '安装并启动')" :disabled="rooms.starting" @click="proc.start(s.shard)" />
+        <IconAction v-else variant="outline" :icon="system.installed ? 'play' : 'download'" :label="rooms.starting ? '请稍候…' : (system.installed ? '启动' : '安装并启动')" :disabled="rooms.starting" @click="proc.start(s.shard)" />
       </span>
     </div>
   </section>

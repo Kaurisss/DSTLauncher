@@ -4,7 +4,7 @@ import {
   PhArchive, PhArrowClockwise, PhArrowCounterClockwise, PhArrowSquareOut, PhArrowsClockwise,
   PhBroom, PhCaretRight, PhCheck, PhClipboard, PhClock, PhCpu, PhDownloadSimple, PhFastForward,
   PhFileCode, PhFloppyDisk, PhFolder, PhGlobe, PhHardDrives, PhHeart, PhInfo, PhKey,
-  PhMagnifyingGlass, PhMapPin, PhPackage, PhPaperPlaneTilt, PhPencilSimple, PhPlay, PhPlus,
+  PhMagnifyingGlass, PhMapPin, PhMemory, PhPackage, PhPaperPlaneTilt, PhPencilSimple, PhPlay, PhPlus,
   PhProhibit, PhPulse, PhSignOut, PhSliders, PhStop, PhTerminalWindow, PhTrash, PhUploadSimple,
   PhUsers, PhWarning, PhX,
 } from '@phosphor-icons/vue';
@@ -47,6 +47,7 @@ const ICONS = {
   skip: PhFastForward,
   logout: PhSignOut,
   pin: PhMapPin,
+  memory: PhMemory,
   save: PhFloppyDisk,
   clean: PhBroom,
 };

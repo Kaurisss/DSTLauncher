@@ -1,7 +1,7 @@
 <script setup>
 // 概览页：资源指标、分片管理与实时日志。
 
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
 import IconAction from '@/components/ui/IconAction.vue';
@@ -10,19 +10,28 @@ import ShardList from '@/components/overview/ShardList.vue';
 import HostResources from '@/components/overview/HostResources.vue';
 import PlayersPanel from '@/components/overview/PlayersPanel.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
+import AnnounceDialog from '@/components/overview/AnnounceDialog.vue';
 import LogConsole from '@/components/overview/LogConsole.vue';
-import QuickActions from '@/components/overview/QuickActions.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
 import { useProcessControl } from '@/composables/useProcessControl.js';
-import { fmtSize } from '@/lib/format.js';
+import { procApi } from '@/lib/api.js';
+import { confirmAction } from '@/lib/confirm.js';
+import { fmtSize, roomShardLabel } from '@/lib/format.js';
+import { toast } from '@/lib/toast.js';
 
 const rooms = useRoomsStore();
 const system = useSystemStore();
 const proc = useProcessControl();
 
+const quickBusy = ref('');
+
 const shardTotal = computed(() => rooms.shards.length);
 const shardRunning = computed(() => rooms.statuses.filter(s => s.state === 'running').length);
+
+const master = computed(() => rooms.current?.shards?.find(shard => shard.isMaster && !shard.disabled));
+const masterRunning = computed(() => master.value && rooms.statuses.some(status => status.shard === master.value.name && status.state === 'running'));
+const anyRunning = computed(() => rooms.statuses.some(status => status.state === 'running'));
 
 const shardTone = computed(() => {
   if (!shardTotal.value) return '';
@@ -66,6 +75,26 @@ const resTone = computed(() => {
   return res.value.cpu > 50 ? 'warn' : 'info';
 });
 
+async function runQuick(action) {
+  if (quickBusy.value || !rooms.current) return;
+  const room = rooms.current;
+  const roomId = room.id;
+  quickBusy.value = action;
+  try {
+    if (action === 'skipday') {
+      if (!await confirmAction(`让「${room.name}」的主世界快进一天？\n\n会改变主世界的时间与实体状态，不能撤销；建议先保存并备份。该操作执行后一分钟内不能再次快进或回档。`)) return;
+    }
+    const labels = new Map(room.shards.map(shard => [shard.name, roomShardLabel(room, shard)]));
+    const result = await procApi.quick(roomId, { action });
+    const failures = Object.entries(result.errors || {}).map(([shard, reason]) => `${labels.get(shard) || shard}：${reason}`);
+    if (failures.length) toast(`「${room.name}」部分分片${action === 'save' ? '保存' : '快进'}失败：${failures.join('、')}`, 'err');
+    else toast(`「${room.name}」${action === 'save' ? '已确认存档保存' : '主世界已执行快进'}`);
+  } catch (err) {
+    toast(`「${room.name}」${err.message}`, 'err');
+  } finally {
+    quickBusy.value = '';
+  }
+}
 </script>
 
 <template>
@@ -94,16 +123,42 @@ const resTone = computed(() => {
       <UiCard class="h-full">
         <template #title>分片管理</template>
         <template #actions>
+          <IconAction
+            variant="outline"
+            icon="save"
+            :label="quickBusy === 'save' ? '等待保存完成…' : '立即保存'"
+            :disabled="!!quickBusy || !anyRunning || rooms.starting"
+            @click="runQuick('save')"
+          />
+          <IconAction
+            variant="outline"
+            icon="skip"
+            :label="quickBusy === 'skipday' ? '等待游戏回执…' : '主世界快进一天'"
+            :disabled="!!quickBusy || !masterRunning || rooms.starting"
+            @click="runQuick('skipday')"
+          />
+          <AnnounceDialog />
           <RollbackDialog />
-          <IconAction :icon="system.installed ? 'play' : 'download'" :label="rooms.starting ? '准备开服中…' : (system.installed ? '全部启动' : '安装并启动')" :disabled="!rooms.current || rooms.starting" @click="proc.start('')" />
-          <IconAction variant="destructive" icon="stop" label="全部停止" :disabled="!rooms.current || rooms.starting" @click="proc.stop('')" />
+          <IconAction
+            variant="outline"
+            :icon="system.installed ? 'play' : 'download'"
+            :label="rooms.starting ? '准备开服中…' : (system.installed ? '全部启动' : '安装并启动')"
+            :disabled="!rooms.current || rooms.starting"
+            @click="proc.start('')"
+          />
+          <IconAction
+            variant="destructive"
+            icon="stop"
+            label="全部停止"
+            :disabled="!rooms.current || rooms.starting"
+            @click="proc.stop('')"
+          />
         </template>
         <ShardList />
       </UiCard>
 
       <div class="overview-sidebar">
-        <QuickActions />
-        <PlayersPanel class="h-full [&>[data-slot=card]]:h-full" />
+        <PlayersPanel />
       </div>
     </div>
 

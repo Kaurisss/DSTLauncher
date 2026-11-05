@@ -23,11 +23,6 @@ const memoryLow = computed(() => !!memory.value
 const diskLow = computed(() => !!disk.value
   && (disk.value.availableBytes / disk.value.totalBytes < 0.1
     || disk.value.availableBytes < 5 * 1024 ** 3));
-const warnings = computed(() => [
-  containerLow.value ? '容器剩余内存配额不足 10%，请减少运行分片或提高容器限额。' : '',
-  memoryLow.value ? '宿主机内存使用已达 90%，请减少运行分片或释放内存。' : '',
-  diskLow.value ? '存档盘空间不足，请清理旧备份或扩容。' : '',
-].filter(Boolean));
 const errors = computed(() => [
   error.value,
   snapshot.value?.memoryError ? '内存读取失败：' + snapshot.value.memoryError : '',
@@ -66,7 +61,7 @@ onUnmounted(() => {
         label="宿主机内存"
         :value="memory ? ((memoryUsed / memory.totalBytes) * 100).toFixed(1) + '%' : '—'"
         :sub="memory ? '已用 ' + fmtSize(memoryUsed) + ' / ' + fmtSize(memory.totalBytes) : (errors.length ? '读取失败' : '读取中…')"
-        icon="cpu"
+        icon="memory"
         :tone="memoryLow ? 'warn' : ''"
       >
         <Progress v-if="memory" class="mt-2 h-1" :model-value="memoryUsed / memory.totalBytes * 100" aria-label="宿主机内存使用率" />
@@ -74,9 +69,9 @@ onUnmounted(() => {
       <Tooltip :disabled="!snapshot?.diskPath">
         <TooltipTrigger as-child>
           <UiStat
-            label="存档盘可用空间"
-            :value="disk ? fmtSize(disk.availableBytes) : '—'"
-            :sub="disk ? '总容量 ' + fmtSize(disk.totalBytes) : (errors.length ? '读取失败' : '读取中…')"
+            label="存档盘"
+            :value="disk ? (((disk.totalBytes - disk.availableBytes) / disk.totalBytes) * 100).toFixed(1) + '%' : '—'"
+            :sub="disk ? '可用 ' + fmtSize(disk.availableBytes) + ' / 总容量 ' + fmtSize(disk.totalBytes) : (errors.length ? '读取失败' : '读取中…')"
             :tabindex="snapshot?.diskPath ? 0 : undefined"
             icon="folder"
             :tone="diskLow ? 'warn' : ''"
@@ -87,14 +82,14 @@ onUnmounted(() => {
         <TooltipContent class="break-all">{{ snapshot?.diskPath }}</TooltipContent>
       </Tooltip>
     </div>
-    <div v-if="container" class="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+    <div v-if="container" class="host-container flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" :class="{ 'is-warn': containerLow }">
       <span>容器内存配额</span>
       <strong class="font-medium text-foreground">{{ fmtSize(container.availableBytes) }}</strong>
       <span>剩余可用 / 限额 {{ fmtSize(container.totalBytes) }}</span>
       <Progress class="h-1 w-24" :model-value="(container.totalBytes - container.availableBytes) / container.totalBytes * 100" aria-label="容器内存使用率" />
     </div>
-    <div v-if="warnings.length || errors.length" role="status" class="grid gap-1 break-words rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
-      <p v-for="message in [...warnings, ...errors]" :key="message">{{ message }}</p>
+    <div v-if="errors.length" role="status" class="grid gap-1 break-words rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
+      <p v-for="message in errors" :key="message">{{ message }}</p>
     </div>
   </section>
 </template>

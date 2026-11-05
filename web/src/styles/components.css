@@ -8,17 +8,17 @@
    卡片
    -------------------------------------------------------------------------- */
 
-/* 左侧分片管理，右侧快捷操作与玩家；两栏底部对齐。 */
+/* 左侧分片管理，右侧按内容取高，停服时不再把空卡拉满。 */
 .overview-workspace {
   display: grid;
   grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-  align-items: stretch;
+  align-items: start;
   gap: 16px;
 }
 
 .overview-sidebar {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: auto auto;
   gap: 16px;
   min-width: 0;
 }
@@ -484,6 +484,7 @@ input[type="radio"] {
 .stat.is-ok .stat-icon     { background: var(--ok-soft);     color: var(--ok); }
 .stat.is-warn .stat-icon   { background: var(--warn-soft);   color: var(--warn); }
 .stat.is-warn [data-slot="progress-indicator"] { background: var(--warn); }
+.host-container.is-warn [data-slot="progress-indicator"] { background: var(--warn); }
 .stat.is-danger .stat-icon { background: var(--danger-soft); color: var(--danger); }
 .stat.is-info .stat-icon   { background: var(--info-soft);   color: var(--info); }
 

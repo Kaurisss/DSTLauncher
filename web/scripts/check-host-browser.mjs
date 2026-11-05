@@ -138,7 +138,7 @@ test('没有房间也显示宿主机而非分片内存，桌面与手机无横�
       assert.match(await section.innerText(), /40.00 GB/);
       assert.match(await section.innerText(), /总容量 100.00 GB/);
       assert.equal(await section.getByRole('status').count(), 0);
-      await section.locator('.stat').filter({ hasText: '存档盘可用空间' }).hover();
+      await section.locator('.stat').filter({ hasText: '存档盘' }).hover();
       await page.getByRole('tooltip').waitFor();
       assert.equal(await page.getByRole('tooltip').innerText(), healthy.diskPath);
       await page.keyboard.press('Escape');
@@ -165,8 +165,6 @@ test('四分片概览的资源与快捷操作保持紧凑，桌面首屏可见�
       await section.getByText('50.0%', { exact: true }).waitFor();
       await page.getByRole('region', { name: '分片状态', exact: true }).getByText('第 108 天', { exact: true }).first().waitFor();
       await page.getByRole('region', { name: '在线玩家', exact: true }).getByText(scenario.running ? '暂无在线玩家' : '房间未运行', { exact: true }).waitFor();
-      const quick = page.getByRole('region', { name: '快捷操作', exact: true });
-      assert.ok((await quick.boundingBox()).height < 180, '快捷操作不被拉高');
       for (const card of await section.locator('.stat').all()) {
         assert.ok((await card.boundingBox()).height < 150, '资源指标按内容取高');
         assert.equal(await card.locator('.stat-value').evaluate(el => el.scrollWidth <= el.clientWidth), true, '指标数字不截断');
@@ -176,7 +174,7 @@ test('四分片概览的资源与快捷操作保持紧凑，桌面首屏可见�
         assert.ok((await logs.boundingBox()).y < 850, '桌面首屏能看见日志入口');
         const left = await page.getByRole('heading', { name: '分片管理', exact: true }).locator('xpath=ancestor::*[@data-slot="card"]').boundingBox();
         const right = await page.getByRole('region', { name: '在线玩家', exact: true }).boundingBox();
-        assert.ok(Math.abs(left.y + left.height - right.y - right.height) < 2, '主区左右底部对齐');
+        assert.ok(right.height + 24 < left.height, '在线玩家按内容取高，不跟分片列表拉齐');
         assert.equal(await page.getByRole('region', { name: '世界状态', exact: true }).count(), 0);
         assert.equal(await logs.locator('.console').count(), 1);
       }
@@ -199,7 +197,7 @@ test('四分片概览的资源与快捷操作保持紧凑，桌面首屏可见�
 test('概览统一四项资源指标，服务器配置仅在设置页提供', async () => {
   const { page } = await openPanel();
   try {
-    assert.deepEqual(await page.locator('.stat-label').allTextContents(), ['运行分片', '进程资源占用', '宿主机内存', '存档盘可用空间']);
+    assert.deepEqual(await page.locator('.stat-label').allTextContents(), ['运行分片', '进程资源占用', '宿主机内存', '存档盘']);
     assert.equal(await page.getByRole('progressbar', { name: '宿主机内存使用率' }).getAttribute('aria-valuenow'), '50');
     assert.equal(await page.getByRole('progressbar', { name: '存档盘已用空间' }).getAttribute('aria-valuenow'), '60');
     assert.equal(await page.getByText('更改服务器文件位置', { exact: true }).count(), 0);
@@ -421,9 +419,10 @@ test('高内存及低磁盘有文字预警，零可用空间显示真实零值',
     } });
     try {
       await section.getByText('90.0%', { exact: true }).waitFor();
-      assert.match(await section.getByRole('status').innerText(), /内存使用已达 90%/);
-      assert.match(await section.getByRole('status').innerText(), /存档盘空间不足/);
-      await section.getByText(availableBytes ? '9.00 GB' : '0 B', { exact: true }).waitFor();
+      await section.locator('.stat.is-warn', { hasText: '宿主机内存' }).waitFor();
+      await section.locator('.stat.is-warn', { hasText: '存档盘' }).waitFor();
+      await section.getByText(availableBytes ? /9\.00 GB/ : /0 B/).waitFor();
+      assert.equal(await section.getByRole('status').count(), 0);
     } finally { await page.close(); }
   }
 });
@@ -448,8 +447,8 @@ test('轮询更新容量，请求失败清除旧值，恢复后清除错误，�
     assert.equal(await section.getByText('50.0%', { exact: true }).count(), 0);
     state.failure = false;
     state.data = { ...healthy, disk: { totalBytes: 20 * GB, availableBytes: 4 * GB } };
-    await section.getByText('4.00 GB', { exact: true }).waitFor();
-    assert.match(await section.getByRole('status').innerText(), /存档盘空间不足/);
+    await section.getByText(/4\.00 GB/).waitFor();
+    await section.locator('.stat.is-warn', { hasText: '存档盘' }).waitFor();
     assert.doesNotMatch(await section.innerText(), /读取失败/);
     await page.locator('#app-navigation').getByRole('button', { name: '房间', exact: true }).click();
     await section.waitFor({ state: 'hidden' });
@@ -466,7 +465,7 @@ test('容器内存独立显示限额和剩余空间，配额耗尽仍显示零�
   try {
     await section.getByText('容器内存配额', { exact: true }).waitFor();
     assert.match(await section.innerText(), /剩余可用 \/ 限额 2.00 GB/);
-    assert.match(await section.innerText(), /容器剩余内存配额/);
+    assert.equal(await section.locator('.host-container.is-warn').count(), 1);
     assert.match(await section.innerText(), /16.00 GB/);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
   } finally { await page.close(); }
