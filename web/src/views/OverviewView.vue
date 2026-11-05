@@ -157,8 +157,8 @@ async function runQuick(action) {
         <ShardList />
       </UiCard>
 
-      <div class="overview-sidebar">
-        <PlayersPanel />
+      <div class="overview-sidebar h-full">
+        <PlayersPanel class="h-full" />
       </div>
     </div>
 

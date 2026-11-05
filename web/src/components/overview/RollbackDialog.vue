@@ -57,7 +57,7 @@ function preventWhileBusy(event) {
       <IconAction variant="outline" icon="clock" :label="rooms.rollingBack ? '正在请求回档…' : remaining > 0 ? `回档中（${remaining}秒）` : '回档'" :disabled="!rooms.current || rooms.rollingBack || remaining > 0" />
     </DialogTrigger>
     <DialogContent
-      class="sm:max-w-md overflow-y-auto"
+      class="sm:max-w-md overflow-y-auto overscroll-contain"
       :close-disabled="rooms.rollingBack"
       @escape-key-down="preventWhileBusy" @interact-outside="preventWhileBusy"
     >

@@ -107,7 +107,7 @@ async function act(player, action, target = '') {
             : '将当前分片中的幽灵玩家复活。';
       if (!await confirmAction({
         title: `${label}「${name}」？`,
-        description: `${player.userid} · 房间「${roomName}」 · ${labelOf(player.shard)}。${description}`,
+        description: `${player.userid}（房间「${roomName}」 ${labelOf(player.shard)}）。${description}`,
         destructive: action === 'kick' || action === 'ban',
       })) return;
     }
@@ -144,8 +144,8 @@ function preventWhileBusy(event) {
 </script>
 
 <template>
-  <section aria-label="在线玩家" class="min-w-0">
-    <UiCard>
+  <section aria-label="在线玩家" class="flex h-full min-w-0 flex-1 flex-col">
+    <UiCard class="h-full flex-1">
       <template #title>在线玩家</template>
       <template #actions>
         <IconAction variant="outline" icon="refresh" :label="loading ? '查询中…' : '刷新玩家'" :disabled="!canQuery || loading || busy" @click="load" />
@@ -165,7 +165,7 @@ function preventWhileBusy(event) {
       </div>
       <p v-if="actionError && !teleportOpen" role="alert" class="mb-3 break-words text-sm text-destructive">{{ actionError }}</p>
 
-      <div v-if="players.length" class="max-h-80 divide-y divide-border overflow-y-auto">
+      <div v-if="players.length" class="max-h-80 divide-y divide-border overflow-y-auto overscroll-contain">
         <article
           v-for="player in players" :key="`${player.shard}:${player.userid}`"
           :aria-label="`${player.name || player.userid} ${player.userid} ${labelOf(player.shard)}`"
@@ -178,9 +178,11 @@ function preventWhileBusy(event) {
               <span v-if="player.admin" class="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">管理员</span>
               <span v-else-if="player.adminSaved" class="text-xs text-muted-foreground">管理员待重启生效</span>
             </div>
-            <p class="mt-0.5 break-words text-xs text-muted-foreground">
-              {{ labelOf(player.shard) }} · {{ CHARACTERS[player.prefab] || player.prefab || '选角中' }}
-              · {{ player.days == null ? '天数未知' : player.days + ' 天' }}{{ player.ghost ? ' · 幽灵' : '' }}
+            <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
+              <span>{{ labelOf(player.shard) }}</span>
+              <span>{{ CHARACTERS[player.prefab] || player.prefab || '选角中' }}</span>
+              <span>{{ player.days == null ? '天数未知' : player.days + ' 天' }}</span>
+              <span v-if="player.ghost" class="font-medium text-destructive">幽灵</span>
             </p>
           </div>
           <div class="flex max-w-full flex-wrap gap-1.5">
@@ -207,7 +209,7 @@ function preventWhileBusy(event) {
             <Select v-model="targetId" :disabled="busy">
               <SelectTrigger aria-label="传送目标" class="w-full"><SelectValue placeholder="选择目标玩家" /></SelectTrigger>
               <SelectContent>
-                <SelectItem v-for="target in targets" :key="target.userid" :value="target.userid">{{ target.name || target.userid }} · {{ target.userid }}</SelectItem>
+                <SelectItem v-for="target in targets" :key="target.userid" :value="target.userid">{{ target.name || target.userid }} ({{ target.userid }})</SelectItem>
               </SelectContent>
             </Select>
             <p v-if="actionError" role="alert" class="break-words text-sm text-destructive">{{ actionError }}</p>

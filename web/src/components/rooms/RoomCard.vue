@@ -48,7 +48,7 @@ function ports(s) {
       <div class="room-card-identity">
         <h3 class="room-title">{{ room.name }}</h3>
         <div class="room-sub">
-          {{ room.key }}{{ room.hasSave ? ' · 已有存档' : '' }}
+          {{ room.key }}{{ room.hasSave ? '（已有存档）' : '' }}
         </div>
       </div>
       <span v-if="selected" class="room-selection">

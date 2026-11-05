@@ -126,7 +126,7 @@ async function save() {
 
 <template>
   <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="save">
-    <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:p-6">
+    <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
       <UiLoading v-if="loading" />
 
       <p v-else-if="loadError" class="text-sm text-destructive" role="alert">读取配置项失败：{{ loadError }}</p>

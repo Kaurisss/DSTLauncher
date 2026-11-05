@@ -23,7 +23,7 @@ const roomDetails = computed(() => {
   const room = rooms.current;
   if (!room) return '';
   const mode = GAME_MODE_LABEL[room.gameMode] || room.gameMode || '';
-  return [room.key, mode.split(' ')[0], room.maxPlayers != null ? room.maxPlayers + '人' : ''].filter(Boolean).join(' · ');
+  return [room.key, mode.split(' ')[0], room.maxPlayers != null ? room.maxPlayers + '人' : ''].filter(Boolean).join(' ');
 });
 const themeIcon = computed(() => ({ auto: PhDesktop, light: PhSun, dark: PhMoon })[theme.mode.value]);
 const themeTitle = computed(() => '切换主题：' + theme.label.value);
@@ -37,10 +37,10 @@ function onTheme() {
 <template>
   <header data-slot="app-header" class="relative z-20 flex h-14 w-full min-w-0 shrink-0 items-center justify-between bg-sidebar text-sidebar-foreground">
     <div class="flex min-w-0 flex-1 items-center">
-      <!-- 品牌与触发区域：宽度与侧边栏严格同步（展开 220px，收起 48px） -->
+      <!-- 品牌与触发区域：桌面端宽度与侧边栏严格同步（展开 220px，收起 48px），移动端仅保留触发按钮 -->
       <div
         class="flex h-14 shrink-0 items-center overflow-hidden transition-[width] duration-180 ease-[cubic-bezier(0.2,0,0,1)]"
-        :class="state === 'expanded' ? 'w-[220px]' : 'w-12'"
+        :class="state === 'expanded' ? 'w-12 md:w-[220px]' : 'w-12'"
       >
         <!-- 侧边栏折叠按钮：固定在左侧 48px 区域内居中，中心点 x=24px 与下方导航图标严格共线 -->
         <div class="flex h-14 w-12 shrink-0 items-center justify-center">
@@ -52,25 +52,25 @@ function onTheme() {
           </Tooltip>
         </div>
 
-        <!-- 品牌标识：展开时展示 -->
-        <div class="flex min-w-0 flex-1 items-center gap-2 pr-3">
+        <!-- 品牌标识：仅在桌面端展开时展示 -->
+        <div class="hidden md:flex min-w-0 flex-1 items-center gap-2 pr-3">
           <img :src="iconUrl" alt="DST" width="28" height="28" class="size-7 shrink-0 rounded-lg object-cover" />
           <span class="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">DST 开服控制台</span>
         </div>
       </div>
 
-      <!-- 当前页面标题：从侧边栏分界处起排，无缝无分割线 -->
-      <h1 class="truncate text-sm font-semibold sm:text-base text-sidebar-foreground pl-3">{{ pageTitle }}</h1>
+      <!-- 当前页面标题：移动端紧随触发按钮，桌面端从侧边栏分界处起排 -->
+      <h1 class="truncate text-sm font-semibold sm:text-base text-sidebar-foreground pl-1 md:pl-3">{{ pageTitle }}</h1>
     </div>
 
     <!-- 右侧：房间选择 + 切换主题 -->
     <div class="flex min-w-0 shrink-0 items-center gap-2 pr-3 sm:pr-4">
       <Select :model-value="rooms.currentId ? String(rooms.currentId) : ''" :disabled="!rooms.list.length" @update:model-value="rooms.select">
-        <SelectTrigger id="roomSelect" aria-label="房间" class="w-auto min-w-[140px] max-w-[200px] sm:max-w-[340px] md:max-w-[420px] lg:max-w-[500px] bg-card data-[size=default]:h-9 px-3">
+        <SelectTrigger id="roomSelect" aria-label="房间" size="sm" class="w-auto min-w-[140px] max-w-[200px] sm:max-w-[340px] md:max-w-[420px] lg:max-w-[500px] bg-card h-7 px-2.5 text-xs">
           <SelectValue as-child>
-            <span class="flex min-w-0 flex-1 items-center gap-2">
-              <span class="truncate text-sm font-medium">{{ rooms.current?.name || (rooms.list.length ? '选择房间' : '（暂无房间）') }}</span>
-              <span v-if="roomDetails" class="hidden sm:inline-flex shrink-0 items-center rounded-md bg-muted/60 px-1.5 py-0.5 text-xs text-muted-foreground tabular-nums">{{ roomDetails }}</span>
+            <span class="flex min-w-0 flex-1 items-center gap-1.5">
+              <span class="truncate text-xs font-medium">{{ rooms.current?.name || (rooms.list.length ? '选择房间' : '（暂无房间）') }}</span>
+              <span v-if="roomDetails" class="hidden sm:inline-flex shrink-0 items-center rounded bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums leading-none">{{ roomDetails }}</span>
             </span>
           </SelectValue>
         </SelectTrigger>
@@ -83,8 +83,8 @@ function onTheme() {
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button variant="outline" size="icon" class="size-9 shrink-0" aria-label="切换主题" @click="onTheme">
-            <component :is="themeIcon" aria-hidden="true" />
+          <Button variant="outline" size="icon-sm" class="size-7 shrink-0" aria-label="切换主题" @click="onTheme">
+            <component :is="themeIcon" class="size-3.5" aria-hidden="true" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>{{ themeTitle }}</TooltipContent>

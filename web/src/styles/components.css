@@ -8,19 +8,19 @@
    卡片
    -------------------------------------------------------------------------- */
 
-/* 左侧分片管理，右侧按内容取高，停服时不再把空卡拉满。 */
+/* 概览工作区：左右两列各占 50%，与上方四张指标卡严格对齐；双卡等高占满背景 */
 .overview-workspace {
   display: grid;
-  grid-template-columns: minmax(0, 7fr) minmax(0, 5fr);
-  align-items: start;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
   gap: 16px;
 }
 
 .overview-sidebar {
-  display: grid;
-  grid-template-rows: auto auto;
-  gap: 16px;
+  display: flex;
+  flex-direction: column;
   min-width: 0;
+  height: 100%;
 }
 
 .stack > * + * { margin-top: 16px; }
@@ -774,6 +774,7 @@ input[type="radio"] {
 .world-shard-tabs { display: flex; gap: 2px; }
 .world-shard-tabs .shard-tab { padding: 5px 10px; border: 0; border-radius: 6px; font: inherit; font-size: 13px; color: var(--muted-foreground); background: transparent; cursor: pointer; }
 .world-shard-tabs .shard-tab[data-state="active"] { color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--card)); font-weight: 600; }
+[data-theme="dark"] .world-shard-tabs .shard-tab[data-state="active"] { color: oklch(0.88 0.13 165); background: color-mix(in srgb, oklch(0.696 0.17 162.48) 18%, var(--card)); }
 .world-shard-tabs .shard-tab:focus-visible { outline: 2px solid var(--ring); }
 .world-main-actions { margin-left: auto; flex-shrink: 0; }
 .world-type-label, .world-count { font-size: 11px; }
@@ -788,10 +789,14 @@ input[type="radio"] {
 .world-group-nav { display: flex; min-height: 0; flex-direction: column; gap: 3px; overflow-y: auto; overscroll-behavior: contain; }
 .world-group-nav button { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted-foreground); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .world-group-nav button[aria-current="true"] { background: color-mix(in srgb, var(--primary) 9%, var(--card)); color: var(--primary); font-weight: 600; }
+[data-theme="dark"] .world-group-nav button[aria-current="true"] { background: color-mix(in srgb, oklch(0.696 0.17 162.48) 18%, var(--card)); color: oklch(0.88 0.13 165); }
 .world-group-nav button:hover:not(:disabled) { background: var(--surface-2); color: var(--foreground); }
+[data-theme="dark"] .world-group-nav button[aria-current="true"]:hover:not(:disabled) { background: color-mix(in srgb, oklch(0.696 0.17 162.48) 24%, var(--card)); color: oklch(0.92 0.11 165); }
 .world-group-nav button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .world-group-nav button:disabled { opacity: .4; cursor: default; }
 .world-group-changes { min-width: 20px; padding: 0 5px; border-radius: 5px; background: color-mix(in srgb, var(--primary) 12%, var(--card)); color: var(--primary); font-size: 11px; line-height: 20px; text-align: center; }
+[data-theme="dark"] .world-group-changes { background: color-mix(in srgb, oklch(0.696 0.17 162.48) 22%, var(--card)); color: oklch(0.88 0.12 165); font-weight: 600; }
+[data-theme="dark"] .world-group-nav button[aria-current="true"] .world-group-changes { background: color-mix(in srgb, oklch(0.696 0.17 162.48) 32%, var(--card)); color: oklch(0.95 0.06 165); }
 .world-group-content { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding-right: 8px; container-type: inline-size; }
 
 /* 类别切换（世界规则 / 世界生成） */
@@ -837,7 +842,7 @@ input[type="radio"] {
 .opt-group-body { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr)); gap: 8px; }
 @container (min-width: 960px) { .opt-group-body { grid-template-columns: repeat(4, minmax(0, 1fr)); } }
 .opt-row { position: relative; display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 78px; padding: 9px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2); transition: border-color .15s ease, background-color .15s ease; }
-.opt-row.is-changed { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 7%, var(--card)); }
+.opt-row.is-changed { background: color-mix(in srgb, var(--primary) 7%, var(--card)); }
 [data-theme="dark"] .opt-row.is-changed { background: color-mix(in srgb, var(--primary) 14%, var(--card)); }
 .opt-row-icon { display: grid; place-items: center; flex-shrink: 0; width: 56px; height: 56px; }
 .opt-row-icon img { width: 100%; height: 100%; object-fit: contain; }
@@ -853,9 +858,11 @@ input[type="radio"] {
 .opt-arrow { display: grid; place-items: center; width: 26px; height: 28px; padding: 0; border: 1px solid var(--border); border-radius: 4px; color: var(--muted-foreground); background: var(--card); cursor: pointer; }
 .opt-arrow svg { width: 14px; height: 14px; }
 .opt-arrow:hover:not(:disabled) { color: var(--primary); border-color: var(--primary); }
+[data-theme="dark"] .opt-arrow:hover:not(:disabled) { color: oklch(0.88 0.13 165); border-color: oklch(0.65 0.14 165); }
 .opt-arrow:focus-visible { outline: 2px solid var(--ring); }
 .opt-arrow:disabled { opacity: .4; cursor: not-allowed; }
 .opt-row-revert { position: absolute; top: 2px; right: 3px; display: grid; place-items: center; width: 20px; height: 20px; padding: 0; border: 0; border-radius: 4px; background: var(--card); color: var(--primary); opacity: 0; cursor: pointer; }
+[data-theme="dark"] .opt-row-revert { color: oklch(0.88 0.13 165); }
 .opt-row-revert svg { width: 13px; height: 13px; }
 .opt-row:hover .opt-row-revert, .opt-row:focus-within .opt-row-revert { opacity: 1; }
 .opt-row-revert:focus-visible { outline: 2px solid var(--ring); }

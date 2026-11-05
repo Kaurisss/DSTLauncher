@@ -79,7 +79,7 @@ async function query(nextPage) {
       <DialogHeader class="shrink-0 border-b p-4 pr-14 sm:p-6">
         <DialogTitle>添加模组</DialogTitle>
       </DialogHeader>
-      <div class="min-h-0 flex-1 overflow-y-auto p-4 sm:px-6">
+      <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:px-6">
         <form class="flex gap-2" @submit.prevent="query()">
           <Input v-model="keyword" class="min-w-0 flex-1" aria-label="搜索创意工坊" placeholder="模组名称、ID 或创意工坊链接" />
           <IconAction type="submit" icon="search" :label="searching ? '查询中…' : looksLikeId ? '查询' : '搜索'" :disabled="searching || !keyword.trim()" />
@@ -101,7 +101,7 @@ async function query(nextPage) {
         <div v-else-if="results.length && !error" class="grid gap-3">
           <article v-for="item in results" :key="item.id" class="workshop-item flex min-w-0 items-center gap-3 rounded-lg border bg-background p-3">
             <div class="grid size-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted" aria-hidden="true">
-              <img v-if="item.previewUrl" :src="item.previewUrl" class="size-full object-cover" loading="lazy" decoding="async" alt="" @error="$event.target.style.display = 'none'" />
+              <img v-if="item.previewUrl" :src="item.previewUrl" class="size-full object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10" loading="lazy" decoding="async" alt="" @error="$event.target.style.display = 'none'" />
               <Icon v-else name="package" :size="24" />
             </div>
             <div class="min-w-0 flex-1">

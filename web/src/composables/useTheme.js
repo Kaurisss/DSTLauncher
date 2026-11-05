@@ -28,9 +28,35 @@ function readSaved() {
   }
 }
 
-function apply() {
-  document.documentElement.dataset.themeMode = mode.value;
-  document.documentElement.dataset.theme = resolved.value;
+function apply(suppressTransition = false) {
+  const doApply = () => {
+    if (typeof document !== 'undefined' && document.documentElement) {
+      document.documentElement.dataset.themeMode = mode.value;
+      document.documentElement.dataset.theme = resolved.value;
+    }
+  };
+
+  if (!suppressTransition || typeof document === 'undefined' || !document.head) {
+    doApply();
+    return;
+  }
+
+  const style = document.createElement('style');
+  style.append(document.createTextNode('*,*::before,*::after{transition:none !important}'));
+  document.head.append(style);
+  try {
+    doApply();
+  } finally {
+    if (document.body) {
+      void document.body.offsetHeight;
+    }
+    const raf = typeof requestAnimationFrame === 'function'
+      ? requestAnimationFrame
+      : (cb) => setTimeout(cb, 16);
+    raf(() => {
+      raf(() => style.remove());
+    });
+  }
 }
 
 function set(next) {
@@ -39,7 +65,7 @@ function set(next) {
   try {
     localStorage.setItem(KEY, mode.value);
   } catch (_) {}
-  apply();
+  apply(true);
   return mode.value;
 }
 
@@ -53,11 +79,11 @@ let inited = false;
 export function initTheme() {
   if (inited) return;
   inited = true;
-  apply();
+  apply(false);
 
   const onChange = () => {
     systemDark.value = mql.matches;
-    apply();
+    apply(true);
   };
   // Safari 14 以下只有 addListener
   if (mql.addEventListener) mql.addEventListener('change', onChange);

@@ -49,7 +49,7 @@ const forwarded = useForwardPropsEmits(delegatedProps, emits);
       v-bind="{ ...$attrs, ...forwarded }"
       :class="
         cn(
-          'data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 data-closed:zoom-out-95 data-open:zoom-in-95 bg-popover text-popover-foreground ring-foreground/10 gap-4 rounded-xl p-4 ring-1 duration-100 sm:max-w-lg group/dialog-content fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 outline-none',
+          'data-open:animate-in data-closed:animate-out data-closed:fade-out-0 data-open:fade-in-0 motion-safe:data-closed:zoom-out-95 motion-safe:data-open:zoom-in-95 bg-popover text-popover-foreground border border-transparent ring-foreground/10 gap-4 rounded-xl p-4 ring-1 duration-100 sm:max-w-lg group/dialog-content fixed top-1/2 left-1/2 z-50 grid w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 outline-none',
           props.class,
         )
       "

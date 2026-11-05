@@ -23,7 +23,7 @@ const avatar = computed(() => {
     <div class="min-w-0">
       <div class="truncate text-sm font-medium" :class="{ 'font-mono': !face.name }">{{ face.name || id }}</div>
       <div v-if="face.name || role" class="truncate text-xs text-muted-foreground">
-        <span class="font-mono">{{ id }}</span><template v-if="role"> · {{ role }}</template>
+        <span class="font-mono">{{ id }}</span><template v-if="role"> ({{ role }})</template>
       </div>
     </div>
   </div>

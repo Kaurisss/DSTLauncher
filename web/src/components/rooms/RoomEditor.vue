@@ -253,7 +253,7 @@ async function save() {
         </div>
       </section>
 
-      <UiField label="Klei 服务器令牌" for-id="f_token" block :hint="form.lanOnly || form.offline ? '局域网或离线模式可留空' : '在线开服必需 · 写入 cluster_token.txt'">
+      <UiField label="Klei 服务器令牌" for-id="f_token" block :hint="form.lanOnly || form.offline ? '局域网或离线模式可留空' : '在线开服必需，写入 cluster_token.txt'">
         <div class="flex min-w-0 items-center gap-1 rounded-lg border border-input pr-1 focus-within:ring-1 focus-within:ring-ring">
           <Input id="f_token" v-model="form.token" type="password" autocomplete="off" spellcheck="false" class="min-w-0 flex-1 border-0 bg-transparent font-mono shadow-none focus-visible:ring-0" placeholder="pds-g^..." />
           <IconAction type="button" variant="ghost" icon="clipboard" label="粘贴" :disabled="saving" @click="pasteToken" />

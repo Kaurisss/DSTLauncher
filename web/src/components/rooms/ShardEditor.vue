@@ -159,8 +159,8 @@ async function removeShard(index) {
 
         <p class="mt-2 text-xs text-muted-foreground">
           世界 ID <code>{{ s.gameId || '自动' }}</code>
-          <template v-if="s.isMaster"> · 进服落点，不可停用</template>
-          <template v-else-if="s.disabled">· 已停用，不会启动</template>
+          <template v-if="s.isMaster">（进服落点，不可停用）</template>
+          <template v-else-if="s.disabled">（已停用，不会启动）</template>
         </p>
       </div>
     </div>

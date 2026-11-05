@@ -62,7 +62,7 @@ function meta(s) {
     s.pid ? 'PID ' + s.pid : '',
     s.port ? '端口 ' + s.port : '',
     s.restarts ? '重启 ' + s.restarts + ' 次' : '',
-  ].filter(Boolean).join(' · ');
+  ].filter(Boolean).join(' ');
 }
 
 // 首次采样没有基准算不出占用率，后端返回 0；此时显示「—」比「0.0%」诚实
@@ -123,7 +123,7 @@ async function refreshSnapshots(id, requestGeneration) {
             </TooltipTrigger>
             <TooltipContent>
               <p v-if="meta(s)">{{ meta(s) }}</p>
-              <p v-if="isLive(s)" class="tabular-nums">CPU（占整机）{{ cpuText(s) }} · 内存 {{ memText(s) }}</p>
+              <p v-if="isLive(s)" class="tabular-nums">CPU（占整机）{{ cpuText(s) }}，内存 {{ memText(s) }}</p>
             </TooltipContent>
           </Tooltip>
           <Tooltip v-if="staleVersion(s)">

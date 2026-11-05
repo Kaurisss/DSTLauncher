@@ -150,7 +150,7 @@ async function removeEntries(ids) {
   try {
     if (!await confirmAction({
       title: `删除 ${ids.length} 条玩家日志？`,
-      description: `房间「${room.name}」· 分片「${sourceShard}」。只删面板历史、不删游戏原始日志。`,
+      description: `房间「${room.name}」分片「${sourceShard}」。只删面板历史、不删游戏原始日志。`,
       destructive: true,
     })) return;
     if (disposed || sourceContext !== context) return;
@@ -180,7 +180,7 @@ async function blockPlayer(entry) {
   try {
     if (!await confirmAction({
       title: `封禁「${entry.name || entry.userid}」？`,
-      description: `${entry.userid} · 房间「${room.name}」。下次重启房间后生效，不会立即踢出在线玩家。`,
+      description: `${entry.userid}（房间「${room.name}」）。下次重启房间后生效，不会立即踢出在线玩家。`,
       destructive: true,
     })) return;
     if (disposed || rooms.currentId !== room.id) return;

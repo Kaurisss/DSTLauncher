@@ -16,7 +16,7 @@ const props = defineProps({
     data-sidebar="content"
     :class="
       cn(
-        'no-scrollbar gap-0 flex min-h-0 flex-1 flex-col overflow-auto group-data-[collapsible=icon]:overflow-hidden',
+        'no-scrollbar gap-0 flex min-h-0 flex-1 flex-col overflow-auto overscroll-contain group-data-[collapsible=icon]:overflow-hidden',
         props.class,
       )
     "

@@ -130,7 +130,7 @@ export function characterName(prefab) {
 
 export function playerOptionLabel(face) {
   if (!face) return '';
-  return [face.name, characterName(face.prefab), face.id].filter(Boolean).join(' · ');
+  return [face.name, characterName(face.prefab), face.id].filter(Boolean).join(' ');
 }
 
 export function unseenPlayers(seen, ids) {

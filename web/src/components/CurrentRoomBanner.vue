@@ -17,7 +17,7 @@ const state = computed(() => !rooms.statusLoaded ? '等待状态' : (rooms.runni
     <div class="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-3 gap-y-1">
       <span class="text-xs text-muted-foreground">当前房间</span>
       <strong class="min-w-0 break-all font-semibold">{{ room.name }}</strong>
-      <span class="break-all text-xs text-muted-foreground">{{ room.key }}<template v-if="mode"> · {{ mode }}</template></span>
+      <span class="break-all text-xs text-muted-foreground">{{ room.key }}<template v-if="mode"> {{ mode }}</template></span>
     </div>
     <Badge :variant="rooms.running ? 'default' : 'secondary'">{{ state }}</Badge>
   </section>

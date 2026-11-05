@@ -99,11 +99,11 @@ const typeLabel = computed(() => WORLD_TYPE_LABEL[shardType.value] || shardType.
 const modLabel = computed(() => (view.value && view.value.mod ? MOD_LABEL[view.value.mod] : ''));
 
 const shardHint = computed(() =>
-  `${labelOf(shard.value)} · ${modLabel.value || typeLabel.value}`);
+  `${labelOf(shard.value)} (${modLabel.value || typeLabel.value})`);
 
-/** 提示文案用的世界描述：“岛屿冒险 · 海难”比只写模组名更清楚。 */
+/** 提示文案用的世界描述：“岛屿冒险（海难）”比只写模组名更清楚。 */
 const worldLabel = computed(() =>
-  modLabel.value ? `${modLabel.value} · ${typeLabel.value}` : typeLabel.value);
+  modLabel.value ? `${modLabel.value}（${typeLabel.value}）` : typeLabel.value);
 
 /** 服务器运行中冻结全部修改：游戏只在启动时读配置，改了也不生效 */
 const frozen = computed(() => rooms.running);

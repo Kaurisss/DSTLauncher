@@ -8,6 +8,6 @@ defineProps({
   <span
     :style="token.htmlStyle"
     class="text-(--shiki-light) dark:text-(--shiki-dark)"
-    >{{ token.content }}</span
+  >{{ token.content }}</span
   >
 </template>

@@ -150,7 +150,7 @@ async function remove(item) {
     <UiToolbar aria-label="存档工具栏" leading-class="min-w-full flex-wrap lg:min-w-0">
       <Input class="min-w-32 max-w-64 flex-1" aria-label="搜索存档" placeholder="搜索存档、房间或分片" :model-value="table.atoms.globalFilter.get() ?? ''" @update:model-value="table.setGlobalFilter" />
       <Badge variant="secondary" class="shrink-0 whitespace-nowrap tabular-nums">共 {{ items.length }} 个存档（{{ fmtSize(totalSize) }}）</Badge>
-      <Badge v-if="orphans.length" variant="outline" class="shrink-0 whitespace-nowrap text-muted-foreground">孤儿存档 {{ orphans.length }} 个 · {{ fmtSize(orphanSize) }}</Badge>
+      <Badge v-if="orphans.length" variant="outline" class="shrink-0 whitespace-nowrap text-muted-foreground">孤儿存档 {{ orphans.length }} 个（{{ fmtSize(orphanSize) }}）</Badge>
       <IconAction v-if="root" variant="ghost" class="text-muted-foreground" icon="folder" label="复制存档根目录" :tip="root" @click="copyRoot" />
       <template #actions>
         <IconAction variant="outline" icon="refresh" label="刷新" :disabled="loading" @click="load" />
