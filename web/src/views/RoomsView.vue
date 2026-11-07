@@ -10,6 +10,7 @@ import RoomEditor from '@/components/rooms/RoomEditor.vue';
 import RoomAdmins from '@/components/rooms/RoomAdmins.vue';
 import RoomPlayerLists from '@/components/rooms/RoomPlayerLists.vue';
 import SaveUploadPanel from '@/components/rooms/SaveUploadPanel.vue';
+import RoomProfilesDialog from '@/components/rooms/RoomProfilesDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard, toast } from '@/lib/toast.js';
 import { confirmAction } from '@/lib/confirm.js';
@@ -71,6 +72,13 @@ async function onUploaded(data) {
   if (ok && data?.room?.id) rooms.select(data.room.id);
 }
 
+async function onProfileCreated(room) {
+  const { ok } = await guard(() => rooms.load());
+  if (!ok) return;
+  rooms.select(room.id);
+  await openEditor(room.id);
+}
+
 async function onRemove(id) {
   if (deleting.value) return;
   const room = rooms.list.find(item => item.id === Number(id));
@@ -110,12 +118,13 @@ async function onRemove(id) {
       <UiToolbar aria-label="房间工具栏" leading-class="flex-none">
         <Badge variant="secondary" class="whitespace-nowrap tabular-nums">共 {{ rooms.list.length }} 个房间</Badge>
         <template #actions>
+          <RoomProfilesDialog @created="onProfileCreated" />
           <IconAction id="new-room-button" icon="plus" label="新建房间" :disabled="preparing" @click="openEditor()" />
           <IconAction variant="outline" icon="upload" label="上传存档" @click="openUpload()" />
           <IconAction variant="outline" icon="refresh" label="刷新" @click="reload" />
         </template>
       </UiToolbar>
-      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" tabindex="0" role="region" aria-label="房间列表">
+      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="房间列表">
         <RoomGrid
           :rooms="rooms.list"
           :current-id="rooms.currentId"

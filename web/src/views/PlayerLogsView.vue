@@ -5,6 +5,7 @@ import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
 import UiToolbar from '@/components/ui/UiToolbar.vue';
+import UiToolbarFilters from '@/components/ui/UiToolbarFilters.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
@@ -197,22 +198,24 @@ async function blockPlayer(entry) {
 
 <template>
   <UiCard flush fill role="region" aria-label="聊天与进出记录" class="min-w-0" :aria-busy="loading">
-    <UiToolbar aria-label="玩家日志工具栏" leading-class="min-w-full 2xl:min-w-0">
-      <form class="flex min-w-0 flex-1 flex-wrap items-center gap-2" @submit.prevent="refresh">
-        <Select v-model="shard" :disabled="!shards.length">
-          <SelectTrigger id="chat_shard" aria-label="记录分片" class="w-24 min-w-0 shrink-0 bg-background"><SelectValue placeholder="选择分片" /></SelectTrigger>
-          <SelectContent position="popper" align="start">
-            <SelectGroup>
-              <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ roomShardLabel(rooms.current, item) }}{{ item.disabled ? '（停用）' : '' }}</SelectItem>
-            </SelectGroup>
-          </SelectContent>
-        </Select>
-        <Select v-model="kind">
-          <SelectTrigger id="chat_kind" aria-label="记录类型" class="w-28 min-w-0 shrink-0 bg-background"><SelectValue /></SelectTrigger>
-          <SelectContent position="popper" align="start">
-            <SelectGroup><SelectItem v-for="(label, key) in labels" :key="key" :value="key">{{ label }}</SelectItem></SelectGroup>
-          </SelectContent>
-        </Select>
+    <UiToolbar aria-label="玩家日志工具栏" layout-class="flex-nowrap">
+      <form class="flex min-w-0 flex-1 items-center gap-2" @submit.prevent="refresh">
+        <UiToolbarFilters v-slot="{ compact }" label="日志筛选" :active="kind !== 'all'">
+          <Select v-model="shard" :disabled="!shards.length">
+            <SelectTrigger id="chat_shard" aria-label="记录分片" :class="compact ? 'w-full' : 'w-24'" class="min-w-0 shrink-0 bg-background"><SelectValue placeholder="选择分片" /></SelectTrigger>
+            <SelectContent position="popper" align="start">
+              <SelectGroup>
+                <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ roomShardLabel(rooms.current, item) }}{{ item.disabled ? '（停用）' : '' }}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+          <Select v-model="kind">
+            <SelectTrigger id="chat_kind" aria-label="记录类型" :class="compact ? 'w-full' : 'w-28'" class="min-w-0 shrink-0 bg-background"><SelectValue /></SelectTrigger>
+            <SelectContent position="popper" align="start">
+              <SelectGroup><SelectItem v-for="(label, key) in labels" :key="key" :value="key">{{ label }}</SelectItem></SelectGroup>
+            </SelectContent>
+          </Select>
+        </UiToolbarFilters>
         <div class="relative min-w-0 flex-1 basis-64">
           <Input id="chat_search" v-model="search" aria-label="搜索历史记录" class="bg-background pr-10" placeholder="昵称、ID、IP、角色或内容" maxlength="200" />
           <IconAction type="button" variant="ghost" class="absolute end-0 top-1/2 -translate-y-1/2" icon="x" label="重置筛选" :disabled="kind === 'all' && !search" @click="resetFilters" />
@@ -224,7 +227,7 @@ async function blockPlayer(entry) {
       </template>
     </UiToolbar>
 
-    <div data-slot="page-scroll" class="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-3" tabindex="0" role="region" aria-label="玩家日志列表">
+    <div data-slot="page-scroll" class="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="玩家日志列表">
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">读取失败：{{ error }}</p>
       <UiLoading v-else-if="loading && !result" />
       <UiEmpty v-else-if="!rooms.current" icon="users" text="请先选择房间" />

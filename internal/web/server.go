@@ -21,6 +21,7 @@ import (
 	"dst-windows/internal/chatlog"
 	"dst-windows/internal/config"
 	"dst-windows/internal/modmgr"
+	"dst-windows/internal/notify"
 	"dst-windows/internal/panelcfg"
 	"dst-windows/internal/room"
 	"dst-windows/internal/saveimport"
@@ -71,11 +72,14 @@ type Server struct {
 	// taskMu 串行化「开服 / 安装更新服务端 / 模组下载」这四类会改动共享状态
 	// （游戏安装目录、共享 ugc 目录）的操作，让「检查是否忙 → 启动」成为原子动作，
 	// 关闭并发请求同时穿过检查的窗口。长任务本身是异步的，这里只锁决策与启动瞬间。
-	taskMu        sync.Mutex
-	maintenanceMu sync.RWMutex
-	automation    *automation.Engine
-	automationErr error
-	playerLogs    *chatlog.History
+	taskMu          sync.Mutex
+	maintenanceMu   sync.RWMutex
+	automation      *automation.Engine
+	automationErr   error
+	playerLogs      *chatlog.History
+	profileMu       sync.Mutex
+	notifications   *notify.Engine
+	notificationErr error
 }
 
 // NewServer 创建 HTTP 服务。
@@ -98,6 +102,7 @@ func NewServer(o Options) *Server {
 		playerLogs:     chatlog.NewHistory(filepath.Join(o.RootDir, "playerlogs")),
 	}
 	s.automation, s.automationErr = automation.New(filepath.Join(o.RootDir, "automation.json"))
+	s.notifications, s.notificationErr = notify.New(filepath.Join(o.RootDir, "notifications.json"))
 	return s
 }
 
@@ -133,6 +138,13 @@ func (s *Server) Handler() http.Handler {
 	// 房间（配置的唯一事实来源）
 	mux.HandleFunc("/api/rooms", s.handleRooms)
 	mux.HandleFunc("/api/rooms/meta", s.handleRoomMeta)
+	mux.HandleFunc("/api/rooms/copy", s.handleProfileApply)
+	mux.HandleFunc("/api/profiles", s.handleProfiles)
+	mux.HandleFunc("/api/profiles/import", s.handleProfileImport)
+	mux.HandleFunc("/api/profiles/apply", s.handleProfileApply)
+	mux.HandleFunc("/api/diagnostics", s.handleDiagnostics)
+	mux.HandleFunc("/api/notifications", s.handleNotifications)
+	mux.HandleFunc("/api/notifications/test", s.handleNotificationTest)
 
 	// 房间管理员（adminlist.txt）
 	mux.HandleFunc("/api/admins", s.handleAdmins)
@@ -1327,6 +1339,9 @@ func (s *Server) handleBackupCreate(w http.ResponseWriter, r *http.Request) {
 	// 有分片在运行时会先请求落盘并等待，无运行分片则立即返回
 	s.mgr.SaveCluster(rm.Key(), 5*time.Second)
 	item, err := s.bakFor(rm).Create()
+	if err != nil {
+		s.publishNotification("backup_failed", rm.ID, "", "备份失败: "+err.Error())
+	}
 	respond(w, 200, item, err)
 }
 

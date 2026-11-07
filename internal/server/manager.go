@@ -194,10 +194,12 @@ type Manager struct {
 	// 返回的 restore 在会话结束后恢复所有房间的并集。由 Web 层注入。
 	modsSetupSwap ModsSetupSwap
 
-	mu     sync.RWMutex
-	subMu  sync.Mutex
-	subs   map[int]chan Event // 每个 SSE 客户端一个通道，避免互相抢事件
-	nextID int
+	mu          sync.RWMutex
+	subMu       sync.Mutex
+	subs        map[int]chan Event // 每个 SSE 客户端一个通道，避免互相抢事件
+	subFilters  map[int]map[string]bool
+	nextID      int
+	startErrors map[string]string
 
 	// ops 是启动分片的独占令牌（容量 1）。检查「是否已在运行」与真正拉起进程
 	// 之间必须原子：并发点击启动会让同一分片起两个进程抢同一个端口。
@@ -268,6 +270,8 @@ func NewManager(baseDir, binDir, logDir string) *Manager {
 		maxRestarts:  5,
 		restartDelay: 3 * time.Second,
 		subs:         make(map[int]chan Event),
+		subFilters:   make(map[int]map[string]bool),
+		startErrors:  make(map[string]string),
 		ops:          make(chan struct{}, 1),
 	}
 }
@@ -275,12 +279,22 @@ func NewManager(baseDir, binDir, logDir string) *Manager {
 // Subscribe 注册一个事件订阅者，返回订阅 ID 与只读通道。
 // 每个 Web 客户端独立订阅，事件广播给所有人，因此多个标签页不会互相抢事件。
 func (m *Manager) Subscribe() (int, <-chan Event) {
+	return m.SubscribeEvents()
+}
+
+// SubscribeEvents keeps high-volume log lines out of status-only consumers.
+func (m *Manager) SubscribeEvents(types ...string) (int, <-chan Event) {
 	m.subMu.Lock()
 	defer m.subMu.Unlock()
 	id := m.nextID
 	m.nextID++
 	ch := make(chan Event, 512)
 	m.subs[id] = ch
+	filter := map[string]bool{}
+	for _, typ := range types {
+		filter[typ] = true
+	}
+	m.subFilters[id] = filter
 	return id, ch
 }
 
@@ -290,6 +304,7 @@ func (m *Manager) Unsubscribe(id int) {
 	defer m.subMu.Unlock()
 	if ch, ok := m.subs[id]; ok {
 		delete(m.subs, id)
+		delete(m.subFilters, id)
 		close(ch)
 	}
 }
@@ -305,7 +320,10 @@ func (m *Manager) emit(cluster, shard, typ, msg string) {
 	}
 	m.subMu.Lock()
 	defer m.subMu.Unlock()
-	for _, ch := range m.subs {
+	for id, ch := range m.subs {
+		if filter := m.subFilters[id]; len(filter) > 0 && !filter[typ] {
+			continue
+		}
 		select {
 		case ch <- ev:
 		default:
@@ -403,7 +421,13 @@ func (m *Manager) StartShard(clusterKey, shard string) error {
 	return m.startShard(c, shard)
 }
 
-func (m *Manager) startShard(c *Cluster, shard string) error {
+func (m *Manager) StartError(clusterKey, shard string) string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.startErrors[procKey(clusterKey, shard)]
+}
+
+func (m *Manager) startShard(c *Cluster, shard string) (startErr error) {
 	if m.closing.Load() {
 		return errShuttingDown
 	}
@@ -412,6 +436,18 @@ func (m *Manager) startShard(c *Cluster, shard string) error {
 	defer func() { <-m.ops }()
 
 	k := procKey(c.Key(), shard)
+	defer func() {
+		m.mu.Lock()
+		if startErr != nil {
+			m.startErrors[k] = startErr.Error()
+		} else {
+			delete(m.startErrors, k)
+		}
+		m.mu.Unlock()
+		if startErr != nil {
+			m.emit(c.Key(), shard, "start_failed", startErr.Error())
+		}
+	}()
 
 	m.mu.Lock()
 	if p, exists := m.procs[k]; exists {
@@ -637,6 +673,7 @@ func (m *Manager) restartWithBackoff(p *process) {
 	p.mu.Unlock()
 
 	if attempt > m.maxRestarts {
+		m.emit(p.cluster.Key(), p.shard, "crash_limit", "连续崩溃已达到自动重启上限，请检查日志")
 		m.emit(p.cluster.Key(), p.shard, "crash",
 			fmt.Sprintf("连续崩溃 %d 次，已停止自动重启，请检查日志", attempt-1))
 		p.close()

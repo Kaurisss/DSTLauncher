@@ -95,6 +95,26 @@ export const roomApi = {
   meta: () => request('/api/rooms/meta'),
 };
 
+export const profileApi = {
+  list: () => request('/api/profiles'),
+  save: (room, name) => request('/api/profiles', { method: 'POST', body: { room, name } }),
+  import: profile => request('/api/profiles/import', { method: 'POST', body: profile }),
+  apply: (id, name) => request('/api/profiles/apply', { method: 'POST', body: { id, name } }),
+  copy: (room, name) => request('/api/rooms/copy', { method: 'POST', body: { room, name } }),
+  remove: id => request('/api/profiles', { method: 'DELETE', params: { id } }),
+  exportUrl: id => '/api/profiles?id=' + encodeURIComponent(id),
+};
+
+export const diagnosticsApi = {
+  get: room => request('/api/diagnostics', { params: { room } }),
+};
+
+export const notificationApi = {
+  get: () => request('/api/notifications'),
+  save: config => request('/api/notifications', { method: 'PUT', body: config }),
+  test: () => request('/api/notifications/test', { method: 'POST' }),
+};
+
 /* ---------- 存档管理（磁盘上的集群目录） ---------- */
 
 export const savesApi = {

@@ -8,6 +8,15 @@
    卡片
    -------------------------------------------------------------------------- */
 
+.toolbar-filters-popover { z-index: 50; }
+
+[data-content-scrolled] > [data-slot="card-header"],
+[data-content-scrolled] > [data-slot="card-content"] > :is(.ui-toolbar, .mods-toolbar, .world-control-header) {
+  position: relative;
+  z-index: 10;
+  box-shadow: 0 6px 10px -7px color-mix(in srgb, var(--foreground) 24%, transparent);
+}
+
 /* 概览工作区：左右两列各占 50%，与上方四张指标卡严格对齐；双卡等高占满背景 */
 .overview-workspace {
   display: grid;
@@ -767,7 +776,7 @@ input[type="radio"] {
    世界配置
    -------------------------------------------------------------------------- */
 
-.world-control-header { padding: 12px; background: var(--card); }
+.world-control-header { padding: var(--panel-padding); background: var(--card); }
 .world-heading-row, .world-shard-controls, .world-main-actions { display: flex; align-items: center; gap: 8px; }
 .world-heading-row { justify-content: space-between; flex-wrap: wrap; }
 .world-shard-controls { min-width: 0; flex-wrap: wrap; }
@@ -784,7 +793,7 @@ input[type="radio"] {
 .world-presets .field { min-width: 0; }
 .world-enabled, .world-only-changed { display: inline-flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; white-space: nowrap; }
 .world-notices { padding: 10px 16px 0; font-size: 12px; color: var(--warn); }
-.world-workspace { display: grid; grid-template-columns: 160px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); flex: 1; min-height: 0; gap: 20px; padding: 12px; }
+.world-workspace { display: grid; grid-template-columns: 160px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); flex: 1; min-height: 0; gap: 20px; padding: 0 var(--panel-padding) var(--panel-padding); }
 .world-workspace > .world-notices { grid-column: 1 / -1; }
 .world-group-nav { display: flex; min-height: 0; flex-direction: column; gap: 3px; overflow-y: auto; overscroll-behavior: contain; }
 .world-group-nav button { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; border: 0; border-radius: 6px; background: transparent; color: var(--muted-foreground); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
@@ -1009,7 +1018,7 @@ input[type="radio"] {
   .opt { grid-template-columns: 1fr; }
   .opt > label { text-align: left; }
   .opt-desc { grid-column: 1; }
-  .world-control-header { padding: 12px; }
+  .world-control-header { padding: var(--panel-padding); }
   .world-shard-tabs .shard-tab { padding: 5px 7px; font-size: 12px; }
   .world-toolbar { grid-template-columns: minmax(0, 1fr) auto; gap: 8px; margin-top: 10px; }
   .world-category-controls { grid-column: 1 / -1; }
@@ -1017,7 +1026,7 @@ input[type="radio"] {
   .world-toolbar .seg-btn { justify-content: center; padding: 4px 8px; font-size: 12px; }
   .world-search { height: 30px; }
   .world-only-changed { gap: 5px; font-size: 11px; }
-  .world-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 12px; padding: 12px; }
+  .world-workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); gap: 12px; padding: 0 var(--panel-padding) var(--panel-padding); }
   .world-group-nav { z-index: 5; flex-direction: row; max-height: none; overflow-x: auto; overflow-y: hidden; padding: 4px 0; background: var(--card); }
   .world-group-nav button { flex-shrink: 0; padding: 6px 9px; font-size: 12px; }
   /* 分片卡片：窄屏下端口单列，名字与类型各占一行 */

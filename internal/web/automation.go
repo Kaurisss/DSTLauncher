@@ -30,9 +30,21 @@ func (s *Server) StartAutomation() func() {
 			log.Printf("自动维护未启动: %v", s.automationErr)
 			return
 		}
-		s.automation.Serve(ctx, s.runMaintenance, func(err error) { log.Printf("自动维护: %v", err) })
+		s.automation.Serve(ctx, s.runMaintenanceWithNotification, func(err error) { log.Printf("自动维护: %v", err) })
 	}()
 	return func() { cancel(); <-done }
+}
+
+func (s *Server) runMaintenanceWithNotification(ctx context.Context, kind string, cfg automation.Config) (string, error) {
+	result, err := s.runMaintenance(ctx, kind, cfg)
+	if err != nil && ctx.Err() == nil {
+		event := "maintenance_failed"
+		if kind == "backup" {
+			event = "backup_failed"
+		}
+		s.publishNotification(event, 0, "", kind+": "+err.Error())
+	}
+	return result, err
 }
 
 func (s *Server) handleAutomation(w http.ResponseWriter, r *http.Request) {

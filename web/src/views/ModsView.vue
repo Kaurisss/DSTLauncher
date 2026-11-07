@@ -18,6 +18,7 @@ import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiPill from '@/components/ui/UiPill.vue';
 import UiLoading from '@/components/ui/UiLoading.vue';
+import UiToolbarFilters from '@/components/ui/UiToolbarFilters.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
@@ -397,24 +398,32 @@ watch([() => rooms.current, shard], () => {
     <UiCard flush fill class="mods-workspace">
       <div class="mods-toolbar z-10 flex shrink-0 items-center justify-between gap-3" role="region" aria-label="模组工具栏">
         <div class="mods-toolbar-left">
-          <Select v-if="rooms.current" v-model="shard" :disabled="configOpen || busyItems.length > 0 || workshopOpen || queueing || pendingIds.length > 0">
-            <SelectTrigger aria-label="模组分片" class="mods-shard">
-              <SelectValue placeholder="选择分片" />
-            </SelectTrigger>
-            <SelectContent position="popper" align="start">
-              <SelectGroup>
-                <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ labelOf(item) }}</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
+          <UiToolbarFilters v-slot="{ compact }" label="模组筛选" :active="filter !== 'all'">
+            <Select v-if="rooms.current" v-model="shard" :disabled="configOpen || busyItems.length > 0 || workshopOpen || queueing || pendingIds.length > 0">
+              <SelectTrigger aria-label="模组分片" :class="compact ? 'w-full' : 'mods-shard'">
+                <SelectValue placeholder="选择分片" />
+              </SelectTrigger>
+              <SelectContent position="popper" align="start">
+                <SelectGroup>
+                  <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ labelOf(item) }}</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Select v-if="compact" v-model="filter">
+              <SelectTrigger aria-label="模组状态" class="w-full"><SelectValue /></SelectTrigger>
+              <SelectContent position="popper" align="start">
+                <SelectGroup><SelectItem v-for="item in statusFilters" :key="item.value" :value="item.value">{{ item.label }} ({{ item.count }})</SelectItem></SelectGroup>
+              </SelectContent>
+            </Select>
+            <div v-else class="seg mods-filters" role="group" aria-label="模组状态">
+              <button v-for="item in statusFilters" :key="item.value" type="button" class="seg-btn" :class="{ 'is-active': filter === item.value }" :aria-pressed="filter === item.value" @click="filter = item.value">
+                {{ item.label }} <span class="tabular-nums">({{ item.count }})</span>
+              </button>
+            </div>
+          </UiToolbarFilters>
           <div class="mods-search">
             <PhMagnifyingGlass class="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" aria-hidden="true" />
             <Input v-model="search" class="w-full pl-8" aria-label="搜索模组" placeholder="搜索模组名称或 ID" />
-          </div>
-          <div class="seg mods-filters" role="group" aria-label="模组状态">
-            <button v-for="item in statusFilters" :key="item.value" type="button" class="seg-btn" :class="{ 'is-active': filter === item.value }" :aria-pressed="filter === item.value" @click="filter = item.value">
-              {{ item.label }} <span class="tabular-nums">({{ item.count }})</span>
-            </button>
           </div>
         </div>
         <div class="mods-toolbar-actions">
@@ -432,7 +441,7 @@ watch([() => rooms.current, shard], () => {
         </div>
       </div>
 
-      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-3" tabindex="0" role="region" aria-label="模组列表">
+      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="模组列表">
         <UiLoading v-if="!rooms.loaded" />
         <UiEmpty v-else-if="!rooms.current" icon="package" text="请先在「房间」页新建一个房间" />
         <!-- 刷新保留列表，避免拆掉创意工坊窗口和更新进度。 -->
@@ -540,18 +549,17 @@ watch([() => rooms.current, shard], () => {
 
 <style scoped>
 .mods-workspace { min-width: 0; container-type: inline-size; }
-.mods-toolbar { padding: 12px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--card); }
+.mods-toolbar { padding: var(--panel-padding); border-radius: var(--radius-lg) var(--radius-lg) 0 0; background: var(--card); }
 .mods-toolbar-left { display: flex; flex: 1; align-items: center; gap: 12px; min-width: 0; }
 .mods-shard { width: 112px; min-width: 0; flex-shrink: 0; }
-.mods-search { position: relative; flex: 1; min-width: 96px; max-width: 256px; }
-.mods-filters { flex-shrink: 0; max-width: 100%; overflow-x: auto; border-radius: 9999px; }
+.mods-search { position: relative; flex: 1; min-width: 0; max-width: 256px; }
+.mods-filters { flex-shrink: 0; border-radius: 9999px; }
 .mods-filters .seg-btn { flex-shrink: 0; padding: 4px 8px; border-radius: 9999px; white-space: nowrap; font-size: 12px; }
 .mods-toolbar-actions { display: flex; flex-shrink: 0; align-items: center; gap: 8px; margin-left: auto; }
-@container (max-width: 820px) {
-  .mods-toolbar { flex-wrap: wrap; }
-  .mods-toolbar-left { flex-basis: 100%; flex-wrap: wrap; gap: 8px; }
-  .mods-search { max-width: none; }
-  .mods-toolbar-actions { flex-wrap: wrap; justify-content: flex-end; }
+@container (max-width: 640px) {
+  .mods-toolbar-left { gap: 8px; }
+  .mods-shard { width: 96px; }
+  .mods-toolbar-actions { gap: 4px; }
 }
 .mod-update-dialog {
   position: fixed;

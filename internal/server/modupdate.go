@@ -654,6 +654,9 @@ func (m *Manager) setModErr(msg string) {
 	m.modMu.Lock()
 	m.modErr = msg
 	m.modMu.Unlock()
+	if msg != "已手动中止" {
+		m.emit("", "", "update_failed", msg)
+	}
 }
 
 // appendModOutput 追加一行输出到内存缓冲与面板控制台。

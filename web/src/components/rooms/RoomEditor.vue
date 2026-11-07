@@ -208,7 +208,7 @@ async function save() {
       </template>
     </UiToolbar>
 
-    <div data-slot="page-scroll" class="room-form grid min-h-0 flex-1 content-start gap-5 overflow-y-auto overscroll-contain p-3" tabindex="0" role="region" aria-label="房间编辑内容">
+    <div data-slot="page-scroll" class="room-form grid min-h-0 flex-1 content-start gap-5 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="房间编辑内容">
       <Alert v-if="saveError" variant="destructive">
         <AlertTitle>保存失败</AlertTitle>
         <AlertDescription>{{ saveError }}</AlertDescription>

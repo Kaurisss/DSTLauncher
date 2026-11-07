@@ -62,7 +62,7 @@ async function openPage(tab, width = 1280, long = false) {
 
 for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '玩家日志'], ['backups', '备份'], ['saves', '存档'], ['config', '配置预览']]) {
   test(`${label}统计筛选与操作合并，桌面单行、手机不溢出`, async () => {
-    for (const width of [1280, 375]) {
+    for (const width of (['mods', 'logs'].includes(tab) ? [640, 768, 820, 900, 1024, 1280, 1536, 375, 320] : [1280, 375])) {
       const { page, state } = await openPage(tab, width);
       try {
         const toolbar = page.getByRole('region', { name: `${label}工具栏`, exact: true });
@@ -82,8 +82,34 @@ for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '�
           };
         });
         assert.equal(layout.emptyHeaders, 0, '主卡片没有残留的空 Header 行');
-        if (width === 1280) assert.ok(Math.max(...layout.centers) - Math.min(...layout.centers) < 2, `${label}桌面工具栏保持单行`);
-        assert.equal(layout.noOverflow, true);
+        if (width >= 1024 || ['mods', 'logs'].includes(tab)) assert.ok(Math.max(...layout.centers) - Math.min(...layout.centers) < 2, `${label}工具栏保持单行（${width}px）`);
+        assert.equal(layout.noOverflow, true, '工具栏不换行，也不产生横向滚动条');
+        if (['mods', 'logs'].includes(tab) && width <= 900) {
+          const trigger = toolbar.getByRole('button', { name: tab === 'mods' ? '模组筛选' : '日志筛选', exact: true });
+          await trigger.click();
+          const popover = page.getByRole('dialog', { name: tab === 'mods' ? '模组筛选' : '日志筛选', exact: true });
+          await popover.waitFor();
+          assert.equal(await popover.getByRole('combobox').count(), 2, '分片和类型整合在同一个筛选面板');
+          if (width === 375) {
+            await popover.getByRole('combobox', { name: tab === 'mods' ? '模组状态' : '记录类型' }).click();
+            await page.getByRole('option', { name: tab === 'mods' ? /^已启用/ : '聊天', exact: tab === 'logs' }).click();
+            await page.waitForFunction(label => document.activeElement?.getAttribute('aria-label') === label, tab === 'mods' ? '模组状态' : '记录类型');
+          }
+          await page.keyboard.press('Escape');
+          await page.waitForFunction(label => document.activeElement?.getAttribute('aria-label') === label, tab === 'mods' ? '模组筛选' : '日志筛选');
+          if (width === 375) {
+            await page.setViewportSize({ width: 1280, height: 900 });
+            if (tab === 'mods') {
+              await page.waitForFunction(() => document.querySelector('.mods-filters button[aria-pressed="true"]')?.textContent.includes('已启用'));
+            } else {
+              await page.waitForFunction(() => document.querySelector('#chat_kind')?.textContent.includes('聊天'));
+            }
+            await page.setViewportSize({ width, height: 900 });
+            await trigger.click();
+            assert.match(await popover.getByRole('combobox', { name: tab === 'mods' ? '模组状态' : '记录类型' }).innerText(), tab === 'mods' ? /已启用/ : /聊天/);
+            await page.keyboard.press('Escape');
+          }
+        }
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
         await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/toolbar-${tab}-${width}.png`, import.meta.url)) });
         assert.deepEqual(state.errors, []);
@@ -110,6 +136,7 @@ for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '�
         await page.setViewportSize({ width, height: 520 });
         await page.waitForFunction(() => document.querySelector('#page-content').getBoundingClientRect().bottom === window.innerHeight);
         const toolbar = page.getByRole('region', { name: label + '工具栏', exact: true });
+        assert.equal(await toolbar.evaluate(el => window.getComputedStyle(el).boxShadow), 'none', '列表顶部不显示工具栏阴影');
         const before = await toolbar.boundingBox();
         const topbar = await page.locator('header[data-slot="app-header"]').boundingBox();
         const card = await list.locator('xpath=ancestor::*[@data-slot="card"]').boundingBox();
@@ -119,6 +146,11 @@ for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '�
         await list.hover();
         await page.mouse.wheel(0, 400);
         await page.waitForFunction(() => document.querySelector('[data-slot="page-scroll"]').scrollTop > 0);
+        await page.waitForFunction(() => {
+          const card = document.querySelector('[data-slot="page-scroll"]').closest('[data-slot="card"]');
+          const toolbar = card.querySelector('.ui-toolbar, .mods-toolbar');
+          return window.getComputedStyle(toolbar).boxShadow !== 'none';
+        });
         await list.evaluate(el => { el.scrollTop = el.scrollHeight; });
         const after = await toolbar.boundingBox();
         assert.equal(after.y, before.y);
@@ -135,6 +167,11 @@ for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '�
         assert.equal(outer.bodyHeight, outer.viewport);
         assert.equal(outer.shellHeight, outer.viewport);
         assert.equal(outer.overflow, 'hidden');
+        await list.evaluate(el => { el.scrollTop = 0; });
+        await page.waitForFunction(() => {
+          const card = document.querySelector('[data-slot="page-scroll"]').closest('[data-slot="card"]');
+          return window.getComputedStyle(card.querySelector('.ui-toolbar, .mods-toolbar')).boxShadow === 'none';
+        });
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
         await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/app-shell-${tab}-${width}.png`, import.meta.url)) });
         assert.deepEqual(state.errors, []);

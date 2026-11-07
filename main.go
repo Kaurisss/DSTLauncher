@@ -256,6 +256,7 @@ func main() {
 	mgr.SetModsChecker(api.MissingModIDs)
 	// 单模组更新要临时改写下载清单再恢复，同样由 web 层提供
 	mgr.SetModsSetupSwap(api.SwapModsSetup)
+	stopNotifications := api.StartNotifications()
 	stopAutomation := api.StartAutomation()
 	stopPlayerLogs := api.StartPlayerLogs()
 
@@ -322,6 +323,7 @@ func main() {
 		}
 	}
 	stopPlayerLogs()
+	stopNotifications()
 	fmt.Println("已安全退出")
 	if windowErr != nil {
 		log.Fatalf("桌面窗口启动失败: %v", windowErr)

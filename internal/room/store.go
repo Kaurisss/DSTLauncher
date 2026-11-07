@@ -149,6 +149,14 @@ func (s *Store) Get(id int) (*Room, bool) {
 	return nil, false
 }
 
+// ValidateTemplate checks a portable room definition before it has local ports.
+func ValidateTemplate(r *Room) error {
+	c := clone(r)
+	c.Normalize()
+	(&Store{}).allocPorts(c, 0)
+	return c.Validate()
+}
+
 // Create 新建房间：分配 ID 与端口、校验、落盘。
 func (s *Store) Create(r *Room) (*Room, error) {
 	if r == nil {

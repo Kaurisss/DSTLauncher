@@ -78,6 +78,12 @@ func ParseOverride(content string) *Override {
 	return o
 }
 
+// ParseOverrideChecked validates imported configuration without executing Lua.
+func ParseOverrideChecked(content string) (*Override, error) {
+	o, _, err := readOverride(content)
+	return o, err
+}
+
 // String 渲染成 worldgenoverride.lua。
 //
 // 只写用户改动过的项——官方文档明确说等于默认值的项可以直接省略，

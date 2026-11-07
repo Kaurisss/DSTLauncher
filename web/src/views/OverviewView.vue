@@ -12,6 +12,7 @@ import PlayersPanel from '@/components/overview/PlayersPanel.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import AnnounceDialog from '@/components/overview/AnnounceDialog.vue';
 import LogConsole from '@/components/overview/LogConsole.vue';
+import DiagnosticsDialog from '@/components/overview/DiagnosticsDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
 import { useProcessControl } from '@/composables/useProcessControl.js';
@@ -123,6 +124,7 @@ async function runQuick(action) {
       <UiCard class="h-full">
         <template #title>分片管理</template>
         <template #actions>
+          <DiagnosticsDialog />
           <IconAction
             variant="outline"
             icon="save"
