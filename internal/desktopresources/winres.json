@@ -1,0 +1,17 @@
+{
+  "RT_GROUP_ICON": {
+    "#1": {
+      "0000": "../../web/src/assets/icon.png"
+    }
+  },
+  "RT_MANIFEST": {
+    "#1": {
+      "0409": {
+        "description": "DST 开服管理系统",
+        "minimum-os": "win10",
+        "execution-level": "as invoker",
+        "dpi-awareness": "per monitor v2"
+      }
+    }
+  }
+}

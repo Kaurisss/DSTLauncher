@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"io/fs"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -286,34 +287,61 @@ func main() {
 	fmt.Println("  按 Ctrl+C 停止面板并安全关闭所有服务器")
 	fmt.Printf("  请打开浏览器，访问 http://%s:%d 进入开服面板\n", *bind, *port)
 
-	// 优雅退出：收到信号后先停止接受新启动/自动重启，再关面板、优雅停服（c_save → c_shutdown）。
-	// done 用于修复退出竞态：ListenAndServe 返回后 main 必须等分片真正停完才能退出，
-	// 否则 Docker 发 SIGTERM 时面板进程可能在存档落盘前就结束。
-	done := make(chan struct{})
-	go func() {
-		defer close(done)
-		sig := make(chan os.Signal, 1)
-		signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
-		<-sig
-		fmt.Println("\n正在安全关闭…")
-		// 先阻断新启动与崩溃重启，避免停服途中进程被重新拉起
-		mgr.BeginShutdown()
-		stopAutomation()
-		_ = srv.Close()
-		for _, c := range mgr.Clusters() {
-			if err := mgr.Stop(c.Key(), 30*time.Second); err != nil {
-				fmt.Printf("关闭房间「%s」失败: %v\n", c.Name, err)
-			}
-		}
-		stopPlayerLogs()
-		fmt.Println("已安全退出")
-	}()
-
-	if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+	listener, err := net.Listen("tcp", srv.Addr)
+	if err != nil {
 		hintBindError(err, *port)
 		log.Fatalf("服务启动失败: %v", err)
 	}
-	<-done
+	serveErr := make(chan error, 1)
+	serverExited := make(chan struct{})
+	stopped := make(chan struct{})
+	sig := make(chan os.Signal, 1)
+	signal.Notify(sig, os.Interrupt, syscall.SIGTERM)
+	defer signal.Stop(sig)
+	go func() {
+		serveErr <- srv.Serve(listener)
+		close(serverExited)
+	}()
+	go func() {
+		select {
+		case <-sig:
+		case <-serverExited:
+		}
+		close(stopped)
+	}()
+
+	windowErr := runPanelWindow(panelURL(listener.Addr()), workDir, stopped)
+	fmt.Println("\n正在安全关闭…")
+	// 窗口关闭与系统信号共用同一条停服路径，等待全部分片保存并退出。
+	mgr.BeginShutdown()
+	stopAutomation()
+	_ = srv.Close()
+	for _, c := range mgr.Clusters() {
+		if err := mgr.Stop(c.Key(), 30*time.Second); err != nil {
+			fmt.Printf("关闭房间「%s」失败: %v\n", c.Name, err)
+		}
+	}
+	stopPlayerLogs()
+	fmt.Println("已安全退出")
+	if windowErr != nil {
+		log.Fatalf("桌面窗口启动失败: %v", windowErr)
+	}
+	if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
+		log.Fatalf("面板服务失败: %v", err)
+	}
+}
+
+func panelURL(addr net.Addr) string {
+	tcp := addr.(*net.TCPAddr)
+	host := tcp.IP.String()
+	if tcp.IP.IsUnspecified() {
+		if tcp.IP.To4() != nil {
+			host = "127.0.0.1"
+		} else {
+			host = "::1"
+		}
+	}
+	return "http://" + net.JoinHostPort(host, fmt.Sprint(tcp.Port))
 }
 
 // hintBindError 对 Windows 下端口绑定失败给出针对性提示。

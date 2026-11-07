@@ -41,6 +41,23 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
 
 生成根目录下的 `dst-windows.exe`。任一步失败会停止构建；脚本不会自动重启面板。
 
+Windows 桌面版使用独立窗口显示同一套管理面板，不显示控制台窗口：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1 -Desktop
+```
+
+生成根目录下的 `dst-desktop.exe`，双击即可打开。运行需要 Microsoft Edge WebView2 Runtime（Windows 11 通常已自带；缺失时可从 [Microsoft 官网](https://developer.microsoft.com/microsoft-edge/webview2/) 安装 Evergreen Runtime）。无需 C/C++ 编译器。关闭窗口会停止后台任务，并等待游戏服务器保存后退出。桌面版沿用上方命令行参数与数据目录规则；浏览器缓存保存在数据目录的 `webview2/` 下。Web 版与桌面版默认使用相同端口，请先退出正在运行的面板再启动另一个版本。
+
+仅编译桌面后端（要求已构建 `web/dist`）：
+
+```powershell
+go generate -tags desktop ./internal/desktopresources
+go build -tags desktop -ldflags "-H=windowsgui" -o dst-desktop.exe .
+```
+
+桌面构建会将项目图标和 Per-Monitor V2 DPI 清单嵌入 EXE，按 Windows 显示缩放比例渲染，并在跨屏移动时调整窗口。资源生成工具使用固定版本，首次构建时由 Go 下载；生成的 `.syso` 只参与桌面版构建。运行 `powershell -NoProfile -ExecutionPolicy Bypass -File .\tools\check-desktop.ps1` 可检查 EXE 图标、DPI 感知与窗口关闭流程。
+
 手动构建：
 
 ```bash
