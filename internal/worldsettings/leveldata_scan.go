@@ -15,6 +15,7 @@ type levelToken struct {
 }
 type levelField struct {
 	name      string
+	index     string
 	value     levelValue
 	separated bool
 }
@@ -27,10 +28,12 @@ type levelTable struct {
 	fields      []levelField
 }
 type levelScanner struct {
-	src string
-	pos int
-	tok levelToken
-	err error
+	src       string
+	pos       int
+	tok       levelToken
+	err       error
+	maxFields int
+	fields    int
 }
 
 var levelNumber = regexp.MustCompile(`^-?(?:0[xX][0-9a-fA-F]+|(?:[0-9]+(?:\.[0-9]*)?|\.[0-9]+)(?:[eE][+-]?[0-9]+)?)$`)
@@ -272,6 +275,11 @@ func (s *levelScanner) table(depth int) *levelTable {
 	s.take('{')
 	seen := map[string]bool{}
 	for s.err == nil && s.tok.kind != '}' {
+		s.fields++
+		if s.maxFields > 0 && s.fields > s.maxFields {
+			s.fail("表项数量超过预览上限")
+			break
+		}
 		f := levelField{}
 		switch s.tok.kind {
 		case 'i':
@@ -291,6 +299,8 @@ func (s *levelScanner) table(depth int) *levelTable {
 			}
 			if s.tok.kind == 's' {
 				f.name = s.tok.text
+			} else {
+				f.index = s.tok.text
 			}
 			s.next()
 			s.take(']')
@@ -318,6 +328,10 @@ func (s *levelScanner) table(depth int) *levelTable {
 	return t
 }
 func scanLevelRoot(src string) (*levelTable, error) {
+	return scanLevelRootLimit(src, 0)
+}
+
+func scanLevelRootLimit(src string, maxFields int) (*levelTable, error) {
 	pos := len(src) - len(strings.TrimPrefix(src, "\ufeff"))
 	// 游戏会给明文持久化文件加此文件头。保留原文与偏移，局部更新时才能
 	// 逐字节保留文件头、注释和未修改的字段；其它压缩/编码版本仍拒绝解析。
@@ -325,7 +339,7 @@ func scanLevelRoot(src string) (*levelTable, error) {
 	if strings.HasPrefix(src[pos:], kleiPlainHeader) {
 		pos += len(kleiPlainHeader)
 	}
-	s := &levelScanner{src: src, pos: pos}
+	s := &levelScanner{src: src, pos: pos, maxFields: maxFields}
 	s.next()
 	if s.tok.kind != 'i' || s.tok.text != "return" {
 		s.fail("文件必须返回一张表")

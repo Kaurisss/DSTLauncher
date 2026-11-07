@@ -16,7 +16,7 @@ function makeUnauthorizedError(msg) {
   return err;
 }
 
-async function request(path, { method = 'GET', params, body } = {}) {
+async function request(path, { method = 'GET', params, body, rawBody, timeoutMs = TIMEOUT_MS } = {}) {
   const url = new URL(path, location.origin);
   if (params) {
     Object.entries(params).forEach(([k, v]) => {
@@ -25,6 +25,7 @@ async function request(path, { method = 'GET', params, body } = {}) {
   }
 
   const init = { method };
+  if (rawBody !== undefined) init.body = rawBody;
   if (body !== undefined) {
     init.headers = { 'Content-Type': 'application/json' };
     init.body = JSON.stringify(body);
@@ -32,7 +33,7 @@ async function request(path, { method = 'GET', params, body } = {}) {
 
   // 停止服务器要等 c_save + c_shutdown，可能几十秒，不能按默认超时掐断
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
   init.signal = controller.signal;
 
   let res;
@@ -366,4 +367,17 @@ export const automationApi = {
 
 export const worldStateApi = {
   get: roomId => request('/api/worldstate', { params: { room: roomId } }),
+};
+
+export const migrationApi = {
+  export: () => request('/api/migration/export', { method: 'POST' }),
+  upload: file => request('/api/migration/upload', { method: 'POST', rawBody: file, timeoutMs: 30 * 60 * 1000 }),
+  status: id => request('/api/migration/job', { params: { id } }),
+  remove: id => request('/api/migration/job', { method: 'DELETE', params: { id } }),
+  apply: (id, applyPlan) => request('/api/migration/apply', { method: 'POST', body: { id, applyPlan } }),
+  downloadUrl: id => '/api/migration/download?id=' + encodeURIComponent(id),
+};
+
+export const mapApi = {
+  get: (room, shard) => request('/api/map', { params: { room, shard } }),
 };

@@ -317,6 +317,7 @@ func main() {
 	mgr.BeginShutdown()
 	stopAutomation()
 	_ = srv.Close()
+	api.StopMigrations()
 	for _, c := range mgr.Clusters() {
 		if err := mgr.Stop(c.Key(), 30*time.Second); err != nil {
 			fmt.Printf("关闭房间「%s」失败: %v\n", c.Name, err)

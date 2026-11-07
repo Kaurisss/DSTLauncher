@@ -82,6 +82,9 @@ func (s *Server) handleAutomation(w http.ResponseWriter, r *http.Request) {
 func (s *Server) guardMaintenance(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		mutation := r.Method != http.MethodGet && r.Method != http.MethodHead
+		if r.URL.Path == "/api/migration/upload" || r.URL.Path == "/api/migration/job" {
+			mutation = false
+		}
 		switch r.URL.Path {
 		case "/api/start", "/api/stop", "/api/restart", "/api/cmd", "/api/mods/toggle", "/api/mods/config", "/api/mods/delete", "/api/backups/create", "/api/backups/delete", "/api/backups/restore":
 			mutation = true

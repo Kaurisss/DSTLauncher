@@ -80,6 +80,8 @@ type Server struct {
 	profileMu       sync.Mutex
 	notifications   *notify.Engine
 	notificationErr error
+	migrations      *migrationJobs
+	mapMu           sync.Mutex
 }
 
 // NewServer 创建 HTTP 服务。
@@ -103,6 +105,7 @@ func NewServer(o Options) *Server {
 	}
 	s.automation, s.automationErr = automation.New(filepath.Join(o.RootDir, "automation.json"))
 	s.notifications, s.notificationErr = notify.New(filepath.Join(o.RootDir, "notifications.json"))
+	s.migrations = newMigrationJobs()
 	return s
 }
 
@@ -140,6 +143,12 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/rooms/meta", s.handleRoomMeta)
 	mux.HandleFunc("/api/rooms/copy", s.handleProfileApply)
 	mux.HandleFunc("/api/profiles", s.handleProfiles)
+	mux.HandleFunc("/api/migration/export", s.handleMigrationExport)
+	mux.HandleFunc("/api/migration/upload", s.handleMigrationUpload)
+	mux.HandleFunc("/api/migration/apply", s.handleMigrationApply)
+	mux.HandleFunc("/api/migration/job", s.handleMigrationJob)
+	mux.HandleFunc("/api/migration/download", s.handleMigrationDownload)
+	mux.HandleFunc("/api/map", s.handleMap)
 	mux.HandleFunc("/api/profiles/import", s.handleProfileImport)
 	mux.HandleFunc("/api/profiles/apply", s.handleProfileApply)
 	mux.HandleFunc("/api/diagnostics", s.handleDiagnostics)

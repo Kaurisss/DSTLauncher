@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import UiLoading from '@/components/ui/UiLoading.vue';
+import SavedMapDialog from '@/components/rooms/SavedMapDialog.vue';
 import {
   Table, TableBody, TableCaption, TableCell, TableEmpty,
   TableHead, TableHeader, TableRow,
@@ -153,6 +154,7 @@ async function remove(item) {
       <Badge v-if="orphans.length" variant="outline" class="shrink-0 whitespace-nowrap text-muted-foreground">孤儿存档 {{ orphans.length }} 个（{{ fmtSize(orphanSize) }}）</Badge>
       <IconAction v-if="root" variant="ghost" class="text-muted-foreground" icon="folder" label="复制存档根目录" :tip="root" @click="copyRoot" />
       <template #actions>
+        <SavedMapDialog />
         <IconAction variant="outline" icon="refresh" label="刷新" :disabled="loading" @click="load" />
       </template>
     </UiToolbar>
