@@ -42,7 +42,7 @@ function archives() {
 async function openBackups({ width = 1280, items = archives() } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
   page.setDefaultTimeout(10000);
-  const state = { items, requests: [], errors: [], deleteFailure: '' };
+  const state = { items, requests: [], errors: [], deleteFailure: '', check: null, nextCheck: 0 };
   page.on('pageerror', error => state.errors.push(error.message));
   await page.addInitScript(() => {
     localStorage.setItem('dst-tab', 'backups');
@@ -55,6 +55,21 @@ async function openBackups({ width = 1280, items = archives() } = {}) {
     if (url.pathname === '/api/rooms/meta') return ok({});
     if (url.pathname === '/api/auth/status') return ok({ enabled: false, authenticated: true });
     if (url.pathname === '/api/backups') return ok(state.items);
+    if (url.pathname === '/api/backup-remote') return ok({ enabled: false, results: [] });
+    if (url.pathname === '/api/backups/check') {
+      if (route.request().method() === 'POST') {
+        const name = route.request().postDataJSON().name;
+        state.check = { id: `check-${++state.nextCheck}`, name, room: 2, state: 'ready', report: { name, sha256: 'a'.repeat(64), canRestore: true, createdAt: state.items.find(item => item.name === name).createdAt, files: 12, bytes: 1024, shards: [], warnings: [] } };
+        return ok({ id: state.check.id });
+      }
+      if (route.request().method() === 'DELETE') return ok(null);
+      return ok(state.check);
+    }
+    if (url.pathname === '/api/backups/restore' && route.request().method() === 'POST') {
+      state.requests.push({ action: 'restore', room: url.searchParams.get('room'), name: state.check.name });
+      state.check = { ...state.check, state: 'restored', previousDirectory: 'isolated-before-restore' };
+      return ok({ id: state.check.id });
+    }
     if (url.pathname.startsWith('/api/backups/')) {
       const name = url.searchParams.get('name');
       const action = url.pathname.split('/').at(-1);
@@ -119,12 +134,15 @@ test('翻页后的操作对应正确备份：导出、回滚确认、删除失�
     assert.equal(downloadUrl.searchParams.get('name'), '房间备份 2.zip');
     const dialog = page.getByRole('alertdialog');
     await row.getByRole('button', { name: '回滚', exact: true }).click();
+    const inspection = page.getByRole('dialog', { name: '备份恢复检查', exact: true });
+    await inspection.getByRole('button', { name: '确认恢复此备份', exact: true }).click();
     await dialog.getByText(/回滚到 房间备份 2.zip/).waitFor();
     await dialog.getByRole('button', { name: '取消', exact: true }).click();
     assert.equal(state.requests.length, 0);
-    await row.getByRole('button', { name: '回滚', exact: true }).click();
+    await inspection.getByRole('button', { name: '确认恢复此备份', exact: true }).click();
     await dialog.getByRole('button', { name: '确定', exact: true }).click();
-    await page.getByText('回滚完成，请启动服务器', { exact: true }).waitFor();
+    await inspection.getByText(/恢复完成/).waitFor();
+    await inspection.getByRole('button', { name: '完成', exact: true }).click();
     await table.getByRole('cell', { name: '12.0 MB', exact: true }).waitFor();
     assert.deepEqual(state.requests.at(-1), { action: 'restore', room: '2', name: '房间备份 2.zip' });
     await page.getByRole('button', { name: '下一页', exact: true }).click();

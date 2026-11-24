@@ -277,6 +277,11 @@ export const backupApi = {
   create: roomId => request('/api/backups/create', { params: { room: roomId } }),
   remove: (roomId, name) => request('/api/backups/delete', { params: { room: roomId, name } }),
   restore: (roomId, name) => request('/api/backups/restore', { params: { room: roomId, name } }),
+  inspect: (roomId, name) => request('/api/backups/check', { method: 'POST', params: { room: roomId }, body: { name } }),
+  check: id => request('/api/backups/check', { params: { id } }),
+  clearCheck: id => request('/api/backups/check', { method: 'DELETE', params: { id } }),
+  checkMap: (id, shard) => request('/api/backups/check/map', { params: { id, shard } }),
+  restoreChecked: (roomId, id, sha256) => request('/api/backups/restore', { method: 'POST', params: { room: roomId }, body: { id, sha256 } }),
   /**
    * 导出备份到浏览器。走原生 <a download> 而不是 request()：
    * 响应体是 zip 文件流而非 JSON，且浏览器自带的下载管理比手动拼 blob 更省事。
@@ -367,6 +372,13 @@ export const automationApi = {
 
 export const worldStateApi = {
   get: roomId => request('/api/worldstate', { params: { room: roomId } }),
+};
+
+export const backupRemoteApi = {
+  get: () => request('/api/backup-remote'),
+  save: config => request('/api/backup-remote', { method: 'PUT', body: config }),
+  test: () => request('/api/backup-remote/test', { method: 'POST' }),
+  sync: (room, name) => request('/api/backup-remote/sync', { method: 'POST', params: { room }, body: { name } }),
 };
 
 export const migrationApi = {

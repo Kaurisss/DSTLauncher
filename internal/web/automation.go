@@ -169,11 +169,23 @@ func (s *Server) runMaintenance(ctx context.Context, kind string, c automation.C
 				failures = append(failures, err)
 				continue
 			}
-			if _, err := s.bakFor(rm).CreateAutomatic(c.Keep); err != nil {
+			s.backupMu.Lock()
+			if ctx.Err() != nil {
+				s.backupMu.Unlock()
+				return "", ctx.Err()
+			}
+			item, err := s.bakFor(rm).CreateAutomatic(c.Keep)
+			if err != nil {
+				s.backupMu.Unlock()
 				failures = append(failures, fmt.Errorf("%s: %w", rm.Name, err))
 				continue
 			}
 			created++
+			_, syncErr := s.queueRemoteBackup(rm.ID, item)
+			s.backupMu.Unlock()
+			if syncErr != nil {
+				failures = append(failures, fmt.Errorf("%s 本地备份已完成，异地同步未排队: %w", rm.Name, syncErr))
+			}
 		}
 		return fmt.Sprintf("已备份 %d 个房间", created), errors.Join(failures...)
 	}

@@ -18,6 +18,7 @@ import (
 
 	"dst-windows/internal/automation"
 	"dst-windows/internal/backup"
+	"dst-windows/internal/backupremote"
 	"dst-windows/internal/chatlog"
 	"dst-windows/internal/config"
 	"dst-windows/internal/modmgr"
@@ -82,6 +83,10 @@ type Server struct {
 	notificationErr error
 	migrations      *migrationJobs
 	mapMu           sync.Mutex
+	backupMu        sync.Mutex
+	backupRemote    *backupremote.Engine
+	backupRemoteErr error
+	backupChecks    *backupChecks
 }
 
 // NewServer 创建 HTTP 服务。
@@ -106,6 +111,10 @@ func NewServer(o Options) *Server {
 	s.automation, s.automationErr = automation.New(filepath.Join(o.RootDir, "automation.json"))
 	s.notifications, s.notificationErr = notify.New(filepath.Join(o.RootDir, "notifications.json"))
 	s.migrations = newMigrationJobs()
+	s.backupChecks = newBackupChecks()
+	s.backupRemote, s.backupRemoteErr = backupremote.New(filepath.Join(o.RootDir, "backup-remote.json"), o.RootDir, func(result backupremote.Result) {
+		s.publishNotification("backup_failed", result.Room, "", "本地备份已保留，异地同步失败: "+result.Name+"；"+result.Error)
+	})
 	return s
 }
 
@@ -203,6 +212,11 @@ func (s *Server) Handler() http.Handler {
 	// 备份
 	mux.HandleFunc("/api/backups", s.handleBackups)
 	mux.HandleFunc("/api/backups/create", s.handleBackupCreate)
+	mux.HandleFunc("/api/backups/check", s.handleBackupCheck)
+	mux.HandleFunc("/api/backups/check/map", s.handleBackupCheckMap)
+	mux.HandleFunc("/api/backup-remote", s.handleBackupRemote)
+	mux.HandleFunc("/api/backup-remote/test", s.handleBackupRemoteTest)
+	mux.HandleFunc("/api/backup-remote/sync", s.handleBackupRemoteSync)
 	mux.HandleFunc("/api/backups/delete", s.handleBackupDelete)
 	mux.HandleFunc("/api/backups/restore", s.handleBackupRestore)
 	mux.HandleFunc("/api/backups/download", s.handleBackupDownload)
@@ -1340,21 +1354,45 @@ func (s *Server) handleBackups(w http.ResponseWriter, r *http.Request) {
 // handleBackupCreate 备份整个集群目录。
 // 备份前对所有运行中的分片发 c_save() 并等待落盘，否则会拷到半截存档。
 func (s *Server) handleBackupCreate(w http.ResponseWriter, r *http.Request) {
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
+	s.backupMu.Lock()
+	defer s.backupMu.Unlock()
 	rm, err := s.roomByID(r)
 	if err != nil {
 		respond(w, 200, nil, err)
 		return
 	}
 	// 有分片在运行时会先请求落盘并等待，无运行分片则立即返回
-	s.mgr.SaveCluster(rm.Key(), 5*time.Second)
+	if err = s.saveRoom(r.Context(), rm); err != nil {
+		s.publishNotification("backup_failed", rm.ID, "", "请求保存失败，未创建备份: "+err.Error())
+		respond(w, 200, nil, err)
+		return
+	}
 	item, err := s.bakFor(rm).Create()
 	if err != nil {
 		s.publishNotification("backup_failed", rm.ID, "", "备份失败: "+err.Error())
 	}
-	respond(w, 200, item, err)
+	if err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
+	queued, syncErr := s.queueRemoteBackup(rm.ID, item)
+	message := ""
+	if syncErr != nil {
+		message = syncErr.Error()
+		s.publishNotification("backup_failed", rm.ID, "", "本地备份已完成，异地同步未排队: "+message)
+	}
+	respond(w, 200, struct {
+		*backup.BackupItem
+		SyncQueued bool   `json:"syncQueued"`
+		SyncError  string `json:"syncError,omitempty"`
+	}{item, queued != nil, message}, nil)
 }
 
 func (s *Server) handleBackupDelete(w http.ResponseWriter, r *http.Request) {
+	s.backupMu.Lock()
+	defer s.backupMu.Unlock()
 	rm, err := s.roomByID(r)
 	if err != nil {
 		respond(w, 200, nil, err)
@@ -1364,6 +1402,20 @@ func (s *Server) handleBackupDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
+	if r.Method == http.MethodPost {
+		s.handleCheckedRestore(w, r)
+		return
+	}
+	if r.Method != http.MethodGet {
+		w.WriteHeader(405)
+		return
+	}
+	s.taskMu.Lock()
+	defer s.taskMu.Unlock()
+	s.backupMu.Lock()
+	defer s.backupMu.Unlock()
+	resume := s.mgr.PauseRecovery()
+	defer resume()
 	rm, err := s.roomByID(r)
 	if err != nil {
 		respond(w, 200, nil, err)

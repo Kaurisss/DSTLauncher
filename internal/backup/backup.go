@@ -12,6 +12,9 @@ package backup
 
 import (
 	"archive/zip"
+	"context"
+	"crypto/rand"
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -147,6 +150,11 @@ func (m *Manager) zipDir(srcDir, dstPath string) error {
 	defer f.Close()
 
 	zw := zip.NewWriter(f)
+	root, err := os.OpenRoot(srcDir)
+	if err != nil {
+		return err
+	}
+	defer root.Close()
 
 	// srcDir 必须以分隔符结尾，否则 filepath.Walk 会把父目录也遍历进来
 	err = filepath.Walk(srcDir+string(os.PathSeparator), func(path string, info os.FileInfo, err error) error {
@@ -156,17 +164,25 @@ func (m *Manager) zipDir(srcDir, dstPath string) error {
 		if info.IsDir() {
 			return nil
 		}
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("备份不支持链接或特殊文件: %s", path)
+		}
 		rel, err := filepath.Rel(srcDir, path)
 		if err != nil {
 			return err
 		}
 
 		// zip 条目统一用正斜杠，保证压缩包跨平台可解
-		w, err := zw.Create(filepath.ToSlash(rel))
+		header, err := zip.FileInfoHeader(info)
 		if err != nil {
 			return err
 		}
-		src, err := os.Open(path)
+		header.Name, header.Method = filepath.ToSlash(rel), zip.Deflate
+		w, err := zw.CreateHeader(header)
+		if err != nil {
+			return err
+		}
+		src, err := root.Open(rel)
 		if err != nil {
 			return err
 		}
@@ -260,79 +276,53 @@ func (m *Manager) Delete(name string) error {
 // 注意：调用方必须确保服务器已停止，否则文件占用会导致解压失败，
 // 且运行中的服务器会在退出时用内存状态覆盖刚恢复的存档。
 func (m *Manager) Restore(name string) error {
-	if name != filepath.Base(name) || !strings.HasSuffix(name, ".zip") {
-		return fmt.Errorf("非法的备份文件名")
+	if err := os.MkdirAll(filepath.Dir(m.clusterDir), 0700); err != nil {
+		return err
 	}
-	zipPath := filepath.Join(m.backupDir, name)
-	if _, err := os.Stat(zipPath); err != nil {
-		return fmt.Errorf("备份不存在: %s", name)
+	dir, err := os.MkdirTemp(filepath.Dir(m.clusterDir), ".restore-check-")
+	if err != nil {
+		return err
 	}
-
-	dstDir := m.clusterDir
-	// 旧存档先改名保留而非直接删除，回滚失败时可人工恢复
-	oldDir := dstDir + ".old"
-	_ = os.RemoveAll(oldDir)
-	if _, err := os.Stat(dstDir); err == nil {
-		if err := os.Rename(dstDir, oldDir); err != nil {
-			return fmt.Errorf("备份现有存档失败: %w", err)
-		}
+	defer os.RemoveAll(dir)
+	stage := filepath.Join(dir, "payload")
+	report, err := m.Stage(context.Background(), name, stage, nil, nil)
+	if err != nil {
+		return err
 	}
-
-	if err := unzipTo(zipPath, dstDir); err != nil {
-		// 解压失败则把旧存档恢复回去
-		_ = os.Rename(oldDir, dstDir)
-		return fmt.Errorf("解压备份失败: %w", err)
+	if !report.CanRestore {
+		return fmt.Errorf("备份检查未通过: %s", strings.Join(report.Warnings, "；"))
 	}
-
-	return nil
+	_, err = m.RestoreStaged(context.Background(), name, stage, report.SHA256)
+	return err
 }
 
-// unzipTo 解压 zip 到目标目录，并防止 Zip Slip 路径穿越攻击。
-func unzipTo(zipPath, dstDir string) error {
-	r, err := zip.OpenReader(zipPath)
+// RestoreStaged consumes a private, fully verified Stage directory. Live data is
+// renamed only after the source archive still matches the checked digest.
+func (m *Manager) RestoreStaged(ctx context.Context, name, stage, digest string) (string, error) {
+	current, err := m.Digest(ctx, name)
 	if err != nil {
-		return err
+		return "", err
 	}
-	defer r.Close()
-
-	absDst, err := filepath.Abs(dstDir)
-	if err != nil {
-		return err
+	if current != digest {
+		return "", fmt.Errorf("备份在检查后发生变化，请重新检查")
 	}
-
-	for _, f := range r.File {
-		// 校验解压目标仍在目标目录内
-		target := filepath.Join(absDst, filepath.FromSlash(f.Name))
-		if !strings.HasPrefix(target, absDst+string(os.PathSeparator)) && target != absDst {
-			return fmt.Errorf("备份包中存在非法路径: %s", f.Name)
-		}
-
-		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(target, 0755); err != nil {
-				return err
-			}
-			continue
-		}
-
-		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-			return err
-		}
-
-		src, err := f.Open()
-		if err != nil {
-			return err
-		}
-		dst, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
-		if err != nil {
-			src.Close()
-			return err
-		}
-		_, err = io.Copy(dst, src)
-		src.Close()
-		dst.Close()
-		if err != nil {
-			return err
-		}
+	if err = ctx.Err(); err != nil {
+		return "", err
 	}
-	return nil
+	previous := ""
+	if _, err = os.Stat(m.clusterDir); err == nil {
+		previous = m.clusterDir + ".before-restore-" + time.Now().Format("20060102_150405") + "-" + rand.Text()
+		if err = os.Rename(m.clusterDir, previous); err != nil {
+			return "", fmt.Errorf("保留当前存档失败: %w", err)
+		}
+	} else if !os.IsNotExist(err) {
+		return "", err
+	}
+	if err = os.Rename(stage, m.clusterDir); err != nil {
+		if previous != "" {
+			err = errors.Join(err, os.Rename(previous, m.clusterDir))
+		}
+		return "", fmt.Errorf("替换存档失败: %w", err)
+	}
+	return previous, nil
 }

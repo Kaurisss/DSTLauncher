@@ -4,6 +4,7 @@ import { onMounted, ref } from 'vue';
 import InstallPanel from '@/components/overview/InstallPanel.vue';
 import AutomationPanel from '@/components/AutomationPanel.vue';
 import NotificationSettings from '@/components/NotificationSettings.vue';
+import BackupRemoteSettings from '@/components/BackupRemoteSettings.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiField from '@/components/ui/UiField.vue';
 import UiPill from '@/components/ui/UiPill.vue';
@@ -25,7 +26,7 @@ const system = useSystemStore();
 
 const section = ref('automation');
 const groups = [
-  { label: '维护', items: [{ key: 'automation', label: '自动维护' }, { key: 'notifications', label: '事件通知' }] },
+  { label: '维护', items: [{ key: 'automation', label: '自动维护' }, { key: 'remote-backup', label: '异地备份' }, { key: 'notifications', label: '事件通知' }] },
   { label: '安全', items: [{ key: 'password', label: '访问密码' }] },
   { label: '创意工坊', items: [{ key: 'workshop', label: 'API Key' }] },
   { label: '服务器', items: [{ key: 'server', label: '文件与架构' }] },
@@ -105,6 +106,7 @@ async function saveApiKey() {
     <div class="min-w-0">
       <AutomationPanel v-show="section === 'automation'" />
       <NotificationSettings v-if="section === 'notifications'" />
+      <BackupRemoteSettings v-if="section === 'remote-backup'" />
 
       <UiCard v-show="section === 'password'">
         <template #title>访问密码</template>

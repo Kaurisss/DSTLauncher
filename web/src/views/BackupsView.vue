@@ -1,7 +1,7 @@
 <script setup>
 // 备份页：整房间备份、回滚、删除。
 
-import { computed, onMounted, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
 import UiToolbar from '@/components/ui/UiToolbar.vue';
@@ -12,9 +12,10 @@ import UiLoading from '@/components/ui/UiLoading.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import BackupTable from '@/components/backups/BackupTable.vue';
 import MigrationDialog from '@/components/backups/MigrationDialog.vue';
+import BackupInspectionDialog from '@/components/backups/BackupInspectionDialog.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
-import { backupApi } from '@/lib/api.js';
+import { backupApi, backupRemoteApi } from '@/lib/api.js';
 import { guard, toast } from '@/lib/toast.js';
 import { confirmAction } from '@/lib/confirm.js';
 
@@ -23,6 +24,10 @@ const rooms = useRoomsStore();
 const items = ref([]);
 const loading = ref(false);
 const loadError = ref('');
+const inspection = ref(null);
+const remote = ref(null);
+const remoteError = ref('');
+let remoteTimer, disposed = false;
 const backupDir = computed(() => (items.value[0]?.path || '').replace(/[\\/][^\\/]+$/, ''));
 
 async function load() {
@@ -44,6 +49,14 @@ async function load() {
 }
 
 onMounted(load);
+async function refreshRemote() {
+  clearTimeout(remoteTimer);
+  try { const data = await backupRemoteApi.get(); if (!disposed) { remote.value = data; remoteError.value = ''; } }
+  catch (err) { if (!disposed && !err.unauthorized) remoteError.value = '读取异地备份状态失败：' + err.message; }
+  finally { if (!disposed) remoteTimer = setTimeout(refreshRemote, 3000); }
+}
+onMounted(refreshRemote);
+onUnmounted(() => { disposed = true; clearTimeout(remoteTimer); });
 // 用 current 而不是 currentId 做触发（原因见 ModsView）：currentId 刷新后
 // 值不变 watch 不到，current 要等房间列表加载完才从 null 变成房间对象
 watch(() => rooms.current, () => { items.value = []; load(); });
@@ -53,23 +66,23 @@ async function create() {
   if (!room) return;
   toast('正在备份…');
   // 备份前后端会先让运行中的分片落盘，可能等好几秒
-  const { ok } = await guard(() => backupApi.create(room.id));
+  const { ok, data } = await guard(() => backupApi.create(room.id));
   if (ok) {
-    toast('备份完成');
+    toast(data.syncError ? '本地备份已完成，异地同步未排队：' + data.syncError : data.syncQueued ? '备份完成，已加入异地同步队列' : '备份完成', data.syncError ? 'err' : undefined);
     load();
   }
 }
 
-async function restore(name) {
+function restore(name) {
   const room = rooms.current;
   if (!room) return;
-  if (!await confirmAction(`回滚到 ${name}？\n\n当前存档将被覆盖，需先停止服务器。`)) return;
-
-  const { ok } = await guard(
-    () => backupApi.restore(room.id, name),
-    { success: '回滚完成，请启动服务器' },
-  );
-  if (ok) load();
+  inspection.value = { room, name };
+}
+async function sync(name) {
+  const room = rooms.current;
+  if (!room) return;
+  await guard(() => backupRemoteApi.sync(room.id, name), { success: '已加入异地同步队列' });
+  await refreshRemote();
 }
 
 async function remove(name) {
@@ -105,12 +118,14 @@ function exportSave(name) {
     </UiToolbar>
 
     <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="备份列表">
+      <p v-if="remoteError" role="alert" class="mb-3 text-sm text-destructive">{{ remoteError }}</p>
       <UiLoading v-if="!rooms.loaded" />
       <UiEmpty v-else-if="!rooms.current" icon="archive" text="请先在「房间」页新建一个房间" />
       <UiLoading v-else-if="loading && !items.length" />
       <UiEmpty v-else-if="loadError" icon="alert" :text="'读取备份失败：' + loadError" />
       <UiEmpty v-else-if="!items.length" icon="archive" text="暂无备份" />
-      <BackupTable v-else :items="items" @restore="restore" @remove="remove" @export="exportSave" />
+      <BackupTable v-else :items="items" :sync-enabled="!!remote?.enabled" :sync-results="(remote?.results || []).filter(item => item.room === rooms.currentId)" @restore="restore" @remove="remove" @export="exportSave" @sync="sync" />
     </div>
+    <BackupInspectionDialog v-if="inspection" :room="inspection.room" :name="inspection.name" @close="inspection = null" @restored="load" />
   </UiCard>
 </template>

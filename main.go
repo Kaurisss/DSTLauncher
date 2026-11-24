@@ -257,6 +257,7 @@ func main() {
 	// 单模组更新要临时改写下载清单再恢复，同样由 web 层提供
 	mgr.SetModsSetupSwap(api.SwapModsSetup)
 	stopNotifications := api.StartNotifications()
+	stopBackupRemote := api.StartBackupRemote()
 	stopAutomation := api.StartAutomation()
 	stopPlayerLogs := api.StartPlayerLogs()
 
@@ -315,9 +316,12 @@ func main() {
 	fmt.Println("\n正在安全关闭…")
 	// 窗口关闭与系统信号共用同一条停服路径，等待全部分片保存并退出。
 	mgr.BeginShutdown()
+	api.CancelBackupChecks()
 	stopAutomation()
 	_ = srv.Close()
 	api.StopMigrations()
+	api.StopBackupChecks()
+	stopBackupRemote()
 	for _, c := range mgr.Clusters() {
 		if err := mgr.Stop(c.Key(), 30*time.Second); err != nil {
 			fmt.Printf("关闭房间「%s」失败: %v\n", c.Name, err)
