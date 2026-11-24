@@ -221,6 +221,10 @@ func (s *Server) handleBackupCheckMap(w http.ResponseWriter, r *http.Request) {
 	if err == nil && data.Terrain == nil {
 		err = fmt.Errorf("此保存点缺少可读取的地块数据")
 	}
+	if err == nil {
+		data.Textures = s.availableMapTextures(data)
+		data.Icons = s.availableMapIcons(data)
+	}
 	respond(w, 200, data, err)
 }
 func (s *Server) handleCheckedRestore(w http.ResponseWriter, r *http.Request) {

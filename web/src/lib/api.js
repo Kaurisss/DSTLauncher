@@ -74,6 +74,38 @@ async function request(path, { method = 'GET', params, body, rawBody, timeoutMs 
   return json.data;
 }
 
+async function readNDJSON(res, onEvent) {
+  const reader = res.body.getReader();
+  const decoder = new globalThis.TextDecoder();
+  let buffer = '';
+  let completed = false;
+  const consumeLine = line => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    const event = JSON.parse(trimmed);
+    if (event.type === 'done') completed = true;
+    onEvent(event);
+  };
+
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      let idx;
+      while ((idx = buffer.indexOf('\n')) >= 0) {
+        consumeLine(buffer.slice(0, idx));
+        buffer = buffer.slice(idx + 1);
+      }
+    }
+    buffer += decoder.decode();
+    if (buffer.trim()) consumeLine(buffer);
+    if (!completed) throw new Error('流式响应在完成前中断');
+  } finally {
+    reader.cancel().catch(() => {});
+  }
+}
+
 /* ---------- 鉴权 ---------- */
 
 export const authApi = {
@@ -175,6 +207,86 @@ export const procApi = {
 /* ---------- 日志 ---------- */
 
 export const logApi = {
+  /**
+   * 流式读取玩家日志分页（NDJSON）。当服务端或测试替身返回普通 JSON 时自动回落为一次性解析。
+   */
+  async chatStream(room, shard, { kind = 'all', search = '', page = 1, limit = 10, signal, onMeta, onEntry, onDone } = {}) {
+    const url = new URL('/api/chat-log', location.origin);
+    const params = { room, shard, kind, search, page, limit, stream: '1' };
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') url.searchParams.set(k, v);
+    });
+
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'GET',
+        headers: { Accept: 'application/x-ndjson, application/json' },
+        signal,
+      });
+    } catch (err) {
+      if (err?.name === 'AbortError') throw err;
+      throw new Error('无法连接面板服务，请确认 dst-windows.exe 正在运行', { cause: err });
+    }
+
+    if (res.status === 401) {
+      if (unauthorizedHandler) unauthorizedHandler();
+      throw makeUnauthorizedError();
+    }
+
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    if (contentType.includes('application/x-ndjson') && res.body) {
+      let meta = null;
+      await readNDJSON(res, ev => {
+        if (ev.type === 'meta') {
+          meta = {
+            exists: !!ev.exists,
+            truncated: !!ev.truncated,
+            modified: ev.modified || '',
+            total: ev.total || 0,
+            page: ev.page || page,
+            pageSize: ev.pageSize || limit,
+            count: ev.count || 0,
+          };
+          onMeta?.(meta);
+        } else if (ev.type === 'entry' && ev.entry) {
+          onEntry?.(ev.entry);
+        } else if (ev.type === 'error') {
+          throw new Error(ev.message || '请求失败');
+        } else if (ev.type === 'done') {
+          onDone?.(ev.total ?? meta?.total ?? 0);
+        }
+      });
+      return;
+    }
+
+    let json;
+    try {
+      json = await res.json();
+    } catch (err) {
+      throw new Error(`接口返回异常（HTTP ${res.status}）`, { cause: err });
+    }
+    if (json.code === 401) {
+      if (unauthorizedHandler) unauthorizedHandler();
+      throw makeUnauthorizedError(json.message);
+    }
+    if (json.code !== 200) {
+      throw new Error(json.message || '请求失败');
+    }
+    const data = json.data || {};
+    const list = data.entries || [];
+    onMeta?.({
+      exists: !!data.exists,
+      truncated: !!data.truncated,
+      modified: data.modified || '',
+      total: data.total || 0,
+      page: data.page || page,
+      pageSize: data.pageSize || limit,
+      count: list.length,
+    });
+    for (const item of list) onEntry?.(item);
+    onDone?.(data.total || list.length);
+  },
   chat: (room, shard, kind = 'all', search = '', page = 1, limit = 10) => request('/api/chat-log', {
     params: { room, shard, kind, search, page, limit },
   }),
@@ -223,6 +335,67 @@ export const serverApi = {
 
 export const modApi = {
   list: (roomId, shard) => request('/api/mods', { params: { room: roomId, shard } }),
+  /**
+   * 流式读取模组列表（NDJSON）。当服务端或测试替身返回普通 JSON 时自动回落为一次性解析。
+   */
+  async listStream(roomId, shard, { signal, onMeta, onMod, onDone } = {}) {
+    const url = new URL('/api/mods', location.origin);
+    if (roomId !== undefined && roomId !== null && roomId !== '') url.searchParams.set('room', roomId);
+    if (shard !== undefined && shard !== null && shard !== '') url.searchParams.set('shard', shard);
+    url.searchParams.set('stream', '1');
+
+    let res;
+    try {
+      res = await fetch(url, {
+        method: 'GET',
+        headers: { Accept: 'application/x-ndjson, application/json' },
+        signal,
+      });
+    } catch (err) {
+      if (err?.name === 'AbortError') throw err;
+      throw new Error('无法连接面板服务，请确认 dst-windows.exe 正在运行', { cause: err });
+    }
+
+    if (res.status === 401) {
+      if (unauthorizedHandler) unauthorizedHandler();
+      throw makeUnauthorizedError();
+    }
+
+    const contentType = (res.headers.get('content-type') || '').toLowerCase();
+    if (contentType.includes('application/x-ndjson') && res.body) {
+      let emitted = 0;
+      await readNDJSON(res, ev => {
+        if (ev.type === 'meta') onMeta?.(ev.total || 0);
+        else if (ev.type === 'mod' && ev.mod) {
+          emitted++;
+          onMod?.(ev.mod);
+        } else if (ev.type === 'error') {
+          throw new Error(ev.message || '请求失败');
+        } else if (ev.type === 'done') {
+          onDone?.(ev.total ?? emitted);
+        }
+      });
+      return;
+    }
+
+    let json;
+    try {
+      json = await res.json();
+    } catch (err) {
+      throw new Error(`接口返回异常（HTTP ${res.status}）`, { cause: err });
+    }
+    if (json.code === 401) {
+      if (unauthorizedHandler) unauthorizedHandler();
+      throw makeUnauthorizedError(json.message);
+    }
+    if (json.code !== 200) {
+      throw new Error(json.message || '请求失败');
+    }
+    const list = json.data || [];
+    onMeta?.(list.length);
+    for (const item of list) onMod?.(item);
+    onDone?.(list.length);
+  },
   toggle: (roomId, id, enabled, shard) => request('/api/mods/toggle', {
     params: { room: roomId, id, enabled, shard },
   }),
@@ -392,4 +565,6 @@ export const migrationApi = {
 
 export const mapApi = {
   get: (room, shard) => request('/api/map', { params: { room, shard } }),
+  textureUrl: tile => '/api/map/texture?tile=' + encodeURIComponent(tile),
+  iconUrl: kind => '/api/map/icon?kind=' + encodeURIComponent(kind),
 };

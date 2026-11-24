@@ -21,6 +21,8 @@ async function openPage(tab, width = 1280) {
   const rooms = [1, 2].map(id => ({ id, key: `Cluster_${id}`, name: id === 1 ? '迁移测试房间' : '另一房间', running: false,
     gameMode: 'endless', locations: { Master: 'forest', Caves: 'cave' }, shards: [{ name: 'Master', isMaster: true }, { name: 'Caves', disabled: true }], statuses: [] }));
   const state = { writes: [], errors: [], mapCalls: [], delayOldMap: false, job: null };
+  const fixturePng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAEUlEQVR4nAAEAPv/Aii+RgMAAkYBL+tbOigAAAAASUVORK5CYII=', 'base64');
+  const fixtureOceanPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAEUlEQVR4nAAEAPv/Ah5a0gMAAewBTc+LjegAAAAASUVORK5CYII=', 'base64');
   const mapTiles = Buffer.alloc(400 * 320 * 2);
   for (let y = 0; y < 320; y++) for (let x = 0; x < 400; x++) mapTiles.writeUInt16LE(x < 200 ? 7 : 10504, 2 * (y * 400 + x));
   const preview = { createdAt: '2026-11-07T10:00:00Z', rooms: rooms.map(room => ({ name: room.name, shards: room.shards })), profiles: 2, files: 42, bytes: 1024 * 1024, hasPlan: true };
@@ -40,12 +42,20 @@ async function openPage(tab, width = 1280) {
     if (path === '/api/migration/upload') { state.job = { id: 'upload-job', kind: 'upload', state: 'ready', preview }; return ok({ id: state.job.id }); }
     if (path === '/api/migration/apply') { state.job = { ...state.job, kind: 'import', roomIds: [3, 4] }; return ok({ id: state.job.id }); }
     if (path === '/api/migration/job') { if (method === 'DELETE') return ok(null); return ok(state.job); }
+    if (path === '/api/map/texture') {
+      return route.fulfill({
+        contentType: 'image/png',
+        body: url.searchParams.get('tile') === 'OCEAN_MEDIUM' ? fixtureOceanPng : fixturePng,
+      });
+    }
+    if (path === '/api/map/icon') return route.fulfill({ contentType: 'image/png', body: fixturePng });
     if (path === '/api/map') {
       state.mapCalls.push({ room: url.searchParams.get('room'), shard: url.searchParams.get('shard') });
       const cave = url.searchParams.get('shard') === 'Caves';
       if (cave) return route.fulfill({ json: { code: 500, message: '此分片尚无世界保存点' } });
       return ok({ width: 400, height: 320, savedAt: '2026-11-07T09:00:00Z', kind: 'terrain',
         terrain: { tiles: mapTiles.toString('base64'), specs: [{ id: 7, name: 'GRASS' }, { id: 10504, name: 'OCEAN_MEDIUM' }] },
+        textures: ['GRASS', 'OCEAN_MEDIUM'], icons: ['pigking'],
         landmarks: [{ id: 'pigking:0', name: '猪王', kind: 'pigking', x: 140, y: 150 }, { id: 'wormhole:0', name: '虫洞 1', kind: 'wormhole', x: 220, y: 180, target: 'wormhole:1' }, { id: 'wormhole:1', name: '虫洞 1', kind: 'wormhole', x: 90, y: 220, target: 'wormhole:0' }] });
     }
     return ok([]);
@@ -108,11 +118,11 @@ test('地形地图复用 DMP 配色，使用自定义 Select，可定位地标�
     const pixels = await dialog.getByRole('img', { name: '地形底图' }).evaluate(async el => {
       const image = await window.createImageBitmap(await (await fetch(el.getAttribute('href'))).blob());
       const canvas = document.createElement('canvas'); canvas.width = 400; canvas.height = 320;
-      const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0);
+      const ctx = canvas.getContext('2d'); ctx.drawImage(image, 0, 0, 400, 320);
       return { grass: [...ctx.getImageData(50, 50, 1, 1).data], ocean: [...ctx.getImageData(350, 50, 1, 1).data] };
     });
-    assert.ok(pixels.grass[1] > pixels.grass[0] && pixels.grass[1] > pixels.grass[2]);
-    assert.ok(pixels.ocean[2] > pixels.ocean[1] && pixels.ocean[1] > pixels.ocean[0], '高 ID 海洋正确呈蓝色');
+    assert.ok(pixels.grass[1] > pixels.grass[0] && pixels.grass[1] > pixels.grass[2], JSON.stringify(pixels));
+    assert.ok(pixels.ocean[2] > pixels.ocean[1] && pixels.ocean[1] > pixels.ocean[0], `高 ID 海洋正确呈蓝色 ${JSON.stringify(pixels)}`);
     await dialog.getByRole('list', { name: '地形图例' }).getByText('草地', { exact: true }).waitFor();
     assert.match(await dialog.locator('time').innerText(), /保存于/);
     await dialog.getByRole('button', { name: '放大地图', exact: true }).click();

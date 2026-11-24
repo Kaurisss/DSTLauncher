@@ -615,43 +615,79 @@ func fileExists(p string) bool {
 
 // InstalledMods 扫描本地已下载的模组。
 // 返回 map[modID]true，modID 统一为 workshop-<数字> 或本地目录名。
+// InstalledMods 返回本地已下载的模组 ID 集合。
 func (m *Manager) InstalledMods() (map[string]bool, error) {
-	out := make(map[string]bool)
+	dirs, err := m.InstalledModDirs()
+	if err != nil {
+		return nil, err
+	}
+	out := make(map[string]bool, len(dirs))
+	for id := range dirs {
+		out[id] = true
+	}
+	return out, nil
+}
+
+// InstalledModDirs 返回本地已下载模组 ID 到实体目录的映射，
+// 目录优先级与 modDirCandidates 保持一致（共享 UGC 优先于旧目录）。
+func (m *Manager) InstalledModDirs() (map[string]string, error) {
+	out := make(map[string]string)
 
 	// 非 UGC：<game>/mods/<name>
 	if entries, err := os.ReadDir(m.modsDir); err == nil {
+		workshopDirs := make(map[string][2]string)
 		for _, e := range entries {
 			if !e.IsDir() {
 				continue
 			}
 			name := e.Name()
+			dir := filepath.Join(m.modsDir, name)
+			if !fileExists(filepath.Join(dir, "modinfo.lua")) {
+				continue
+			}
 			switch {
 			case strings.HasPrefix(name, "workshop-"):
-				out[name] = true
+				id := name
+				workshopDirs[id] = [2]string{dir, workshopDirs[id][1]}
 			case strings.HasPrefix(name, "workshop_"):
-				out["workshop-"+strings.TrimPrefix(name, "workshop_")] = true
+				id := "workshop-" + strings.TrimPrefix(name, "workshop_")
+				workshopDirs[id] = [2]string{workshopDirs[id][0], dir}
 			default:
 				// 自制/本地模组直接用目录名
-				out[name] = true
+				out[name] = dir
+			}
+		}
+		for id, dirs := range workshopDirs {
+			switch {
+			case dirs[0] != "":
+				out[id] = dirs[0]
+			case dirs[1] != "":
+				out[id] = dirs[1]
 			}
 		}
 	}
 
-	// UGC（共享布局）：服务器写入的是 <ugcDir>/content/322330/<id>
-	for _, base := range []string{
-		filepath.Join(m.ugcDir, "content", "322330"),
+	// UGC（共享布局）：后扫描的高优先级目录覆盖前者
+	ugcBases := []string{
 		// 兼容 SteamCMD 原始下载布局（steamapps/workshop/...）
 		filepath.Join(m.ugcDir, "steamapps", "workshop", "content", "322330"),
-	} {
+		// 服务器写入的是 <ugcDir>/content/322330/<id>
+		filepath.Join(m.ugcDir, "content", "322330"),
+	}
+	if m.ugcDir != "" {
+		ugcBases = append([]string{m.ugcDir}, ugcBases...)
+	}
+	for _, base := range ugcBases {
 		entries, err := os.ReadDir(base)
 		if err != nil {
 			continue
 		}
 		for _, e := range entries {
 			id := e.Name()
+			dir := filepath.Join(base, id)
 			if e.IsDir() && id != "" && strings.Trim(id, "0123456789") == "" &&
-				fileExists(filepath.Join(base, id, "modinfo.lua")) {
-				out["workshop-"+id] = true
+				fileExists(filepath.Join(dir, "modinfo.lua")) {
+				out["workshop-"+id] = dir
 			}
 		}
 	}
@@ -739,6 +775,61 @@ var modInfoNameRe = regexp.MustCompile(`^name\s*=\s*(.+?)\s*$`)
 // 都有自己的 name 字段，抓到就会把配置项名当成模组名——
 // 棱镜、神话人物等 mod 曾因此被显示成 "Title" / "language_switch"。
 // 所以先摘掉 configuration_options 块，再逐行找顶层的 name 赋值。
+// ModSummary 汇总单个模组列表展示所需的本地元数据。
+type ModSummary struct {
+	Name        string
+	Version     string
+	ClientOnly  bool
+	IconVersion string
+}
+
+// InspectMod 单次读取 modinfo.lua 并在需要时流式计算图标版本，避免列表扫描重复读盘和全目录 WalkDir。
+func (m *Manager) InspectMod(id, dir string) ModSummary {
+	if dir == "" {
+		return ModSummary{Name: id}
+	}
+	root, err := os.OpenRoot(dir)
+	if err != nil {
+		return ModSummary{Name: id}
+	}
+	defer root.Close()
+
+	data, err := readIconFile(root, "modinfo.lua", 4<<20)
+	if err != nil {
+		return ModSummary{Name: id}
+	}
+	text := string(data)
+	name, version, clientOnly := parseModInfoSummary(id, text)
+	if clientOnly {
+		return ModSummary{Name: name, Version: version, ClientOnly: true}
+	}
+	iconVersion := ""
+	if validateModIconID(id) == nil {
+		if v, err := computeModIconVersion(root, text); err == nil {
+			iconVersion = v
+		}
+	}
+	return ModSummary{
+		Name:        name,
+		Version:     version,
+		ClientOnly:  false,
+		IconVersion: iconVersion,
+	}
+}
+
+func parseModInfoSummary(id, text string) (name, version string, clientOnly bool) {
+	name = extractModInfoName(text)
+	// mod 作者常在名字里放自己图标字体的私用区字形（如 U+F000A），
+	// 任何系统字体都没有，界面上是豆腐块——剥掉
+	name = textutil.Clean(name)
+	if name == "" {
+		// modinfo 里确实没写名字（或写法太怪解析不出），
+		// 退回模组 ID，至少保证列表里能对上号
+		name = id
+	}
+	return name, extractModInfoVersion(text), extractModInfoLiteral(text, "client_only_mod") == "true"
+}
+
 func (m *Manager) ModInfo(id string) (name, version string, clientOnly bool) {
 	dir := m.findModDir(id)
 	if dir == "" {
@@ -750,16 +841,7 @@ func (m *Manager) ModInfo(id string) (name, version string, clientOnly bool) {
 		return id, "", false
 	}
 
-	name = extractModInfoName(string(data))
-	// mod 作者常在名字里放自己图标字体的私用区字形（如 U+F000A），
-	// 任何系统字体都没有，界面上是豆腐块——剥掉
-	name = textutil.Clean(name)
-	if name == "" {
-		// modinfo 里确实没写名字（或写法太怪解析不出），
-		// 退回模组 ID，至少保证列表里能对上号
-		name = id
-	}
-	return name, extractModInfoVersion(string(data)), extractModInfoLiteral(string(data), "client_only_mod") == "true"
+	return parseModInfoSummary(id, string(data))
 }
 
 var modInfoTokenRe = regexp.MustCompile(`(?s)--\[=*\[.*?\]=*\]|--[^\r\n]*|\[=*\[.*?\]=*\]|"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[A-Za-z_][A-Za-z_0-9]*|[0-9]+(?:\.[0-9]+)?|\S`)

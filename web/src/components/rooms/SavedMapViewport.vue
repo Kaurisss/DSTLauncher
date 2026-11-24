@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
+import { mapApi } from '@/lib/api.js';
 import { landmarkCoordinates, landmarkStyle } from '@/lib/mapLandmarks.js';
 
 const props = defineProps({
@@ -21,6 +22,8 @@ const view = computed(() => ({ x: center.value.x - props.map.width / props.zoom 
 const selected = computed(() => props.map.landmarks.find(point => point.id === props.selectedId));
 const paired = computed(() => selected.value?.target ? props.map.landmarks.find(point => point.id === selected.value.target) : null);
 const markers = computed(() => props.map.landmarks.filter(point => point.x >= view.value.x && point.x <= view.value.x + view.value.width && point.y >= view.value.y && point.y <= view.value.y + view.value.height));
+const iconKinds = computed(() => new Set(props.map.icons || []));
+const hasGameIcon = kind => iconKinds.value.has(kind);
 
 // As in DMP's map renderer, choose labels in screen space and keep them apart.
 // Important landmarks remain named at fit zoom; selection always takes priority.
@@ -33,11 +36,12 @@ const labels = computed(() => {
     const x = (point.x - view.value.x) * scale.value + (viewportSize.value.width - view.value.width * scale.value) / 2;
     const y = point.y * scale.value;
     const width = point.name.length * 12;
-    const left = x + 24 + width > viewportSize.value.width;
-    const box = { x: left ? x - 24 - width : x + 16, y: y - 10, right: left ? x - 16 : x + 24 + width, bottom: y + 10 };
+    const offset = hasGameIcon(point.kind) ? 18 : 16;
+    const left = x + offset + 8 + width > viewportSize.value.width;
+    const box = { x: left ? x - offset - 8 - width : x + offset, y: y - 10, right: left ? x - offset : x + offset + 8 + width, bottom: y + 10 };
     if (point.id !== props.selectedId && boxes.some(other => box.x < other.right && box.right > other.x && box.y < other.bottom && box.bottom > other.y)) continue;
     boxes.push(box);
-    visible.set(point.id, { x: left ? -16 : 16, anchor: left ? 'end' : 'start' });
+    visible.set(point.id, { x: left ? -offset : offset, anchor: left ? 'end' : 'start' });
   }
   return visible;
 });
@@ -98,16 +102,23 @@ function keydown(event) {
 </script>
 
 <template>
-  <div ref="viewport" class="map-viewport min-h-0 min-w-0 overflow-hidden" tabindex="0" role="region" aria-label="存档地形地图" @keydown="keydown">
+  <div ref="viewport" class="map-viewport min-h-0 min-w-0 overflow-hidden" :data-textured="map.textured ? 'true' : 'false'" tabindex="0" role="region" aria-label="存档地形地图" @keydown="keydown">
     <svg ref="svg" class="block size-full cursor-grab touch-none select-none data-[dragging=true]:cursor-grabbing" :data-dragging="dragging" :viewBox="`${view.x} ${view.y} ${view.width} ${view.height}`" role="group" aria-label="地图地形与地标" @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="up" @lostpointercapture="up" @wheel.prevent="wheel">
-      <image :href="map.terrainImage" :width="map.width" :height="map.height" style="image-rendering: pixelated" role="img" aria-label="地形底图" />
+      <image :href="map.terrainImage" :width="map.width" :height="map.height" :style="map.textured ? undefined : { imageRendering: 'pixelated' }" role="img" aria-label="地形底图" />
       <line v-if="showLandmarks && selected && paired" :x1="selected.x" :y1="selected.y" :x2="paired.x" :y2="paired.y" stroke="#fff4cd" :stroke-width="2 / scale" :stroke-dasharray="`${5 / scale} ${4 / scale}`" aria-label="虫洞连接" />
       <g v-if="showLandmarks">
         <g v-for="point in markers" :key="point.id" :transform="`translate(${point.x} ${point.y}) scale(${1 / scale})`" class="map-marker cursor-pointer" data-landmark tabindex="0" role="button" :aria-label="`${point.name}（${landmarkCoordinates(point, map)}）`" :aria-pressed="point.id === selectedId" @click.stop="emit('select', point.id)" @keydown.enter.stop.prevent="emit('select', point.id)" @keydown.space.stop.prevent="emit('select', point.id)">
           <title>{{ point.name }}（{{ landmarkCoordinates(point, map) }}）</title>
-          <circle v-if="point.id === selectedId || point.id === paired?.id" r="15" fill="none" stroke="#fff4cd" stroke-width="2" />
-          <circle class="marker-frame" r="11" :fill="landmarkStyle(point.kind).color" stroke="#f5f1e8" stroke-width="1.5" />
-          <component :is="landmarkStyle(point.kind).icon" x="-8" y="-8" :width="16" :height="16" weight="bold" color="#ffffff" aria-hidden="true" />
+          <template v-if="hasGameIcon(point.kind)">
+            <circle v-if="point.id === selectedId || point.id === paired?.id" r="18" fill="rgba(255, 244, 205, 0.16)" stroke="#fff4cd" stroke-width="2" />
+            <circle class="marker-frame" r="16" fill="transparent" stroke="transparent" stroke-width="2" />
+            <image :href="mapApi.iconUrl(point.kind)" x="-15" y="-15" width="30" height="30" preserveAspectRatio="xMidYMid meet" class="map-game-icon" aria-hidden="true" />
+          </template>
+          <template v-else>
+            <circle v-if="point.id === selectedId || point.id === paired?.id" r="15" fill="none" stroke="#fff4cd" stroke-width="2" />
+            <circle class="marker-frame" r="11" :fill="landmarkStyle(point.kind).color" stroke="#f5f1e8" stroke-width="1.5" />
+            <component :is="landmarkStyle(point.kind).icon" x="-8" y="-8" :width="16" :height="16" weight="bold" color="#ffffff" aria-hidden="true" />
+          </template>
           <text v-if="labels.has(point.id)" :x="labels.get(point.id).x" :text-anchor="labels.get(point.id).anchor" y="4" font-size="12" font-weight="600" fill="#ffffff" stroke="#18232c" stroke-width="3" paint-order="stroke" stroke-linejoin="round">{{ point.name }}</text>
         </g>
       </g>
@@ -117,6 +128,8 @@ function keydown(event) {
 
 <style scoped>
 .map-viewport { background: #152632; }
+.map-viewport[data-textured="true"] { background: #16181d; }
 .map-marker:focus-visible { outline: none; }
 .map-marker:focus-visible .marker-frame { stroke: #fff4cd; stroke-width: 4; }
+.map-game-icon { filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.72)); }
 </style>

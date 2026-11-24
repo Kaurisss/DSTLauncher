@@ -57,11 +57,25 @@ type SavedMap struct {
 	Regions   []MapRegion   `json:"regions"`
 	Landmarks []MapLandmark `json:"landmarks"`
 	Terrain   *MapTerrain   `json:"terrain,omitempty"`
+	Textures  []string      `json:"textures,omitempty"`
+	Icons     []string      `json:"icons,omitempty"`
 }
 
 var mapLandmarks = map[string]string{
-	"multiplayer_portal": "绚丽之门", "multiplayer_portal_moonrock": "天体传送门", "pigking": "猪王", "resurrectionstone": "试金石", "wormhole": "虫洞", "cave_entrance": "洞穴入口", "cave_entrance_open": "洞穴入口", "cave_exit": "洞穴出口", "atrium_gate": "远古大门", "ancient_altar": "远古伪科学站", "ancient_altar_broken": "损坏的远古伪科学站", "archive_switch": "远古档案馆",
-	"moonbase": "月台", "oasislake": "绿洲", "beequeenhivegrown": "蜂后巢", "hermithouse": "隐士之家", "monkeyisland_portal": "月亮码头传送门", "terrarium": "泰拉瑞亚", "multiplayer_portal_moonrock_constr": "天体传送门",
+	// 森林与洞穴（原版）
+	"multiplayer_portal": "绚丽之门", "multiplayer_portal_moonrock": "天体传送门", "multiplayer_portal_moonrock_constr": "天体传送门",
+	"pigking": "猪王", "resurrectionstone": "试金石", "wormhole": "虫洞",
+	"cave_entrance": "洞穴入口", "cave_entrance_open": "洞穴入口", "cave_exit": "洞穴出口",
+	"atrium_gate": "远古大门", "ancient_altar": "远古伪科学站", "ancient_altar_broken": "损坏的远古伪科学站", "archive_switch": "远古档案馆",
+	"moonbase": "月台", "oasislake": "绿洲", "beequeenhivegrown": "蜂后巢", "hermithouse": "隐士之家",
+	"monkeyisland_portal": "月亮码头传送门", "terrarium": "泰拉瑞亚",
+	// 海难与火山（Island Adventures）
+	"volcano": "火山入口", "volcano_exit": "火山出口", "volcano_altar": "火山祭坛", "obsidian_workbench": "黑曜石工作台",
+	"octopusking": "章鱼王", "slotmachine": "老虎机", "sharkittenspawner": "虎鲨巢穴", "bermudatriangle": "百慕大三角",
+	"seaworthy": "海之传送门", "skyworthy": "天空传送门", "packim_fishbone": "帕克鱼骨", "coral_brain_rock": "智慧树",
+	"tar_pool": "焦油坑", "critterlab_water": "水上岩穴", "doydoy": "渡渡鸟", "doydoynest": "渡渡鸟巢",
+	"woodlegs_cage": "木腿笼子", "kraken": "海妖", "buriedtreasure": "藏宝点", "mermhouse_fisher": "渔夫鱼人房",
+	"daywalker_pillar_tropical": "噩梦疯猪柱",
 }
 
 // ReadSavedMap only examines direct numeric world files, never player subdirectories.
@@ -365,7 +379,7 @@ func parseSavedMap(text string) (*SavedMap, error) {
 					return nil, err
 				}
 				landmark := MapLandmark{MapPoint: p, ID: fmt.Sprintf("%s:%d", group.name, index), Kind: group.name, Name: name}
-				if group.name == "wormhole" {
+				if group.name == "wormhole" || group.name == "bermudatriangle" {
 					if id := mapField(entity.value.table, "id"); id.kind == 'n' {
 						n, err := mapNumber(id)
 						if err != nil {
@@ -397,9 +411,14 @@ func parseSavedMap(text string) (*SavedMap, error) {
 }
 
 func pairMapWormholes(landmarks []MapLandmark) {
+	pairLinkedLandmarks(landmarks, "wormhole", "虫洞")
+	pairLinkedLandmarks(landmarks, "bermudatriangle", "百慕大三角")
+}
+
+func pairLinkedLandmarks(landmarks []MapLandmark, kind, label string) {
 	indices := map[int64]int{}
 	for i, point := range landmarks {
-		if point.Kind == "wormhole" && point.recordID != 0 {
+		if point.Kind == kind && point.recordID != 0 {
 			indices[point.recordID] = i
 		}
 	}
@@ -416,7 +435,7 @@ func pairMapWormholes(landmarks []MapLandmark) {
 			continue
 		}
 		pair++
-		name := fmt.Sprintf("虫洞 %d", pair)
+		name := fmt.Sprintf("%s %d", label, pair)
 		landmarks[i].Target, landmarks[other].Target = landmarks[other].ID, landmarks[i].ID
 		landmarks[i].Name, landmarks[other].Name = name, name
 	}

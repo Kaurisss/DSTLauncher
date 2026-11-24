@@ -107,6 +107,18 @@ async function openPanel({ tab = 'overview', width = 1280, stopped = false, dark
       if (state.delayChat) await state.delayChat.promise;
       if (state.chatError) return fail('聊天日志暂不可读');
       const filtered = rows.filter(row => !removed.includes(row.id) && (kind === 'all' || kind === row.kind) && (!search || `${row.name} ${row.userid} ${row.message}`.includes(search)));
+      if (url.searchParams.get('stream') === '1') {
+        const entries = filtered.slice((page - 1) * limit, page * limit);
+        return route.fulfill({
+          contentType: 'application/x-ndjson',
+          body: [
+            JSON.stringify({ type: 'meta', exists: true, truncated: false, modified: '2026-02-03T04:05:06Z', total: filtered.length, page, pageSize: limit, count: entries.length }),
+            ...entries.map(entry => JSON.stringify({ type: 'entry', entry })),
+            JSON.stringify({ type: 'done', total: filtered.length }),
+            '',
+          ].join('\n'),
+        });
+      }
       return ok({ entries: filtered.slice((page - 1) * limit, page * limit), total: filtered.length, page, pageSize: limit, exists: true, truncated: false, modified: '2026-02-03T04:05:06Z' });
     }
     return ok([]);

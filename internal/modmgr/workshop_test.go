@@ -46,3 +46,32 @@ func TestSteamWorkshopReadAndMissingMods(t *testing.T) {
 		t.Fatalf("残缺下载应仍报缺失: %v, %v", missing, err)
 	}
 }
+
+func TestInstalledModDirsUsesCandidatePriorityAndRequiresModInfo(t *testing.T) {
+	root := t.TempDir()
+	modsDir := filepath.Join(root, "game", "mods")
+	manager := NewManager(filepath.Join(root, "cluster"), filepath.Join(root, "game"), "", []string{"Master"})
+
+	for _, name := range []string{"workshop-123", "workshop_123", "workshop-456"} {
+		if err := os.MkdirAll(filepath.Join(modsDir, name), 0755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(modsDir, "workshop-123", "modinfo.lua"), []byte("name='hyphen'"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(modsDir, "workshop_123", "modinfo.lua"), []byte("name='underscore'"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	installed, err := manager.InstalledModDirs()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := installed["workshop-123"], filepath.Join(modsDir, "workshop-123"); got != want {
+		t.Fatalf("短横线目录应优先于下划线目录: got %q want %q", got, want)
+	}
+	if _, ok := installed["workshop-456"]; ok {
+		t.Fatal("缺少 modinfo.lua 的目录不应被视为已安装")
+	}
+}

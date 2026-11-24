@@ -7,9 +7,10 @@ import (
 	"image/color"
 )
 
+// DecodeTEX 解码 Klei KTEX 纹理为标准 NRGBA 图像。
 // KTEX 的文件头与 mipmap 布局：https://github.com/oblivioncth/Stexatlaser#klei-tex-format
 // shortcut: 支持 PC 的 DXT1/3/5、RGB(A)；需要移动端 ETC 图标时再扩展。
-func decodeTEX(data []byte) (*image.NRGBA, error) {
+func DecodeTEX(data []byte) (*image.NRGBA, error) {
 	if len(data) < 18 || string(data[:4]) != "KTEX" {
 		return nil, fmt.Errorf("无效的 KTEX 文件")
 	}

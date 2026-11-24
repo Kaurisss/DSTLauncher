@@ -52,6 +52,8 @@ const frozen = computed(() => rooms.starting || rooms.current?.running
 
 const mods = ref([]);
 const loading = ref(false);
+const streaming = ref(false);
+const expectedTotal = ref(0);
 const loadError = ref('');
 const workshopDetails = ref({});
 const workshopError = ref('');
@@ -59,6 +61,11 @@ const pendingDetails = new Set();
 const search = ref('');
 const filter = ref('all');
 const enabledCount = computed(() => mods.value.filter(mod => mod.enabled).length);
+const tailSkeletonCount = computed(() => {
+  if (!streaming.value || !mods.value.length) return 0;
+  const remaining = expectedTotal.value - mods.value.length;
+  return remaining > 0 ? Math.min(3, remaining) : 1;
+});
 const visibleMods = computed(() => {
   const query = search.value.trim().toLowerCase();
   return displayMods.value.filter(mod => {
@@ -71,6 +78,28 @@ const visibleMods = computed(() => {
   });
 });
 let loadRequest = 0;
+let loadController = null;
+let workshopBatch = [];
+let workshopBatchTimer = null;
+
+function flushWorkshopBatch() {
+  clearTimeout(workshopBatchTimer);
+  workshopBatchTimer = null;
+  if (!workshopBatch.length) return;
+  const batch = workshopBatch;
+  workshopBatch = [];
+  loadWorkshopDetails(batch);
+}
+
+function queueWorkshopCheck(mod) {
+  if (!mod || (mod.iconUrl && mod.name && mod.name !== mod.id)) return;
+  workshopBatch.push(mod);
+  if (workshopBatch.length >= 12) {
+    flushWorkshopBatch();
+  } else if (!workshopBatchTimer) {
+    workshopBatchTimer = setTimeout(flushWorkshopBatch, 60);
+  }
+}
 
 const hasCJK = s => /[\u4e00-\u9fff]/.test(s || '');
 
@@ -112,24 +141,73 @@ const missingCount = computed(() =>
 
 async function load() {
   const request = ++loadRequest;
+  loadController?.abort();
+  loadController = null;
+  clearTimeout(workshopBatchTimer);
+  workshopBatchTimer = null;
+  workshopBatch = [];
+
   const room = rooms.current;
   const target = shard.value;
   if (!room || !target) {
     mods.value = [];
+    loading.value = false;
+    streaming.value = false;
+    expectedTotal.value = 0;
     loadError.value = '';
     return;
   }
+
+  const controller = new AbortController();
+  loadController = controller;
+  const progressive = mods.value.length === 0;
+  const buffered = [];
+  const isCurrent = () => !disposed && request === loadRequest && shard.value === target && rooms.currentId === room.id;
+
   loading.value = true;
+  streaming.value = progressive;
+  if (progressive) expectedTotal.value = 0;
   loadError.value = '';
+
+  let completed = false;
   try {
-    const list = (await modApi.list(room.id, target)) || [];
-    if (disposed || request !== loadRequest || shard.value !== target || rooms.currentId !== room.id) return;
-    mods.value = list;
-    loadWorkshopDetails(list.filter(mod => !mod.iconUrl || !mod.name || mod.name === mod.id));
+    await modApi.listStream(room.id, target, {
+      signal: controller.signal,
+      onMeta(total) {
+        if (!isCurrent()) return;
+        if (progressive) expectedTotal.value = total;
+      },
+      onMod(mod) {
+        if (!isCurrent()) return;
+        if (progressive) {
+          mods.value.push(mod);
+          queueWorkshopCheck(mod);
+        } else {
+          buffered.push(mod);
+        }
+      },
+      onDone() {
+        if (!isCurrent()) return;
+        if (progressive) {
+          flushWorkshopBatch();
+        } else {
+          mods.value = buffered;
+          loadWorkshopDetails(buffered.filter(mod => !mod.iconUrl || !mod.name || mod.name === mod.id));
+        }
+      },
+    });
+    completed = true;
   } catch (err) {
-    if (!disposed && request === loadRequest) loadError.value = err.message;
+    if (err?.name !== 'AbortError' && !disposed && request === loadRequest) {
+      loadError.value = err.message;
+    }
   } finally {
-    if (request === loadRequest) loading.value = false;
+    if (loadController === controller) loadController = null;
+    if (request === loadRequest) {
+      if (completed) flushWorkshopBatch();
+      loading.value = false;
+      streaming.value = false;
+    }
   }
 }
 
@@ -370,6 +448,8 @@ onMounted(async () => {
 });
 onUnmounted(() => {
   disposed = true;
+  loadController?.abort();
+  clearTimeout(workshopBatchTimer);
   stopPoll();
 });
 // 用 current 而不是 currentId 做触发：刷新页面时 currentId 从 localStorage
@@ -500,7 +580,7 @@ watch([() => rooms.current, shard], () => {
               {{ workshopError }}。当前显示本地名称或 ID，可点击「刷新」重试。
             </AlertDescription>
           </Alert>
-          <template v-if="visibleMods.length">
+          <template v-if="visibleMods.length || tailSkeletonCount">
             <ModItem
               v-for="m in visibleMods"
               :key="`${shard}:${m.id}`"
@@ -516,6 +596,22 @@ watch([() => rooms.current, shard], () => {
               @config-open="configOpen = $event"
               @busy="setItemBusy(m.id, $event)"
             />
+            <div v-if="tailSkeletonCount" role="status" aria-label="继续加载模组">
+              <div v-for="i in tailSkeletonCount" :key="`stream-sk-${i}`" class="mod flex flex-wrap items-center gap-4">
+                <div class="flex min-w-0 flex-1 items-center gap-3.5">
+                  <Skeleton class="size-14 shrink-0 rounded-lg" />
+                  <div class="grid min-w-0 flex-1 gap-2">
+                    <Skeleton class="h-4 w-44" />
+                    <Skeleton class="h-3.5 w-32" />
+                  </div>
+                </div>
+                <div class="ml-auto flex items-center gap-2">
+                  <Skeleton class="h-5 w-16 rounded-full" />
+                  <Skeleton class="size-7 rounded-md" />
+                  <Skeleton class="size-7 rounded-md" />
+                </div>
+              </div>
+            </div>
           </template>
           <div v-else class="grid justify-items-center gap-3 rounded-lg border border-dashed p-10">
             <UiEmpty :text="mods.length ? '没有匹配的模组' : '还没有模组'" />

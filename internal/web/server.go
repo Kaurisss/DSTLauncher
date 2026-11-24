@@ -2,6 +2,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -83,6 +84,12 @@ type Server struct {
 	notificationErr error
 	migrations      *migrationJobs
 	mapMu           sync.Mutex
+	mapTexMu        sync.RWMutex
+	mapTexCache     map[string][]byte
+	mapIconMu       sync.Mutex
+	mapIconCache    map[string][]byte
+	mapIconIdxKey   string
+	mapIconIdx      map[string]resolvedMapIcon
 	backupMu        sync.Mutex
 	backupRemote    *backupremote.Engine
 	backupRemoteErr error
@@ -158,6 +165,8 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/api/migration/job", s.handleMigrationJob)
 	mux.HandleFunc("/api/migration/download", s.handleMigrationDownload)
 	mux.HandleFunc("/api/map", s.handleMap)
+	mux.HandleFunc("/api/map/texture", s.handleMapTexture)
+	mux.HandleFunc("/api/map/icon", s.handleMapIcon)
 	mux.HandleFunc("/api/profiles/import", s.handleProfileImport)
 	mux.HandleFunc("/api/profiles/apply", s.handleProfileApply)
 	mux.HandleFunc("/api/diagnostics", s.handleDiagnostics)
@@ -1128,6 +1137,12 @@ func (s *Server) syncModsSetup() {
 	}
 }
 
+type modStreamEvent struct {
+	Type  string      `json:"type"`
+	Total int         `json:"total,omitempty"`
+	Mod   *modmgr.Mod `json:"mod,omitempty"`
+}
+
 func (s *Server) handleMods(w http.ResponseWriter, r *http.Request) {
 	rm, err := s.roomByID(r)
 	if err != nil {
@@ -1141,7 +1156,7 @@ func (s *Server) handleMods(w http.ResponseWriter, r *http.Request) {
 	}
 	mods := s.modsFor(rm, shard)
 
-	installed, err := mods.InstalledMods()
+	installedDirs, err := mods.InstalledModDirs()
 	if err != nil {
 		respond(w, 200, nil, err)
 		return
@@ -1152,44 +1167,158 @@ func (s *Server) handleMods(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	list := make([]*modmgr.Mod, 0)
-	seen := make(map[string]bool)
-	add := func(id string) {
-		if seen[id] {
-			return
-		}
-		seen[id] = true
-		name, version, clientOnly := mods.ModInfo(id)
-		if clientOnly {
-			return
-		}
-		iconURL := ""
-		if installed[id] {
-			if version := mods.ModIconVersion(id); version != "" {
-				iconURL = "/api/mods/icon?" + url.Values{"room": {strconv.Itoa(rm.ID)}, "id": {id}, "v": {version}}.Encode()
-			}
-		}
-		list = append(list, &modmgr.Mod{
-			ID:        id,
-			Name:      name,
-			Version:   version,
-			IconURL:   iconURL,
-			Enabled:   o.Enabled[id],
-			Installed: installed[id],
-			Config:    o.Config[id],
-			Priority:  o.Priority[id],
-		})
-	}
+	candidates := make([]string, 0, len(o.Order)+len(installedDirs))
+	seen := make(map[string]bool, len(o.Order)+len(installedDirs))
 	// overrides 中的顺序即用户期望的加载顺序
 	for _, id := range o.Order {
-		add(id)
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		candidates = append(candidates, id)
 	}
-	// 已下载但未在 overrides 中出现的模组也列出来
-	for id := range installed {
-		add(id)
+	// 已下载但未在 overrides 中出现的模组按 ID 排序追加，保持列表稳定
+	extra := make([]string, 0, len(installedDirs))
+	for id := range installedDirs {
+		if !seen[id] {
+			seen[id] = true
+			extra = append(extra, id)
+		}
+	}
+	sort.Strings(extra)
+	candidates = append(candidates, extra...)
+
+	inspect := func(id string) *modmgr.Mod {
+		dir, isInstalled := installedDirs[id]
+		summary := mods.InspectMod(id, dir)
+		if summary.ClientOnly {
+			return nil
+		}
+		iconURL := ""
+		if isInstalled && summary.IconVersion != "" {
+			iconURL = "/api/mods/icon?" + url.Values{"room": {strconv.Itoa(rm.ID)}, "id": {id}, "v": {summary.IconVersion}}.Encode()
+		}
+		return &modmgr.Mod{
+			ID:        id,
+			Name:      summary.Name,
+			Version:   summary.Version,
+			IconURL:   iconURL,
+			Enabled:   o.Enabled[id],
+			Installed: isInstalled,
+			Config:    o.Config[id],
+			Priority:  o.Priority[id],
+		}
 	}
 
-	respond(w, 200, list, nil)
+	streaming := r.URL.Query().Get("stream") == "1" || strings.Contains(r.Header.Get("Accept"), "application/x-ndjson")
+	ctx := r.Context()
+
+	type inspectedItem struct {
+		index int
+		mod   *modmgr.Mod
+	}
+
+	runOrdered := func(onMod func(*modmgr.Mod) bool) {
+		n := len(candidates)
+		if n == 0 {
+			return
+		}
+		wctx, cancel := context.WithCancel(ctx)
+		defer cancel()
+		workers := min(8, n)
+		jobs := make(chan int)
+		results := make(chan inspectedItem, workers*2)
+
+		var wg sync.WaitGroup
+		for range workers {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+				for idx := range jobs {
+					if wctx.Err() != nil {
+						return
+					}
+					item := inspectedItem{index: idx, mod: inspect(candidates[idx])}
+					select {
+					case results <- item:
+					case <-wctx.Done():
+						return
+					}
+				}
+			}()
+		}
+
+		go func() {
+			defer close(jobs)
+			for i := range candidates {
+				select {
+				case jobs <- i:
+				case <-wctx.Done():
+					return
+				}
+			}
+		}()
+
+		go func() {
+			wg.Wait()
+			close(results)
+		}()
+
+		ready := make(map[int]*modmgr.Mod)
+		next := 0
+		for res := range results {
+			ready[res.index] = res.mod
+			for {
+				mod, ok := ready[next]
+				if !ok {
+					break
+				}
+				delete(ready, next)
+				next++
+				if mod != nil && !onMod(mod) {
+					return
+				}
+			}
+		}
+	}
+
+	if !streaming {
+		list := make([]*modmgr.Mod, 0, len(candidates))
+		runOrdered(func(mod *modmgr.Mod) bool {
+			list = append(list, mod)
+			return true
+		})
+		respond(w, 200, list, nil)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-cache")
+	w.Header().Set("X-Accel-Buffering", "no")
+	flusher, _ := w.(http.Flusher)
+	enc := json.NewEncoder(w)
+	writeEvent := func(ev modStreamEvent, flush bool) bool {
+		if ctx.Err() != nil {
+			return false
+		}
+		if err := enc.Encode(ev); err != nil {
+			return false
+		}
+		if flush && flusher != nil {
+			flusher.Flush()
+		}
+		return true
+	}
+
+	if !writeEvent(modStreamEvent{Type: "meta", Total: len(candidates)}, true) {
+		return
+	}
+	emitted := 0
+	runOrdered(func(mod *modmgr.Mod) bool {
+		emitted++
+		return writeEvent(modStreamEvent{Type: "mod", Mod: mod}, true)
+	})
+	writeEvent(modStreamEvent{Type: "done", Total: emitted}, true)
 }
 
 func (s *Server) handleModToggle(w http.ResponseWriter, r *http.Request) {

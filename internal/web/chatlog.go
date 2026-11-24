@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 
 	"dst-windows/internal/chatlog"
@@ -105,5 +106,69 @@ func (s *Server) handleChatLog(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	result, err := s.playerLogs.Query(clusterDir, shard, q)
-	respond(w, 200, result, err)
+	if err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
+	wantStream := query(r, "stream") == "1" || strings.Contains(strings.ToLower(r.Header.Get("Accept")), "application/x-ndjson")
+	if !wantStream {
+		respond(w, 200, result, nil)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/x-ndjson; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("X-Accel-Buffering", "no")
+	w.WriteHeader(http.StatusOK)
+
+	flusher, _ := w.(http.Flusher)
+	enc := json.NewEncoder(w)
+	meta := chatLogStreamEvent{
+		Type:      "meta",
+		Exists:    result.Exists,
+		Truncated: result.Truncated,
+		Total:     result.Total,
+		Page:      result.Page,
+		PageSize:  result.PageSize,
+		Count:     len(result.Entries),
+	}
+	if !result.Modified.IsZero() {
+		modified := result.Modified
+		meta.Modified = &modified
+	}
+	if err := enc.Encode(meta); err != nil {
+		return
+	}
+	if flusher != nil {
+		flusher.Flush()
+	}
+	for i := range result.Entries {
+		if r.Context().Err() != nil {
+			return
+		}
+		entry := result.Entries[i]
+		if err := enc.Encode(chatLogStreamEvent{Type: "entry", Entry: &entry}); err != nil {
+			return
+		}
+		if flusher != nil {
+			flusher.Flush()
+		}
+	}
+	_ = enc.Encode(chatLogStreamEvent{Type: "done", Total: result.Total})
+	if flusher != nil {
+		flusher.Flush()
+	}
+}
+
+type chatLogStreamEvent struct {
+	Type      string         `json:"type"`
+	Exists    bool           `json:"exists,omitempty"`
+	Truncated bool           `json:"truncated,omitempty"`
+	Modified  *time.Time     `json:"modified,omitempty"`
+	Total     int            `json:"total,omitempty"`
+	Page      int            `json:"page,omitempty"`
+	PageSize  int            `json:"pageSize,omitempty"`
+	Count     int            `json:"count,omitempty"`
+	Entry     *chatlog.Entry `json:"entry,omitempty"`
+	Message   string         `json:"message,omitempty"`
 }

@@ -28,6 +28,7 @@ const selectedId = ref('');
 const search = ref('');
 const room = computed(() => rooms.list.find(item => String(item.id) === roomId.value));
 const landmarks = computed(() => (data.value?.landmarks || []).filter(point => `${point.name} ${point.kind}`.toLowerCase().includes(search.value.trim().toLowerCase())));
+const iconKinds = computed(() => new Set(data.value?.icons || []));
 let revision = 0;
 
 watch(open, value => {
@@ -51,7 +52,8 @@ async function refresh() {
   loading.value = true;
   try {
     const result = await mapApi.get(Number(roomId.value), shard.value);
-    if (current === revision) data.value = decodeTerrain(result);
+    const decoded = await decodeTerrain(result);
+    if (current === revision) data.value = decoded;
   } catch (err) { if (current === revision) error.value = err.message; }
   finally { if (current === revision) loading.value = false; }
 }
@@ -100,7 +102,8 @@ function selectLandmark(id) { selectedId.value = id; showLandmarks.value = true;
           <ul class="grid min-h-0 content-start gap-1 overflow-y-auto" aria-label="地图地标清单">
             <li v-for="point in landmarks" :key="point.id">
               <Button :variant="selectedId === point.id ? 'secondary' : 'ghost'" class="h-auto w-full justify-start gap-3 px-2 py-2" :aria-label="`定位${point.name}（${landmarkCoordinates(point, data)}）`" :aria-pressed="selectedId === point.id" @click="selectLandmark(point.id)">
-                <component :is="landmarkStyle(point.kind).icon" data-icon="inline-start" :style="{ color: landmarkStyle(point.kind).color }" weight="bold" />
+                <img v-if="iconKinds.has(point.kind)" :src="mapApi.iconUrl(point.kind)" alt="" aria-hidden="true" width="24" height="24" class="size-6 shrink-0 object-contain" />
+                <component :is="landmarkStyle(point.kind).icon" v-else data-icon="inline-start" :style="{ color: landmarkStyle(point.kind).color }" weight="bold" />
                 <span class="grid min-w-0 gap-0.5 text-left"><span class="truncate">{{ point.name }}</span><span class="text-xs font-normal text-muted-foreground tabular-nums">{{ landmarkCoordinates(point, data) }}</span></span>
               </Button>
             </li>

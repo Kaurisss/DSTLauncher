@@ -61,3 +61,25 @@ func TestDecodeTilesRejectsUnknownVersionsLengthsAndIDs(t *testing.T) {
 		}
 	}
 }
+
+func TestShipwreckedAndVolcanoLandmarksAndBermudaPairing(t *testing.T) {
+	text := `return {map={width=2,height=2,tiles="TILES",world_tile_map={BEACH=90}},ents={volcano={{x=0,z=0}},octopusking={{x=4,z=0}},volcano_altar={{x=0,z=4}},obsidian_workbench={{x=4,z=4}},bermudatriangle={{id=501,x=0,z=0,data={teleporter={target=502}}},{id=502,x=4,z=4,data={teleporter={target=501}}}}}}`
+	text = strings.Replace(text, "TILES", tileStream(90, 90, 90, 90), 1)
+	m, err := parseSavedMap(text)
+	if err != nil {
+		t.Fatal(err)
+	}
+	byKind := map[string][]MapLandmark{}
+	for _, lm := range m.Landmarks {
+		byKind[lm.Kind] = append(byKind[lm.Kind], lm)
+	}
+	for _, want := range []string{"volcano", "octopusking", "volcano_altar", "obsidian_workbench", "bermudatriangle"} {
+		if len(byKind[want]) == 0 {
+			t.Fatalf("missing landmark %q in %+v", want, m.Landmarks)
+		}
+	}
+	pair := byKind["bermudatriangle"]
+	if len(pair) != 2 || pair[0].Target != pair[1].ID || pair[1].Target != pair[0].ID || pair[0].Name != "百慕大三角 1" {
+		t.Fatalf("bermudatriangle did not pair properly: %+v", pair)
+	}
+}

@@ -74,29 +74,35 @@ func (h *History) Query(clusterDir, shard string, q Query) (Result, error) {
 	if err != nil {
 		return result, err
 	}
-	matched := make([]Entry, 0)
+	page := q.Page
+	if page == 0 {
+		page = 1
+	}
+	outOfRange := page-1 > len(s.Entries)/q.Limit
+	from, to := 0, 0
+	if !outOfRange {
+		from = (page - 1) * q.Limit
+		to = from + q.Limit
+	}
+	total := 0
 	needle := strings.ToLower(strings.TrimSpace(q.Search))
 	for i := len(s.Entries) - 1; i >= 0; i-- {
 		e := s.Entries[i].Entry
 		if q.Kind != "all" && e.Kind != q.Kind {
 			continue
 		}
-		text := strings.Join([]string{e.Name, e.UserID, e.SteamID, e.IP, e.Prefab, e.Message, e.Time}, " ")
-		if needle == "" || strings.Contains(strings.ToLower(text), needle) {
-			matched = append(matched, e)
+		if needle != "" {
+			text := strings.Join([]string{e.Name, e.UserID, e.SteamID, e.IP, e.Prefab, e.Message, e.Time}, " ")
+			if !strings.Contains(strings.ToLower(text), needle) {
+				continue
+			}
 		}
+		if !outOfRange && total >= from && total < to {
+			result.Entries = append(result.Entries, e)
+		}
+		total++
 	}
-	page := q.Page
-	if page == 0 {
-		page = 1
-	}
-	from := len(matched)
-	if page-1 <= len(matched)/q.Limit {
-		from = (page - 1) * q.Limit
-	}
-	to := min(from+q.Limit, len(matched))
-	result.Entries = append(result.Entries, matched[from:to]...)
-	result.Total, result.Page, result.PageSize = len(matched), page, q.Limit
+	result.Total, result.Page, result.PageSize = total, page, q.Limit
 	result.Exists = s.Chat.Offset > 0 || len(s.Entries) > 0
 	// A new empty chat file is different from a missing one.
 	if !result.Exists {
@@ -104,7 +110,7 @@ func (h *History) Query(clusterDir, shard string, q Query) (Result, error) {
 		result.Exists = statErr == nil
 	}
 	result.Modified = s.Modified
-	result.Truncated = q.Page == 0 && len(matched) > q.Limit
+	result.Truncated = q.Page == 0 && total > q.Limit
 	return result, nil
 }
 

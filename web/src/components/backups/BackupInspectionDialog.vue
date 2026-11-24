@@ -52,7 +52,11 @@ async function poll() {
 async function loadMap() {
   const revision = ++mapRevision;
   map.value = null; mapError.value = ''; mapBusy.value = true; zoom.value = 1; selectedId.value = '';
-  try { const data = await backupApi.checkMap(id, shard.value); if (!disposed && revision === mapRevision) map.value = decodeTerrain(data); }
+  try {
+    const data = await backupApi.checkMap(id, shard.value);
+    const decoded = await decodeTerrain(data);
+    if (!disposed && revision === mapRevision) map.value = decoded;
+  }
   catch (err) { if (!disposed && revision === mapRevision) mapError.value = err.message; }
   finally { if (!disposed && revision === mapRevision) mapBusy.value = false; }
 }

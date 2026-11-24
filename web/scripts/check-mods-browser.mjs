@@ -99,6 +99,17 @@ async function openMods({
       const delay = state.shardDelays[shard] || state.listDelay;
       await waitForMods;
       await delay;
+      if (url.searchParams.get('stream') === '1') {
+        return route.fulfill({
+          contentType: 'application/x-ndjson',
+          body: [
+            JSON.stringify({ type: 'meta', total: list.length }),
+            ...list.map(mod => JSON.stringify({ type: 'mod', mod })),
+            JSON.stringify({ type: 'done', total: list.length }),
+            '',
+          ].join('\n'),
+        });
+      }
       return ok(list);
     }
     if (url.pathname === '/api/mods/delete') {

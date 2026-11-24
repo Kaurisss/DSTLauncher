@@ -19,6 +19,7 @@ async function openPage(tab, { width = 1280, badCheck = false, running = false }
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(tab => { localStorage.setItem('dst-tab', tab); localStorage.setItem('dst-room', '1'); }, tab);
   const state = { writes: [], errors: [], badCheck, testFailure: '', config: { enabled: true, kind: 'directory', directory: 'D:\\Backups', url: '', username: '', passwordSet: false, keep: 3, results: [{ id: 'old', room: 1, name: archive, state: 'failed', time: '2026-11-07T12:00:00Z', error: 'WebDAV PUT 返回 HTTP 503' }] }, check: null };
+  const fixturePng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAEUlEQVR4nAAEAPv/Aii+RgMAAkYBL+tbOigAAAAASUVORK5CYII=', 'base64');
   page.on('pageerror', error => state.errors.push(error.message));
   const tiles = Buffer.alloc(20 * 20 * 2);
   for (let i = 0; i < 400; i++) tiles.writeUInt16LE(i % 20 < 12 ? 7 : 201, 2 * i);
@@ -45,7 +46,8 @@ async function openPage(tab, { width = 1280, badCheck = false, running = false }
       if (method === 'DELETE') return ok(null);
       return ok(state.check);
     }
-    if (path === '/api/backups/check/map') return ok({ width: 20, height: 20, kind: 'terrain', terrain: { tiles: tiles.toString('base64'), specs: [{ id: 7, name: 'GRASS' }, { id: 201, name: 'OCEAN_COASTAL' }] }, landmarks: [{ id: 'pigking:0', name: '猪王', kind: 'pigking', x: 8, y: 10 }] });
+    if (path === '/api/map/texture' || path === '/api/map/icon') return route.fulfill({ contentType: 'image/png', body: fixturePng });
+    if (path === '/api/backups/check/map') return ok({ width: 20, height: 20, kind: 'terrain', terrain: { tiles: tiles.toString('base64'), specs: [{ id: 7, name: 'GRASS' }, { id: 201, name: 'OCEAN_COASTAL' }] }, textures: ['GRASS'], icons: ['pigking'], landmarks: [{ id: 'pigking:0', name: '猪王', kind: 'pigking', x: 8, y: 10 }] });
     if (path === '/api/backups/restore') { state.check = { ...state.check, state: 'restored', previousDirectory: 'isolated/Cluster_1.before-restore' }; return ok({ id: 'check' }); }
     if (path === '/api/automation') return ok({ config: { backupHours: 0, keep: 10, restartAt: '', updateMinutes: 0, updateMode: 'notify' }, jobs: {} });
     if (path === '/api/host') return ok({ memory: { totalBytes: 16e9, availableBytes: 12e9 }, disk: { totalBytes: 100e9, availableBytes: 80e9 } });
