@@ -65,7 +65,7 @@ function selectLandmark(id) { selectedId.value = id; showLandmarks.value = true;
     <DialogContent class="flex max-h-[94dvh] flex-col overflow-y-auto sm:max-w-6xl">
       <DialogHeader class="shrink-0">
         <DialogTitle>存档地图预览</DialogTitle>
-        <DialogDescription>最近保存点的地形与地标。选择地标可定位，滚轮缩放，拖动地图平移。</DialogDescription>
+        <DialogDescription>最近保存点的地形与地标。</DialogDescription>
       </DialogHeader>
       <FieldGroup class="grid shrink-0 grid-cols-2 gap-3">
         <Field>

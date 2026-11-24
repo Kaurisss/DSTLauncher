@@ -120,10 +120,10 @@ function exportSave(name) {
     <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="备份列表">
       <p v-if="remoteError" role="alert" class="mb-3 text-sm text-destructive">{{ remoteError }}</p>
       <UiLoading v-if="!rooms.loaded" />
-      <UiEmpty v-else-if="!rooms.current" icon="archive" text="请先在「房间」页新建一个房间" />
+      <UiEmpty v-else-if="!rooms.current" text="请先在「房间」页新建一个房间" />
       <UiLoading v-else-if="loading && !items.length" />
-      <UiEmpty v-else-if="loadError" icon="alert" :text="'读取备份失败：' + loadError" />
-      <UiEmpty v-else-if="!items.length" icon="archive" text="暂无备份" />
+      <UiEmpty v-else-if="loadError" :text="'读取备份失败：' + loadError" />
+      <UiEmpty v-else-if="!items.length" text="暂无备份" />
       <BackupTable v-else :items="items" :sync-enabled="!!remote?.enabled" :sync-results="(remote?.results || []).filter(item => item.room === rooms.currentId)" @restore="restore" @remove="remove" @export="exportSave" @sync="sync" />
     </div>
     <BackupInspectionDialog v-if="inspection" :room="inspection.room" :name="inspection.name" @close="inspection = null" @restored="load" />

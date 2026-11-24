@@ -22,7 +22,7 @@ watch([() => rooms.currentId, () => rooms.shards.join(',')], ([roomId], [previou
 <template>
   <section class="min-w-0" aria-label="实时日志">
     <h2 class="sr-only">实时日志</h2>
-    <UiEmpty v-if="!rooms.shards.length" icon="inbox" text="还没有可用的房间。先在「房间」页新建一个，再回来看日志。" />
+    <UiEmpty v-if="!rooms.shards.length" text="还没有可用的房间。先在「房间」页新建一个，再回来看日志。" />
     <TabsRoot v-else v-model="active" class="min-w-0">
       <CodeBlock size="sm">
         <CodeBlockHeader class="flex-wrap border-b border-border px-4 py-3">

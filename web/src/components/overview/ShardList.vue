@@ -110,7 +110,7 @@ async function refreshSnapshots(id, requestGeneration) {
 </script>
 
 <template>
-  <UiEmpty v-if="!rooms.current" icon="server" text="请先在「房间」页新建一个房间" />
+  <UiEmpty v-if="!rooms.current" text="请先在「房间」页新建一个房间" />
 
   <section v-else aria-label="分片状态" class="divide-y divide-border">
     <div v-for="s in rows" :key="s.shard" class="shard-row" :aria-label="label(s)">

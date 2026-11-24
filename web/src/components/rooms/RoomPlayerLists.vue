@@ -152,7 +152,7 @@ async function change(id, remove = false) {
             <IconAction variant="outline" icon="trash" :label="`从${selected.title}移除 ${who(id)}`" :disabled="busy" @click="change(id, true)" />
           </li>
         </ul>
-        <UiEmpty v-else icon="users" :text="ids.length ? '没有匹配的玩家' : `暂无${selected.title}玩家`" />
+        <UiEmpty v-else :text="ids.length ? '没有匹配的玩家' : `暂无${selected.title}玩家`" />
       </template>
     </section>
   </UiCard>

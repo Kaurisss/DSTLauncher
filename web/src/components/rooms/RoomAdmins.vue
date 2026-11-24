@@ -130,7 +130,7 @@ async function remove(id) {
 
     <p v-if="file" class="path-line" style="margin-bottom: 12px">{{ file }}</p>
 
-    <UiEmpty v-if="!room" icon="users" text="请先在「房间」页新建一个房间" />
+    <UiEmpty v-if="!room" text="请先在「房间」页新建一个房间" />
     <p v-else-if="loadError" class="field-tip">读取失败：{{ loadError }}</p>
 
     <template v-else>
@@ -170,7 +170,7 @@ async function remove(id) {
           <IconAction variant="destructive" icon="trash" :label="`移除管理员 ${who(id)}`" :disabled="busy" @click="remove(id)" />
         </div>
       </div>
-      <UiEmpty v-else icon="users" text="暂无管理员。房主（服务器持有者）默认就是管理员" />
+      <UiEmpty v-else text="暂无管理员。房主（服务器持有者）默认就是管理员" />
     </template>
   </UiCard>
 </template>

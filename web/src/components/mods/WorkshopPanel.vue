@@ -91,7 +91,7 @@ async function query(nextPage) {
         <form v-if="showKeyForm" class="mb-4 grid gap-2 rounded-lg border bg-muted/30 p-3" @submit.prevent="saveKey">
           <Label for="workshop-api-key">Steam Web API Key</Label>
           <div class="flex gap-2">
-            <Input id="workshop-api-key" v-model="apiKeyInput" type="password" autocomplete="off" class="min-w-0 flex-1" placeholder="输入新的 API Key，留空可清除" />
+            <Input id="workshop-api-key" v-model="apiKeyInput" type="password" autocomplete="off" class="min-w-0 flex-1" placeholder="留空保存可清除" />
             <IconAction variant="outline" type="submit" icon="save" :label="savingKey ? '保存中…' : '保存'" :disabled="savingKey" />
           </div>
           <p v-if="keyError" role="alert" class="text-sm text-destructive">{{ keyError }}</p>
@@ -125,7 +125,6 @@ async function query(nextPage) {
           </article>
         </div>
         <div v-else-if="searched && !error" class="py-10 text-center text-sm text-muted-foreground">没有查到结果</div>
-        <div v-else-if="!error" class="grid justify-items-center gap-3 py-10 text-muted-foreground" aria-hidden="true"><Icon name="package" :size="32" /></div>
         <nav v-if="searched && !idQuery && !error && (page > 1 || results.length === 20)" aria-label="工坊分页" class="mt-4 flex items-center justify-end gap-2">
           <span class="mr-2 text-sm text-muted-foreground">第 {{ page }} 页</span>
           <IconAction variant="outline" icon="chevron" icon-class="rotate-180" label="上一页" :disabled="searching || page === 1" @click="query(page - 1)" />

@@ -221,7 +221,7 @@ async function save() {
             <Input id="f_name" v-model="form.name" type="text" placeholder="显示在服务器列表里的名字" />
           </UiField>
           <UiField label="描述" for-id="f_description" block class="min-w-0 md:col-span-5">
-            <Input id="f_description" v-model="form.description" type="text" placeholder="一句话介绍" />
+            <Input id="f_description" v-model="form.description" type="text" />
           </UiField>
           <UiField label="房间密码" for-id="f_password" block class="min-w-0 md:col-span-3">
             <Input id="f_password" v-model="form.password" type="text" placeholder="留空表示无密码" />

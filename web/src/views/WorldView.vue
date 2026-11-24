@@ -582,7 +582,7 @@ onMounted(() => selectShard(rooms.shards[0]));
 
       <TabsContent ref="content" :value="shard" class="min-h-0 flex-1 overflow-hidden outline-none" aria-label="世界配置列表">
         <div v-if="!rooms.loaded || (loading && !view)" class="p-4"><UiLoading /></div>
-        <UiEmpty v-else-if="!rooms.current" icon="globe" text="请先在「房间」页新建一个房间" />
+        <UiEmpty v-else-if="!rooms.current" text="请先在「房间」页新建一个房间" />
         <p v-else-if="loadError" role="alert" class="p-4 text-sm text-destructive">读取失败：{{ loadError }}</p>
         <div v-else-if="view" data-slot="page-scroll" class="flex h-full min-h-0 flex-col overflow-hidden">
           <div v-if="frozen || (!enabled && !levelDataInUse) || presetMismatch" class="world-notices shrink-0">
@@ -609,7 +609,7 @@ onMounted(() => selectShard(rooms.shards[0]));
               </button>
             </nav>
             <div class="world-group-content" data-slot="world-options-scroll" tabindex="0" role="region" aria-label="世界配置选项">
-              <UiEmpty v-if="!selectedGroup" icon="inbox" :text="onlyChanged ? '没有匹配的已改动选项' : '没有匹配的选项'" />
+              <UiEmpty v-if="!selectedGroup" :text="onlyChanged ? '没有匹配的已改动选项' : '没有匹配的选项'" />
               <OptionGroupPanel
                 v-else
                 id="world-active-group"

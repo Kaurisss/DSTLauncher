@@ -129,7 +129,6 @@ async function saveApiKey() {
               v-model="currentPwd"
               type="password"
               autocomplete="current-password"
-              placeholder="输入当前密码"
             />
           </UiField>
           <UiField :label="auth.enabled ? '新密码' : '访问密码'" for-id="set-new-pwd" block>

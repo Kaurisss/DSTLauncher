@@ -4,7 +4,6 @@
 import { computed } from 'vue';
 
 import UiPill from '@/components/ui/UiPill.vue';
-import Icon from '@/components/ui/Icon.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import { GAME_MODE_LABEL, roomShardLabel } from '@/lib/format.js';
 
@@ -52,7 +51,7 @@ function ports(s) {
         </div>
       </div>
       <span v-if="selected" class="room-selection">
-        <Icon name="check" size="14" />当前房间
+        当前房间
       </span>
     </div>
 
@@ -60,12 +59,12 @@ function ports(s) {
 
     <div class="room-summary">
       <span class="room-run" :class="{ 'is-on': running }">
-        <Icon :name="running ? 'play' : 'stop'" size="13" />{{ running ? '运行中' : '已停止' }}
+        {{ running ? '运行中' : '已停止' }}
       </span>
       <span>{{ modeLabel }}</span>
       <span v-if="enabledCount <= 1">仅一个世界</span>
       <UiPill v-if="room.needToken" tone="warn">
-        <Icon name="key" size="12" />缺令牌
+        缺令牌
       </UiPill>
     </div>
 

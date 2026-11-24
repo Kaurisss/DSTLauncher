@@ -168,13 +168,15 @@ onUnmounted(() => {
           <h1 class="text-base font-semibold leading-tight">DST 开服控制台</h1>
         </div>
       </div>
-      <Input
-        v-model="loginPwd"
-        type="password"
-        autocomplete="current-password"
-        placeholder="面板访问密码"
-        aria-label="面板访问密码"
-      />
+      <div class="grid gap-1.5">
+        <label for="login-password" class="text-xs font-medium text-muted-foreground">面板访问密码</label>
+        <Input
+          id="login-password"
+          v-model="loginPwd"
+          type="password"
+          autocomplete="current-password"
+        />
+      </div>
       <p v-if="loginWait" role="status" class="text-xs text-destructive">密码错误次数过多，请 {{ loginWait }} 秒后再试</p>
       <p v-else-if="loginError" role="alert" class="text-xs text-destructive">{{ loginError }}</p>
       <Button type="submit" :disabled="loggingIn || !loginPwd || loginWait > 0">

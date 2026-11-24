@@ -230,9 +230,9 @@ async function blockPlayer(entry) {
     <div data-slot="page-scroll" class="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="玩家日志列表">
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">读取失败：{{ error }}</p>
       <UiLoading v-else-if="loading && !result" />
-      <UiEmpty v-else-if="!rooms.current" icon="users" text="请先选择房间" />
-      <UiEmpty v-else-if="!result?.exists" icon="inbox" text="该分片还没有聊天日志，开服并产生聊天或进出记录后显示" />
-      <UiEmpty v-else-if="!entries.length" icon="inbox" text="历史日志中没有匹配的记录" />
+      <UiEmpty v-else-if="!rooms.current" text="请先选择房间" />
+      <UiEmpty v-else-if="!result?.exists" text="该分片还没有聊天日志，开服并产生聊天或进出记录后显示" />
+      <UiEmpty v-else-if="!entries.length" text="历史日志中没有匹配的记录" />
       <template v-else>
         <div class="min-w-0 overflow-hidden rounded-lg border">
           <Table class="min-w-[1440px] table-fixed" role="region" aria-label="日志表格，可横向滚动" tabindex="0">

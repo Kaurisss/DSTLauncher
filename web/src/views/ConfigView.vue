@@ -87,10 +87,10 @@ watch(() => rooms.current, load);
 
     <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="配置文件列表">
       <UiLoading v-if="!rooms.loaded" />
-      <UiEmpty v-else-if="!rooms.current" icon="fileCode" text="请先在「房间」页新建一个房间" />
+      <UiEmpty v-else-if="!rooms.current" text="请先在「房间」页新建一个房间" />
       <UiLoading v-else-if="loading && !files.length" />
-      <UiEmpty v-else-if="loadError" icon="alert" :text="'读取失败：' + loadError" />
-      <UiEmpty v-else-if="!files.length" icon="fileCode" text="尚未生成配置文件" />
+      <UiEmpty v-else-if="loadError" :text="'读取失败：' + loadError" />
+      <UiEmpty v-else-if="!files.length" text="尚未生成配置文件" />
       <ConfigFiles v-else :files="files" />
     </div>
   </UiCard>

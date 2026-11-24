@@ -443,10 +443,10 @@ watch([() => rooms.current, shard], () => {
 
       <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="模组列表">
         <UiLoading v-if="!rooms.loaded" />
-        <UiEmpty v-else-if="!rooms.current" icon="package" text="请先在「房间」页新建一个房间" />
+        <UiEmpty v-else-if="!rooms.current" text="请先在「房间」页新建一个房间" />
         <!-- 刷新保留列表，避免拆掉创意工坊窗口和更新进度。 -->
         <UiLoading v-else-if="loading && !mods.length" />
-        <UiEmpty v-else-if="loadError" icon="alert" :text="'读取模组失败：' + loadError" />
+        <UiEmpty v-else-if="loadError" :text="'读取模组失败：' + loadError" />
 
         <template v-else>
           <div v-if="frozen" class="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm" role="status">
@@ -467,7 +467,7 @@ watch([() => rooms.current, shard], () => {
           <p
             v-if="checkResult && (checkResult.missing || []).length"
             class="field-tip"
-            style="margin-bottom: 14px"
+            style="margin-bottom: 16px"
           >
             工坊查不到以下模组（可能已下架或 ID 有误）：{{ (checkResult.missing || []).join('、') }}
           </p>
@@ -505,7 +505,7 @@ watch([() => rooms.current, shard], () => {
             />
           </template>
           <div v-else class="grid justify-items-center gap-3 rounded-lg border border-dashed p-10">
-            <UiEmpty icon="package" :text="mods.length ? '没有匹配的模组' : '还没有模组'" />
+            <UiEmpty :text="mods.length ? '没有匹配的模组' : '还没有模组'" />
             <IconAction v-if="mods.length" variant="outline" icon="clean" label="清除筛选" @click="search = ''; filter = 'all'" />
             <IconAction v-else icon="plus" label="添加模组" @click="workshopOpen = true" />
           </div>

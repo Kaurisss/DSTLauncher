@@ -265,7 +265,7 @@ async function setExpanded(open) {
 @media (hover: hover) {
   .mod-workshop-link:hover { color: var(--legacy-primary); text-decoration: underline; text-underline-offset: 3px; }
 }
-.mod-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 5px; }
+.mod-status { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .mod-id { overflow-wrap: anywhere; }
 .mod-entry-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .mod-toggle { display: inline-flex; align-items: center; min-height: 28px; gap: 8px; margin-right: 8px; font-size: 13px; font-weight: 500; cursor: pointer; }

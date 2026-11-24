@@ -82,13 +82,12 @@ async function submit() {
         </DialogDescription>
       </DialogHeader>
       <form class="grid gap-4" @submit.prevent="submit">
-        <UiField label="公告内容" for-id="announce-message" block tip="最多 500 字，按 Ctrl+Enter 或点击发送将广播给所有在线玩家。">
+        <UiField label="公告内容" for-id="announce-message" block tip="最多 500 字，按 Ctrl+Enter 发送。">
           <Textarea
             id="announce-message"
             v-model="message"
             class="min-h-24 w-full resize-y"
             aria-label="全服公告"
-            placeholder="输入全服公告内容（最多 500 字）"
             maxlength="500"
             :disabled="busy"
             @keydown.ctrl.enter="submit"

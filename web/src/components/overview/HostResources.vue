@@ -61,7 +61,6 @@ onUnmounted(() => {
         label="宿主机内存"
         :value="memory ? ((memoryUsed / memory.totalBytes) * 100).toFixed(1) + '%' : '—'"
         :sub="memory ? '已用 ' + fmtSize(memoryUsed) + ' / ' + fmtSize(memory.totalBytes) : (errors.length ? '读取失败' : '读取中…')"
-        icon="memory"
         :tone="memoryLow ? 'warn' : ''"
       >
         <Progress v-if="memory" class="mt-2 h-1" :model-value="memoryUsed / memory.totalBytes * 100" aria-label="宿主机内存使用率" />
@@ -73,7 +72,6 @@ onUnmounted(() => {
             :value="disk ? (((disk.totalBytes - disk.availableBytes) / disk.totalBytes) * 100).toFixed(1) + '%' : '—'"
             :sub="disk ? '可用 ' + fmtSize(disk.availableBytes) + ' / 总容量 ' + fmtSize(disk.totalBytes) : (errors.length ? '读取失败' : '读取中…')"
             :tabindex="snapshot?.diskPath ? 0 : undefined"
-            icon="folder"
             :tone="diskLow ? 'warn' : ''"
           >
             <Progress v-if="disk" class="mt-2 h-1" :model-value="(disk.totalBytes - disk.availableBytes) / disk.totalBytes * 100" aria-label="存档盘已用空间" />

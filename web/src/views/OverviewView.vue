@@ -108,14 +108,12 @@ async function runQuick(action) {
         label="运行分片"
         :value="`${shardRunning} / ${shardTotal}`"
         :sub="shardSub"
-        icon="server"
         :tone="shardTone"
       />
       <UiStat
         label="进程资源占用"
         :value="resValue"
         :sub="resSub"
-        icon="cpu"
         :tone="resTone"
       />
     </HostResources>
