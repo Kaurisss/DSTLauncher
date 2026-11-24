@@ -4,6 +4,7 @@ import UiCard from '@/components/ui/UiCard.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Checkbox } from '@/components/ui/checkbox';
 import { notificationApi } from '@/lib/api.js';
@@ -86,7 +87,20 @@ async function test() {
         <p class="text-sm text-muted-foreground">向接收端发送 JSON。测试使用已保存的设置；签名接入方式见项目说明。</p>
       </FieldGroup>
     </form>
-    <p v-else-if="!error" role="status" class="text-sm text-muted-foreground">正在读取通知设置…</p>
+    <div v-else-if="!error" role="status" aria-label="正在读取通知设置" class="grid gap-4">
+      <div class="flex items-center justify-between gap-4">
+        <Skeleton class="h-4 w-20" />
+        <Skeleton class="h-5 w-9 rounded-full" />
+      </div>
+      <div v-for="i in 2" :key="i" class="grid gap-2">
+        <Skeleton class="h-4 w-24" />
+        <Skeleton class="h-9 w-full" />
+      </div>
+      <div class="grid gap-2 pt-1">
+        <Skeleton class="h-4 w-20" />
+        <Skeleton v-for="i in 4" :key="i" class="h-4 w-40" />
+      </div>
+    </div>
     <section v-if="snapshot?.results.length" class="mt-4 border-t pt-4" aria-label="最近通知结果">
       <h3 class="mb-3 text-sm font-medium">最近投递结果</h3>
       <ul class="grid gap-3">

@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import IconAction from '@/components/ui/IconAction.vue';
-import UiLoading from '@/components/ui/UiLoading.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import SavedMapViewport from '@/components/rooms/SavedMapViewport.vue';
 import { decodeTerrain } from '@/lib/mapTerrain.js';
 import { landmarkStyle, landmarkCoordinates } from '@/lib/mapLandmarks.js';
@@ -86,7 +86,13 @@ function selectLandmark(id) { selectedId.value = id; showLandmarks.value = true;
         <time v-if="data" class="ml-auto text-xs text-muted-foreground">保存于 {{ fmtTime(data.savedAt) }}</time>
       </div>
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">{{ error }}</p>
-      <UiLoading v-else-if="loading" aria-label="正在读取世界保存点" />
+      <div v-else-if="loading" role="status" aria-label="正在读取世界保存点" class="grid h-[min(58dvh,36rem)] min-h-[27rem] shrink-0 grid-rows-[minmax(15rem,1fr)_12rem] overflow-hidden rounded-md border md:min-h-[24rem] md:grid-cols-[minmax(0,1fr)_15rem] md:grid-rows-1">
+        <Skeleton class="size-full rounded-none" />
+        <div class="flex min-h-0 flex-col gap-2 border-t p-3 md:border-t-0 md:border-l">
+          <Skeleton class="h-9 w-full shrink-0 rounded-md" />
+          <Skeleton v-for="i in 5" :key="i" class="h-10 w-full rounded-md" />
+        </div>
+      </div>
       <div v-else-if="data" class="grid h-[min(58dvh,36rem)] min-h-[27rem] shrink-0 grid-rows-[minmax(15rem,1fr)_12rem] overflow-hidden rounded-md border md:min-h-[24rem] md:grid-cols-[minmax(0,1fr)_15rem] md:grid-rows-1">
         <SavedMapViewport v-model:zoom="zoom" :map="data" :selected-id="selectedId" :show-landmarks="showLandmarks" @select="selectLandmark" />
         <aside class="flex min-h-0 flex-col gap-2 border-t p-3 md:border-t-0 md:border-l" aria-label="地标定位">

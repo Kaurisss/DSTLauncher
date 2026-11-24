@@ -4,7 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import IconAction from '@/components/ui/IconAction.vue';
-import UiLoading from '@/components/ui/UiLoading.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import { migrationApi } from '@/lib/api.js';
 import { fmtSize, fmtTime } from '@/lib/format.js';
 import { confirmAction } from '@/lib/confirm.js';
@@ -94,9 +94,12 @@ async function reset() {
       <p v-if="!allStopped" role="status" class="text-sm text-muted-foreground">仍有房间运行，请先停止。</p>
       <p v-if="error || job?.error" role="alert" class="break-words text-sm text-destructive">{{ error || job.error }}</p>
       <div v-if="working" class="grid gap-3" role="status">
-        <UiLoading />
         <p class="text-sm">{{ stage }}</p>
         <p v-if="job?.total" class="text-sm text-muted-foreground tabular-nums">{{ job.done }} / {{ job.total }}</p>
+        <div class="grid gap-2">
+          <Skeleton class="h-4 w-48" />
+          <Skeleton class="h-4 w-36" />
+        </div>
       </div>
       <template v-if="job?.preview">
         <div class="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">

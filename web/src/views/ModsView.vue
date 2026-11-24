@@ -17,7 +17,7 @@ import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiPill from '@/components/ui/UiPill.vue';
-import UiLoading from '@/components/ui/UiLoading.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import UiToolbarFilters from '@/components/ui/UiToolbarFilters.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -442,10 +442,23 @@ watch([() => rooms.current, shard], () => {
       </div>
 
       <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="模组列表">
-        <UiLoading v-if="!rooms.loaded" />
+        <div v-if="!rooms.loaded || (loading && !mods.length)" role="status" aria-label="加载中">
+          <div v-for="i in 4" :key="i" class="mod flex flex-wrap items-center gap-4">
+            <div class="flex min-w-0 flex-1 items-center gap-3.5">
+              <Skeleton class="size-14 shrink-0 rounded-lg" />
+              <div class="grid min-w-0 flex-1 gap-2">
+                <Skeleton class="h-4 w-44" />
+                <Skeleton class="h-3.5 w-32" />
+              </div>
+            </div>
+            <div class="ml-auto flex items-center gap-2">
+              <Skeleton class="h-5 w-16 rounded-full" />
+              <Skeleton class="size-7 rounded-md" />
+              <Skeleton class="size-7 rounded-md" />
+            </div>
+          </div>
+        </div>
         <UiEmpty v-else-if="!rooms.current" text="请先在「房间」页新建一个房间" />
-        <!-- 刷新保留列表，避免拆掉创意工坊窗口和更新进度。 -->
-        <UiLoading v-else-if="loading && !mods.length" />
         <UiEmpty v-else-if="loadError" :text="'读取模组失败：' + loadError" />
 
         <template v-else>

@@ -5,6 +5,7 @@ import UiEmpty from '@/components/ui/UiEmpty.vue';
 import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { playerListApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
 import { lookupPlayer, playerOptionLabel, unseenPlayers } from '@/lib/format.js';
@@ -126,7 +127,16 @@ async function change(id, remove = false) {
     <section :aria-label="selected.title" class="min-w-0 space-y-3">
       <p class="text-sm text-muted-foreground">{{ selected.hint }}</p>
       <p v-if="file" class="break-all font-mono text-xs text-muted-foreground">{{ file }}</p>
-      <p v-if="loading" role="status" class="text-sm text-muted-foreground">读取名单中…</p>
+      <div v-if="loading" role="status" aria-label="读取名单中" class="grid gap-2">
+        <div v-for="i in 2" :key="i" class="flex items-center gap-2 rounded-md border px-3 py-2">
+          <Skeleton class="size-8 shrink-0 rounded-md" />
+          <div class="grid flex-1 gap-1.5">
+            <Skeleton class="h-4 w-32" />
+            <Skeleton class="h-3 w-40" />
+          </div>
+          <Skeleton class="size-7 shrink-0 rounded-md" />
+        </div>
+      </div>
       <p v-else-if="error" role="alert" class="text-sm text-destructive">读取失败：{{ error }}，请刷新重试。</p>
       <template v-else>
         <p v-if="kind === 'whitelist'" class="text-sm">预留 {{ slots }} / {{ room.maxPlayers }} 个位置，最多预留最大人数对应的位置。</p>

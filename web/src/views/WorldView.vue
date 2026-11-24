@@ -13,7 +13,7 @@ import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiField from '@/components/ui/UiField.vue';
-import UiLoading from '@/components/ui/UiLoading.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
@@ -581,7 +581,25 @@ onMounted(() => selectShard(rooms.shards[0]));
       </div>
 
       <TabsContent ref="content" :value="shard" class="min-h-0 flex-1 overflow-hidden outline-none" aria-label="世界配置列表">
-        <div v-if="!rooms.loaded || (loading && !view)" class="p-4"><UiLoading /></div>
+        <div v-if="!rooms.loaded || (loading && !view)" role="status" aria-label="加载中" class="world-workspace pt-4">
+          <div class="world-group-nav">
+            <Skeleton v-for="i in 6" :key="i" class="h-8 w-full rounded-md" />
+          </div>
+          <div class="world-group-content">
+            <div class="opt-group-head">
+              <Skeleton class="h-5 w-24" />
+            </div>
+            <div class="opt-group-body">
+              <div v-for="i in 8" :key="i" class="opt-row">
+                <Skeleton class="size-14 shrink-0 rounded-md" />
+                <div class="grid min-w-0 flex-1 gap-1.5">
+                  <Skeleton class="h-4 w-20" />
+                  <Skeleton class="h-4 w-16" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
         <UiEmpty v-else-if="!rooms.current" text="请先在「房间」页新建一个房间" />
         <p v-else-if="loadError" role="alert" class="p-4 text-sm text-destructive">读取失败：{{ loadError }}</p>
         <div v-else-if="view" data-slot="page-scroll" class="flex h-full min-h-0 flex-col overflow-hidden">

@@ -8,7 +8,7 @@ import UiToolbar from '@/components/ui/UiToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
-import UiLoading from '@/components/ui/UiLoading.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import IconAction from '@/components/ui/IconAction.vue';
 import BackupTable from '@/components/backups/BackupTable.vue';
 import MigrationDialog from '@/components/backups/MigrationDialog.vue';
@@ -119,9 +119,21 @@ function exportSave(name) {
 
     <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="备份列表">
       <p v-if="remoteError" role="alert" class="mb-3 text-sm text-destructive">{{ remoteError }}</p>
-      <UiLoading v-if="!rooms.loaded" />
+      <div v-if="!rooms.loaded || (loading && !items.length)" role="status" aria-label="加载中" class="min-w-0 overflow-hidden rounded-md border">
+        <div class="flex items-center justify-between gap-4 border-b bg-muted/40 px-4 py-3">
+          <Skeleton class="h-3.5 w-12" />
+          <Skeleton class="h-3.5 w-12" />
+          <Skeleton class="h-3.5 w-12" />
+        </div>
+        <div v-for="i in 4" :key="i" class="flex items-center justify-between gap-4 border-b px-4 py-3 last:border-b-0">
+          <Skeleton class="h-4 w-40" />
+          <Skeleton class="h-4 w-16" />
+          <div class="flex gap-2">
+            <Skeleton v-for="j in 3" :key="j" class="size-7 rounded-md" />
+          </div>
+        </div>
+      </div>
       <UiEmpty v-else-if="!rooms.current" text="请先在「房间」页新建一个房间" />
-      <UiLoading v-else-if="loading && !items.length" />
       <UiEmpty v-else-if="loadError" :text="'读取备份失败：' + loadError" />
       <UiEmpty v-else-if="!items.length" text="暂无备份" />
       <BackupTable v-else :items="items" :sync-enabled="!!remote?.enabled" :sync-results="(remote?.results || []).filter(item => item.room === rooms.currentId)" @restore="restore" @remove="remove" @export="exportSave" @sync="sync" />

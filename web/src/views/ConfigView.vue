@@ -19,7 +19,7 @@ import UiCard from '@/components/ui/UiCard.vue';
 import UiToolbar from '@/components/ui/UiToolbar.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
-import UiLoading from '@/components/ui/UiLoading.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import IconAction from '@/components/ui/IconAction.vue';
 import ConfigFiles from '@/components/config/ConfigFiles.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -86,9 +86,24 @@ watch(() => rooms.current, load);
     </UiToolbar>
 
     <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="配置文件列表">
-      <UiLoading v-if="!rooms.loaded" />
+      <div v-if="!rooms.loaded || (loading && !files.length)" role="status" aria-label="加载中" class="grid min-w-0 gap-4">
+        <div v-for="i in 2" :key="i" class="overflow-hidden rounded-xl border">
+          <div class="flex items-center justify-between gap-2 border-b bg-muted/40 px-4 py-2.5">
+            <div class="flex items-center gap-2">
+              <Skeleton class="h-4 w-44" />
+              <Skeleton class="h-5 w-14 rounded-full" />
+            </div>
+            <Skeleton class="size-7 rounded-md" />
+          </div>
+          <div class="grid gap-2 p-4">
+            <Skeleton class="h-3.5 w-3/4" />
+            <Skeleton class="h-3.5 w-1/2" />
+            <Skeleton class="h-3.5 w-5/6" />
+            <Skeleton class="h-3.5 w-2/3" />
+          </div>
+        </div>
+      </div>
       <UiEmpty v-else-if="!rooms.current" text="请先在「房间」页新建一个房间" />
-      <UiLoading v-else-if="loading && !files.length" />
       <UiEmpty v-else-if="loadError" :text="'读取失败：' + loadError" />
       <UiEmpty v-else-if="!files.length" text="尚未生成配置文件" />
       <ConfigFiles v-else :files="files" />

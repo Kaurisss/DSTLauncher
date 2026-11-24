@@ -5,6 +5,7 @@ import UiField from '@/components/ui/UiField.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { automationApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
@@ -90,7 +91,20 @@ function date(value) {
         </UiField>
       </fieldset>
     </form>
-    <p v-else-if="!error" role="status">读取计划中…</p>
+    <div v-else-if="!error" role="status" aria-label="读取计划中" class="grid gap-4">
+      <div class="grid gap-4 sm:grid-cols-2">
+        <div v-for="i in 5" :key="i" class="grid gap-2">
+          <Skeleton class="h-4 w-36" />
+          <Skeleton class="h-9 w-full" />
+        </div>
+      </div>
+      <div class="mt-2 grid gap-3">
+        <div v-for="i in 3" :key="i" class="flex justify-between gap-2 border-t pt-3">
+          <Skeleton class="h-4 w-20" />
+          <Skeleton class="h-4 w-32" />
+        </div>
+      </div>
+    </div>
     <div v-if="snapshot" class="mt-4 grid gap-3 text-sm" aria-label="维护执行状态">
       <p v-if="snapshot.running" role="status">正在执行：{{ jobs[snapshot.running] }}</p>
       <div v-for="(label, key) in jobs" :key="key" class="grid gap-1 border-t pt-3">

@@ -6,7 +6,7 @@
 
 import { computed, onMounted, reactive, ref } from 'vue';
 
-import UiLoading from '@/components/ui/UiLoading.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import {
@@ -127,7 +127,12 @@ async function save() {
 <template>
   <form class="flex min-h-0 flex-1 flex-col" @submit.prevent="save">
     <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-6">
-      <UiLoading v-if="loading" />
+      <div v-if="loading" role="status" aria-label="加载中" class="grid gap-3">
+        <div v-for="i in 5" :key="i" class="opt mb-0">
+          <Skeleton class="ml-auto h-4 w-28 max-w-full" />
+          <Skeleton class="h-9 w-full" />
+        </div>
+      </div>
 
       <p v-else-if="loadError" class="text-sm text-destructive" role="alert">读取配置项失败：{{ loadError }}</p>
 

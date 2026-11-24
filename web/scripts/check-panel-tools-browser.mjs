@@ -546,7 +546,7 @@ test('删除等待期间禁用操作，切房间或筛选不携带选择且迟�
   } finally { await close(); }
 });
 
-test('玩家日志首次和筛选加载用 Spinner，刷新时保留已有记录', async () => {
+test('玩家日志首次和筛选加载用骨架屏，刷新时保留已有记录', async () => {
   const { page, state, close } = await openPanel();
   try {
     let pending = state.hold('delayChat');
@@ -554,7 +554,7 @@ test('玩家日志首次和筛选加载用 Spinner，刷新时保留已有记录
     const panel = page.getByRole('region', { name: '聊天与进出记录', exact: true });
     const spinner = panel.getByRole('status', { name: '加载中', exact: true });
     await spinner.waitFor();
-    assert.equal(await spinner.locator('svg').count(), 1);
+    assert.ok(await spinner.locator('[data-slot="skeleton"]').count() > 0);
     assert.equal(await panel.getByText('读取记录中…', { exact: true }).count(), 0);
     state.delayChat = null;
     pending.release();

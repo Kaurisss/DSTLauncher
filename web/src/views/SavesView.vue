@@ -19,7 +19,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
-import UiLoading from '@/components/ui/UiLoading.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import SavedMapDialog from '@/components/rooms/SavedMapDialog.vue';
 import {
   Table, TableBody, TableCaption, TableCell, TableEmpty,
@@ -187,7 +187,18 @@ async function remove(item) {
             </TableHeader>
             <TableBody>
               <TableRow v-if="loading && !items.length">
-                <TableCell :colspan="columns.length"><UiLoading /></TableCell>
+                <TableCell :colspan="columns.length" class="p-0">
+                  <div role="status" aria-label="加载中" class="divide-y divide-border">
+                    <div v-for="i in 4" :key="i" class="flex items-center justify-between gap-4 px-3 py-3">
+                      <Skeleton class="h-4 w-28" />
+                      <Skeleton class="h-4 w-24" />
+                      <Skeleton class="h-4 w-24" />
+                      <Skeleton class="h-4 w-16" />
+                      <Skeleton class="h-4 w-32" />
+                      <Skeleton class="size-7 shrink-0 rounded-md" />
+                    </div>
+                  </div>
+                </TableCell>
               </TableRow>
               <TableEmpty v-else-if="loadError" :colspan="columns.length">
                 <span role="alert" class="text-destructive">读取失败：{{ loadError }}</span>

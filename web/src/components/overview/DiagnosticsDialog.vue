@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import IconAction from '@/components/ui/IconAction.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { diagnosticsApi } from '@/lib/api.js';
@@ -48,7 +49,12 @@ async function refresh() {
         <IconAction icon="refresh" variant="outline" :label="busy ? '诊断中…' : '重新诊断'" :disabled="busy" @click="refresh" />
       </div>
       <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
-      <p v-else-if="busy && !report" role="status" class="text-sm text-muted-foreground">正在读取最近日志…</p>
+      <div v-else-if="busy && !report" role="status" aria-label="正在读取最近日志" class="grid gap-3">
+        <div v-for="i in 3" :key="i" class="grid gap-2 border-t pt-3">
+          <Skeleton class="h-4 w-24" />
+          <Skeleton class="h-14 w-full rounded-lg" />
+        </div>
+      </div>
       <section v-for="group in groups" :key="group.label" class="grid gap-3 border-t pt-3" :aria-label="group.label">
         <h3 class="text-sm font-semibold">{{ group.label }}</h3>
         <p v-if="group.error" role="alert" class="text-sm text-destructive">{{ group.error }}</p>

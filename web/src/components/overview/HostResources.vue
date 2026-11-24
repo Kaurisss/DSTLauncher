@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref } from 'vue';
 
 import UiStat from '@/components/ui/UiStat.vue';
 import { Progress } from '@/components/ui/progress';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { hostApi } from '@/lib/api.js';
 import { fmtSize } from '@/lib/format.js';
@@ -59,21 +60,29 @@ onUnmounted(() => {
       <slot />
       <UiStat
         label="宿主机内存"
+        :loading="!snapshot && !errors.length"
         :value="memory ? ((memoryUsed / memory.totalBytes) * 100).toFixed(1) + '%' : '—'"
-        :sub="memory ? '已用 ' + fmtSize(memoryUsed) + ' / ' + fmtSize(memory.totalBytes) : (errors.length ? '读取失败' : '读取中…')"
+        :sub="memory ? '已用 ' + fmtSize(memoryUsed) + ' / ' + fmtSize(memory.totalBytes) : '读取失败'"
         :tone="memoryLow ? 'warn' : ''"
       >
+        <template #loading>
+          <Skeleton class="mt-2 h-1 w-full rounded-full" />
+        </template>
         <Progress v-if="memory" class="mt-2 h-1" :model-value="memoryUsed / memory.totalBytes * 100" aria-label="宿主机内存使用率" />
       </UiStat>
       <Tooltip :disabled="!snapshot?.diskPath">
         <TooltipTrigger as-child>
           <UiStat
             label="存档盘"
+            :loading="!snapshot && !errors.length"
             :value="disk ? (((disk.totalBytes - disk.availableBytes) / disk.totalBytes) * 100).toFixed(1) + '%' : '—'"
-            :sub="disk ? '可用 ' + fmtSize(disk.availableBytes) + ' / 总容量 ' + fmtSize(disk.totalBytes) : (errors.length ? '读取失败' : '读取中…')"
+            :sub="disk ? '可用 ' + fmtSize(disk.availableBytes) + ' / 总容量 ' + fmtSize(disk.totalBytes) : '读取失败'"
             :tabindex="snapshot?.diskPath ? 0 : undefined"
             :tone="diskLow ? 'warn' : ''"
           >
+            <template #loading>
+              <Skeleton class="mt-2 h-1 w-full rounded-full" />
+            </template>
             <Progress v-if="disk" class="mt-2 h-1" :model-value="(disk.totalBytes - disk.availableBytes) / disk.totalBytes * 100" aria-label="存档盘已用空间" />
           </UiStat>
         </TooltipTrigger>

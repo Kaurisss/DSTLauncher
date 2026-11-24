@@ -59,14 +59,14 @@ async function openPage(tab, { paused = false, width = 1280 } = {}) {
   return { page, state, release };
 }
 
-test('世界、模组、备份、存档与配置初次加载都使用 Spinner 而非骨架', async () => {
+test('世界、模组、备份、存档与配置初次加载都使用骨架屏', async () => {
   for (const tab of Object.keys(resources)) {
     const { page, state, release } = await openPage(tab, { paused: true });
     try {
       const loading = page.getByRole('status', { name: '加载中', exact: true });
       await loading.waitFor();
-      assert.equal(await page.locator('[data-slot="skeleton"], .skeleton, .mod-skeleton').count(), 0, tab);
-      assert.equal(await loading.locator('svg').count(), 1);
+      assert.ok(await loading.locator('[data-slot="skeleton"]').count() > 0, tab);
+      assert.equal(await loading.locator('svg').count(), 0, tab);
       release();
       await loading.waitFor({ state: 'hidden' });
       assert.deepEqual(state.errors, [], tab);

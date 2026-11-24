@@ -1,4 +1,5 @@
 <script setup>
+import { Skeleton } from '@/components/ui/skeleton';
 import { fmtTime } from '@/lib/format.js';
 
 defineProps({
@@ -12,7 +13,10 @@ const seasons = { spring: '春季', summer: '夏季', autumn: '秋季', winter: 
 
 <template>
   <div class="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
-    <p v-if="loading" role="status" class="text-muted-foreground">读取存档中…</p>
+    <div v-if="loading" role="status" aria-label="读取存档中" class="flex h-4 items-center gap-2">
+      <Skeleton class="h-3 w-20" />
+      <Skeleton class="h-3 w-28" />
+    </div>
     <p v-else-if="error || snapshot?.error" role="alert" class="break-words text-destructive">读取失败：{{ error || snapshot.error }}</p>
     <template v-else-if="snapshot?.state">
       <p class="flex flex-wrap items-baseline gap-x-2 gap-y-1">

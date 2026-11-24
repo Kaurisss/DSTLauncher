@@ -6,6 +6,7 @@ import IconAction from '@/components/ui/IconAction.vue';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Skeleton } from '@/components/ui/skeleton';
 import { workshopApi } from '@/lib/api.js';
 import { fmtSize } from '@/lib/format.js';
 
@@ -97,7 +98,17 @@ async function query(nextPage) {
           <p v-if="keyError" role="alert" class="text-sm text-destructive">{{ keyError }}</p>
         </form>
         <p v-if="error" role="alert" class="mb-4 break-words text-sm text-destructive">{{ error }}</p>
-        <div v-if="searching" role="status" class="py-8 text-center text-sm text-muted-foreground">正在查询创意工坊…</div>
+        <div v-if="searching" role="status" aria-label="正在查询创意工坊" class="grid gap-3">
+          <div v-for="i in 3" :key="i" class="flex items-center gap-3 rounded-lg border bg-background p-3">
+            <Skeleton class="size-14 shrink-0 rounded-lg" />
+            <div class="grid min-w-0 flex-1 gap-1.5">
+              <Skeleton class="h-4 w-44" />
+              <Skeleton class="h-3.5 w-full max-w-sm" />
+              <Skeleton class="h-3 w-28" />
+            </div>
+            <Skeleton class="size-7 shrink-0 rounded-md" />
+          </div>
+        </div>
         <div v-else-if="results.length && !error" class="grid gap-3">
           <article v-for="item in results" :key="item.id" class="workshop-item flex min-w-0 items-center gap-3 rounded-lg border bg-background p-3">
             <div class="grid size-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted" aria-hidden="true">

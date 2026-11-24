@@ -8,6 +8,7 @@ import {
 import UiCard from '@/components/ui/UiCard.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { adminApi, playerApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
 import { CHARACTERS, shardLabel } from '@/lib/format.js';
@@ -155,7 +156,9 @@ function preventWhileBusy(event) {
       <p v-else-if="!rooms.statusLoaded" class="text-sm text-muted-foreground">等待分片状态</p>
       <p v-else-if="!canQuery && rooms.statuses.some(status => status.state === 'running')" class="text-sm text-muted-foreground">等待玩家进入世界</p>
       <p v-else-if="!canQuery" class="text-sm text-muted-foreground">{{ rooms.running ? '等待分片启动' : '房间未运行' }}</p>
-      <p v-else-if="loading && !players.length" role="status" class="text-sm text-muted-foreground">正在查询玩家…</p>
+      <div v-else-if="loading && !players.length" role="status" aria-label="正在查询玩家" class="flex h-5 items-center">
+        <Skeleton class="h-3.5 w-28" />
+      </div>
       <p v-else-if="loadError" role="alert" class="break-words text-sm text-destructive">{{ loadError }}</p>
       <p v-else-if="!players.length && !Object.keys(errors).length" class="text-sm text-muted-foreground">
         暂无在线玩家

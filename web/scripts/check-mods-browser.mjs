@@ -468,7 +468,7 @@ test('封面加载失败保留占位图，运行中冻结修改但标题仍可�
   }
 });
 
-test('模组配置等待 schema 时使用 Spinner，完成后恢复表单内容', async () => {
+test('模组配置等待 schema 时使用骨架屏，完成后恢复表单内容', async () => {
   const { page } = await openMods();
   let release;
   const pending = new Promise(resolve => { release = resolve; });
@@ -480,19 +480,19 @@ test('模组配置等待 schema 时使用 Spinner，完成后恢复表单内容'
     await page.locator('.mod').nth(1).getByRole('button', { name: '配置', exact: true }).click();
     const dialog = page.getByRole('dialog');
     await dialog.getByRole('status', { name: '加载中', exact: true }).waitFor();
-    assert.equal(await dialog.locator('[data-slot="skeleton"]').count(), 0);
+    assert.ok(await dialog.locator('[data-slot="skeleton"]').count() > 0);
     release();
     await dialog.getByText('该模组没有可配置项。', { exact: true }).waitFor();
     assert.equal(await dialog.getByRole('status', { name: '加载中', exact: true }).count(), 0);
   } finally { release(); await page.close(); }
 });
 
-test('首次加载使用 Spinner，刷新保留模组列表且不闪回占位', async () => {
+test('首次加载使用骨架屏，刷新保留模组列表且不闪回占位', async () => {
   for (const width of [1280, 390]) {
     const { page, releaseMods, state } = await openMods({ delayMods: true, width });
     let releaseRefresh = () => {};
     try {
-      assert.equal(await page.locator('[data-slot="skeleton"]').count(), 0);
+      assert.ok(await page.locator('[data-slot="skeleton"]').count() > 0);
       releaseMods();
       await waitForTitle(page);
       await page.getByRole('status', { name: '加载中', exact: true }).waitFor({ state: 'hidden' });

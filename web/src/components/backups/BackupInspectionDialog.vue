@@ -5,7 +5,7 @@ import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectVa
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import SavedMapViewport from '@/components/rooms/SavedMapViewport.vue';
-import UiLoading from '@/components/ui/UiLoading.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import { backupApi } from '@/lib/api.js';
 import { decodeTerrain } from '@/lib/mapTerrain.js';
 import { fmtSize, fmtTime } from '@/lib/format.js';
@@ -77,9 +77,20 @@ async function close(value) {
         <DialogDescription>{{ room.name }}，{{ name }}</DialogDescription>
       </DialogHeader>
       <p v-if="error || job?.error" role="alert" class="break-words text-sm text-destructive">{{ error || job.error }}</p>
-      <div v-if="starting || job?.state === 'checking' || restoring" role="status" class="grid gap-2">
-        <UiLoading />
+      <div v-if="starting || job?.state === 'checking' || restoring" role="status" class="grid gap-3">
         <p class="text-sm">{{ restoring ? '正在复核备份并恢复存档…' : '正在校验 ZIP 和各分片存档…' }}<span v-if="job?.total && !restoring" class="ml-2 tabular-nums">{{ job.done }} / {{ job.total }}</span></p>
+        <div class="flex flex-wrap items-center gap-3">
+          <Skeleton class="h-5 w-28 rounded-full" />
+          <Skeleton class="h-4 w-32" />
+          <Skeleton class="h-4 w-16" />
+        </div>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div v-for="i in 2" :key="i" class="grid gap-2 rounded-md border p-3">
+            <Skeleton class="h-4 w-20" />
+            <Skeleton class="h-3.5 w-44" />
+            <Skeleton class="h-3.5 w-28" />
+          </div>
+        </div>
       </div>
       <template v-if="job?.report">
         <div class="flex flex-wrap items-center gap-3 text-sm text-muted-foreground"><Badge :variant="job.report.canRestore ? 'secondary' : 'destructive'">{{ job.report.canRestore ? 'ZIP 完整性检查通过' : '备份内容不完整' }}</Badge><time>{{ fmtTime(job.report.createdAt) }}</time><span>{{ job.report.files }} 个文件</span><span>{{ fmtSize(job.report.bytes) }}</span></div>
@@ -103,7 +114,7 @@ async function close(value) {
             <Button v-if="mapError" size="sm" variant="outline" :disabled="mapBusy" @click="loadMap">重试地图</Button>
           </div>
           <p v-if="mapError" class="text-sm text-muted-foreground">地图预览不可用：{{ mapError }}</p>
-          <UiLoading v-else-if="mapBusy" />
+          <div v-else-if="mapBusy" role="status" aria-label="加载中"><Skeleton class="h-72 w-full rounded-md" /></div>
           <SavedMapViewport v-else-if="map" :key="shard" v-model:zoom="zoom" :map="map" :selected-id="selectedId" class="h-72 shrink-0 rounded-md" @select="selectedId = $event" />
         </template>
       </template>

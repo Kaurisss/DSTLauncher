@@ -3,7 +3,7 @@ import { computed, onUnmounted, ref, watch } from 'vue';
 import { PhCaretLeft, PhCaretRight, PhCopy } from '@phosphor-icons/vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
-import UiLoading from '@/components/ui/UiLoading.vue';
+import { Skeleton } from '@/components/ui/skeleton';
 import UiToolbar from '@/components/ui/UiToolbar.vue';
 import UiToolbarFilters from '@/components/ui/UiToolbarFilters.vue';
 import { Badge } from '@/components/ui/badge';
@@ -229,7 +229,35 @@ async function blockPlayer(entry) {
 
     <div data-slot="page-scroll" class="min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="玩家日志列表">
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">读取失败：{{ error }}</p>
-      <UiLoading v-else-if="loading && !result" />
+      <div v-else-if="loading && !result" role="status" aria-label="加载中" class="space-y-4">
+        <div class="min-w-0 overflow-hidden rounded-lg border">
+          <div class="flex items-center gap-4 border-b bg-muted/50 px-4 py-3">
+            <Skeleton class="size-4 shrink-0" />
+            <Skeleton class="h-3.5 w-20" />
+            <Skeleton class="h-3.5 w-24" />
+            <Skeleton class="h-3.5 w-28" />
+            <Skeleton class="h-3.5 w-16" />
+            <Skeleton class="h-3.5 flex-1" />
+          </div>
+          <div v-for="i in 5" :key="i" class="flex items-center gap-4 border-b px-4 py-3 last:border-b-0">
+            <Skeleton class="size-4 shrink-0" />
+            <Skeleton class="h-4 w-20 shrink-0" />
+            <Skeleton class="h-4 w-24 shrink-0" />
+            <Skeleton class="h-4 w-28 shrink-0" />
+            <Skeleton class="h-5 w-12 shrink-0 rounded-full" />
+            <Skeleton class="h-4 flex-1" />
+          </div>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <Skeleton class="h-4 w-32" />
+          <div class="flex items-center gap-2">
+            <Skeleton class="h-8 w-24 rounded-md" />
+            <Skeleton class="size-7 rounded-md" />
+            <Skeleton class="h-4 w-16" />
+            <Skeleton class="size-7 rounded-md" />
+          </div>
+        </div>
+      </div>
       <UiEmpty v-else-if="!rooms.current" text="请先选择房间" />
       <UiEmpty v-else-if="!result?.exists" text="该分片还没有聊天日志，开服并产生聊天或进出记录后显示" />
       <UiEmpty v-else-if="!entries.length" text="历史日志中没有匹配的记录" />
