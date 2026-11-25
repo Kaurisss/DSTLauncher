@@ -172,7 +172,7 @@ async function waitForTitle(page) {
 
 async function chooseSelect(page, label, option) {
   await page.getByRole('combobox', { name: label, exact: true }).click();
-  await page.getByRole('option', { name: option }).click();
+  await page.getByRole('option', { name: option }).first().click();
 }
 
 const shardItems = [
@@ -430,7 +430,7 @@ test('设置展示实际 Steam 工坊路径，下载期间锁定路径切换且�
   const { page, requests } = await openMods({ ugcDir, serverLocked: true });
   try {
     await page.locator('#app-navigation').getByRole('button', { name: '设置', exact: true }).click();
-    await page.getByText(ugcDir, { exact: true }).waitFor();
+    await page.locator('dd').filter({ hasText: ugcDir }).first().waitFor();
     await page.getByText('更改服务器文件位置', { exact: true }).click();
     assert.equal(await page.locator('#srv_dir').isDisabled(), true);
     await page.setViewportSize({ width: 375, height: 900 });

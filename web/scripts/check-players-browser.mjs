@@ -148,9 +148,9 @@ test('已记忆房间确认运行后首次加载查询玩家，角色/天数/选
     const { page, section, requests } = await openPanel({ width });
     try {
       await row(section, 'KU_A').waitFor();
-      assert.match(await row(section, 'KU_A').innerText(), /威尔逊.*12 天/);
-      assert.match(await row(section, 'KU_S').innerText(), /选角中.*天数未知/);
-      assert.match(await row(section, 'KU_C').innerText(), /洞穴.*温蒂.*幽灵/);
+      assert.match(await row(section, 'KU_A').innerText(), /威尔逊[\s\S]*12 天/);
+      assert.match(await row(section, 'KU_S').innerText(), /选角中[\s\S]*天数未知/);
+      assert.match(await row(section, 'KU_C').innerText(), /洞穴[\s\S]*温蒂[\s\S]*幽灵/);
       assert.equal(await section.locator('article img').count(), 0);
       assert.equal(await row(section, 'KU_A').getByRole('button', { name: '复活', exact: true }).isDisabled(), true);
       assert.equal(await row(section, 'KU_C').getByRole('button', { name: '复活', exact: true }).isEnabled(), true);
@@ -203,9 +203,9 @@ test('传送只选同分片已入场目标，管理员复用名单接口并明�
     const dialog = page.getByRole('dialog', { name: /^传送/ });
     assert.equal(await dialog.getByRole('button', { name: '确认传送' }).isDisabled(), true);
     await dialog.getByRole('combobox', { name: '传送目标' }).click();
-    await page.getByRole('option', { name: '贝塔 · KU_B', exact: true }).waitFor();
-    assert.deepEqual(await page.getByRole('option').allTextContents(), ['贝塔 · KU_B']);
-    await page.getByRole('option', { name: '贝塔 · KU_B', exact: true }).click();
+    await page.getByRole('option', { name: '贝塔 (KU_B)', exact: true }).waitFor();
+    assert.deepEqual(await page.getByRole('option').allTextContents(), ['贝塔 (KU_B)']);
+    await page.getByRole('option', { name: '贝塔 (KU_B)', exact: true }).click();
     await dialog.getByRole('button', { name: '确认传送' }).click();
     await dialog.waitFor({ state: 'hidden' });
     assert.deepEqual(writes(requests)[0].body, { shard: 'Master', userid: 'KU_A', action: 'teleport', target: 'KU_B' });

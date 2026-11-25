@@ -186,10 +186,12 @@ func (m *Manager) zipDir(srcDir, dstPath string) error {
 		if err != nil {
 			return err
 		}
-		defer src.Close()
-
 		_, err = io.Copy(w, src)
-		return err
+		closeErr := src.Close()
+		if err != nil {
+			return err
+		}
+		return closeErr
 	})
 	if err != nil {
 		_ = zw.Close()

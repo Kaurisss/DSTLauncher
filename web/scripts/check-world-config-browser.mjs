@@ -525,7 +525,8 @@ test('真实选项布局紧凑，桌面两行吸顶保存搜索，浅色深色�
         const header = document.querySelector('.world-control-header').getBoundingClientRect();
         const main = document.querySelector('#page-content').getBoundingClientRect();
         const root = document.querySelector('[data-slot="page-scroll"]');
-        return { headerTop: header.top, mainScroll: document.querySelector('#page-content').scrollTop, headerBottom: header.bottom, viewportBottom: main.bottom, scrollTop: root.scrollTop, scrollWidth: root.scrollWidth, clientWidth: root.clientWidth };
+        const options = document.querySelector('.world-group-content');
+        return { headerTop: header.top, mainScroll: document.querySelector('#page-content').scrollTop, headerBottom: header.bottom, viewportBottom: main.bottom, scrollTop: options.scrollTop, scrollWidth: root.scrollWidth, clientWidth: root.clientWidth };
       });
       assert.ok(position.scrollTop > 0, '卡片列表真实发生滚动');
       assert.equal(position.mainScroll, 0);

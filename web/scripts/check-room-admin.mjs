@@ -88,7 +88,7 @@ test('房间编辑表单：保留数字、布尔、空值与字符串修整的�
   app.use(pinia);
   const html = await renderToString(app);
 
-  assert.ok(html.includes('编辑房间 ·   冒险生存服  '));
+  assert.ok(html.includes('编辑房间：  冒险生存服  '));
   assert.ok(html.includes('Cluster_3'));
   assert.ok(html.includes('保存'));
   assert.ok(html.includes('取消'));

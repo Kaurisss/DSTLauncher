@@ -228,7 +228,7 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	var body struct {
 		Password string `json:"password"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := decodeJSON(w, r, &body, 4096); err != nil {
 		respond(w, 200, nil, fmt.Errorf("请求格式错误"))
 		return
 	}
@@ -310,7 +310,7 @@ func (s *Server) handleAuthPassword(w http.ResponseWriter, r *http.Request) {
 		CurrentPassword string `json:"currentPassword"`
 		NewPassword     string `json:"newPassword"`
 	}
-	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+	if err := decodeJSON(w, r, &body, 4096); err != nil {
 		respond(w, 200, nil, fmt.Errorf("请求格式错误"))
 		return
 	}

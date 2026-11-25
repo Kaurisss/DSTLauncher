@@ -158,7 +158,7 @@ async function runQuick(action) {
       </UiCard>
 
       <div class="overview-sidebar h-full">
-        <PlayersPanel class="h-full" />
+        <PlayersPanel />
       </div>
     </div>
 

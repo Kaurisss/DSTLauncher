@@ -28,6 +28,17 @@ func readJSON(w http.ResponseWriter, r *http.Request, dst any, limit int64) erro
 	return nil
 }
 
+func decodeJSON(w http.ResponseWriter, r *http.Request, dst any, limit int64) error {
+	d := json.NewDecoder(http.MaxBytesReader(w, r.Body, limit))
+	if err := d.Decode(dst); err != nil {
+		return fmt.Errorf("解析请求体失败: %w", err)
+	}
+	if d.Decode(new(any)) != io.EOF {
+		return fmt.Errorf("只接受一份 JSON 对象")
+	}
+	return nil
+}
+
 func (s *Server) handleProfiles(w http.ResponseWriter, r *http.Request) {
 	store := roomprofile.New(filepath.Join(s.rootDir, "profiles"))
 	switch r.Method {

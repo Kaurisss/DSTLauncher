@@ -204,6 +204,7 @@ test('概览统一四项资源指标，服务器配置仅在设置页提供', as
     assert.equal(await page.getByRole('button', { name: '检查更新', exact: true }).count(), 0);
     const nav = page.locator('#app-navigation');
     await nav.getByRole('button', { name: '设置', exact: true }).click();
+    await page.getByRole('button', { name: '文件与架构', exact: true }).click();
     await page.getByRole('heading', { name: '服务器文件与架构', exact: true }).waitFor();
     await page.getByText('更改服务器文件位置', { exact: true }).click();
     await page.getByLabel('安装目录', { exact: true }).waitFor();
@@ -247,14 +248,14 @@ test('Unified App Shell：Header 横跨顶部，Sidebar 位于左侧无缝连接
 
     const selector = header.getByRole('combobox', { name: '房间', exact: true });
     assert.match(await selector.innerText(), /Skr Wu的世界 单人 双穿/);
-    assert.match(await selector.innerText(), /Cluster_1 · 生存 · 2人/);
+    assert.match(await selector.innerText(), /Cluster_1 生存 2人/);
     assert.doesNotMatch(await header.innerText(), /survival/);
-    assert.equal(await header.getByText('Cluster_1 · 生存 · 2人', { exact: true }).count(), 1);
+    assert.equal(await header.getByText('Cluster_1 生存 2人', { exact: true }).count(), 1);
 
     await selector.click();
     await page.getByRole('option', { name: '备用房间', exact: true }).click();
     assert.match(await selector.innerText(), /备用房间/);
-    assert.match(await selector.innerText(), /Cluster_2 · 无尽 · 6人/);
+    assert.match(await selector.innerText(), /Cluster_2 无尽 6人/);
     assert.equal(await page.evaluate(() => localStorage.getItem('dst-room')), '2');
     assert.equal(await title.isVisible(), true, '换房不改变当前页面');
 
@@ -267,7 +268,7 @@ test('Unified App Shell：Header 横跨顶部，Sidebar 位于左侧无缝连接
     await page.screenshot({ path: fileURLToPath(new URL('../../.scratch/screenshots/layout-1440-dark.png', import.meta.url)) });
   } finally { await page.close(); }
 });
-test('手机主标题和长房间选择器不溢出，品牌与版本在通顶抽屉内', async () => {
+test('手机主标题和长房间选择器不溢出，品牌在通顶抽屉内', async () => {
   const room = { id: 1, key: 'Cluster_1', name: 'Skr Wu的世界 单人 双穿 '.repeat(4), gameMode: 'survival', maxPlayers: 2, shards: [{ name: 'Master', isMaster: true }] };
   const { page } = await openPanel({ room, width: 375, tab: 'config' });
   try {
@@ -282,10 +283,10 @@ test('手机主标题和长房间选择器不溢出，品牌与版本在通顶�
     await header.getByRole('button', { name: '切换导航', exact: true }).click();
     const drawer = page.locator('[data-mobile="true"]');
     await drawer.getByText('DST 开服控制台', { exact: true }).waitFor();
-    await drawer.getByText('v0.1.2', { exact: true }).waitFor();
     assert.equal((await drawer.boundingBox()).y, 0);
     await drawer.getByRole('button', { name: '房间', exact: true }).click();
     await drawer.waitFor({ state: 'hidden' });
+    await header.getByRole('heading', { level: 1, name: '房间', exact: true }).waitFor();
     assert.equal(await header.getByRole('heading', { level: 1 }).innerText(), '房间');
     assert.equal(await page.locator('#new-room-button').isVisible(), true);
   } finally { await page.close(); }
@@ -421,7 +422,8 @@ test('高内存及低磁盘有文字预警，零可用空间显示真实零值',
       await section.getByText('90.0%', { exact: true }).waitFor();
       await section.locator('.stat.is-warn', { hasText: '宿主机内存' }).waitFor();
       await section.locator('.stat.is-warn', { hasText: '存档盘' }).waitFor();
-      await section.getByText(availableBytes ? /9\.00 GB/ : /0 B/).waitFor();
+      const diskStat = section.locator('.stat').filter({ hasText: '存档盘' });
+      await diskStat.getByText(availableBytes ? /9\.00 GB/ : /0 B/).waitFor();
       assert.equal(await section.getByRole('status').count(), 0);
     } finally { await page.close(); }
   }

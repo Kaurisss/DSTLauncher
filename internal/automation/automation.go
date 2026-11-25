@@ -85,6 +85,9 @@ func New(path string) (*Engine, error) {
 		j.Result = "上次执行被面板退出中断，请检查服务器状态"
 		e.state.Jobs[key] = j
 		e.state.Running = ""
+		if err := e.persist(); err != nil {
+			return nil, err
+		}
 	}
 	return e, nil
 }

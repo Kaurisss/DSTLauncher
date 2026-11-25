@@ -367,8 +367,8 @@ func (s *Server) handleRooms(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPost:
 		var rm room.Room
-		if err := json.NewDecoder(r.Body).Decode(&rm); err != nil {
-			respond(w, 200, nil, fmt.Errorf("解析请求体失败: %w", err))
+		if err := decodeJSON(w, r, &rm, 1<<20); err != nil {
+			respond(w, 200, nil, err)
 			return
 		}
 		created, err := s.rooms.Create(&rm)
@@ -388,8 +388,8 @@ func (s *Server) handleRooms(w http.ResponseWriter, r *http.Request) {
 
 	case http.MethodPut:
 		var rm room.Room
-		if err := json.NewDecoder(r.Body).Decode(&rm); err != nil {
-			respond(w, 200, nil, fmt.Errorf("解析请求体失败: %w", err))
+		if err := decodeJSON(w, r, &rm, 1<<20); err != nil {
+			respond(w, 200, nil, err)
 			return
 		}
 		if rm.ID == 0 {
@@ -488,8 +488,8 @@ func (s *Server) handleAdmins(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			KleiID string `json:"kleiId"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&in); err != nil {
-			respond(w, 200, nil, fmt.Errorf("解析请求体失败: %w", err))
+		if err := decodeJSON(w, r, &in, 4096); err != nil {
+			respond(w, 200, nil, err)
 			return
 		}
 		list, err := room.AddAdmin(clusterDir, in.KleiID)
@@ -1047,8 +1047,8 @@ func (s *Server) handleWorkshopKey(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			SteamApiKey string `json:"steamApiKey"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			respond(w, 200, nil, fmt.Errorf("解析请求体失败: %w", err))
+		if err := decodeJSON(w, r, &req, 4096); err != nil {
+			respond(w, 200, nil, err)
 			return
 		}
 		cfg, err := s.loadPanelConfig()
@@ -2040,8 +2040,8 @@ func (s *Server) handleServer(w http.ResponseWriter, r *http.Request) {
 			ServerDir string `json:"serverDir"`
 			Arch      string `json:"arch"`
 		}
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			respond(w, 200, nil, fmt.Errorf("解析请求体失败: %w", err))
+		if err := decodeJSON(w, r, &req, 4096); err != nil {
+			respond(w, 200, nil, err)
 			return
 		}
 		if s.anyRunning() {
@@ -2130,8 +2130,8 @@ func (s *Server) handleWorldConfig(w http.ResponseWriter, r *http.Request) {
 	var in *worldConfigInput
 	if r.Method == http.MethodPut || r.Method == http.MethodPost {
 		in = &worldConfigInput{}
-		if err := json.NewDecoder(r.Body).Decode(in); err != nil {
-			respond(w, 200, nil, fmt.Errorf("解析请求体失败: %w", err))
+		if err := decodeJSON(w, r, in, 1<<20); err != nil {
+			respond(w, 200, nil, err)
 			return
 		}
 		// 读取文件前统一目标；正文与查询参数冲突时拒绝，不能读一片写另一片。

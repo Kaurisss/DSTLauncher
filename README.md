@@ -1,4 +1,4 @@
-# DSTWin · 饥荒联机版开服面板（Windows / Linux）
+# DSTWin - 饥荒联机版开服面板（Windows / Linux）
 
 《饥荒联机版》(Don't Starve Together) 专用服务器管理系统。用 Go 原生进程管理（`exec.Command` + stdin 管道）替代 Linux 下的 `screen`/`bash`/`ps`/`tail`：在 Windows 上直接运行，无需 WSL；也提供 Linux 原生进程层与 Docker Compose 部署。
 

@@ -276,7 +276,7 @@ func main() {
 	fmt.Printf("  模组目录  %s\n", ugcDir)
 	fmt.Printf("  房间定义  %s\n", rooms.Path())
 	if steam.IsInstalled() {
-		fmt.Printf("  服务器    %s（%s 位 · %s）\n", steam.Root(), steam.Arch(), steam.Source())
+		fmt.Printf("  服务器    %s（%s 位，%s）\n", steam.Root(), steam.Arch(), steam.Source())
 		if v := steam.Version(); v != "" {
 			fmt.Printf("  游戏版本  %s\n", v)
 		}

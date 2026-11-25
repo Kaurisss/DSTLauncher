@@ -145,8 +145,8 @@ function preventWhileBusy(event) {
 </script>
 
 <template>
-  <section aria-label="在线玩家" class="flex h-full min-w-0 flex-1 flex-col">
-    <UiCard class="h-full flex-1">
+  <section aria-label="在线玩家" class="flex min-w-0 flex-col">
+    <UiCard>
       <template #title>在线玩家</template>
       <template #actions>
         <IconAction variant="outline" icon="refresh" :label="loading ? '查询中…' : '刷新玩家'" :disabled="!canQuery || loading || busy" @click="load" />

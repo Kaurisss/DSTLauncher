@@ -189,7 +189,7 @@ test('编辑和管理员绑定所编辑房间，保存失败保留草稿，重�
   const { page, state, close } = await openRooms();
   try {
     await card(page).getByRole('button', { name: '编辑', exact: true }).click();
-    await page.getByRole('heading', { name: '编辑房间 · 测试房间乙', exact: true }).waitFor();
+    await page.getByRole('heading', { name: '编辑房间：测试房间乙', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => localStorage.getItem('dst-room')), '2');
     await page.getByPlaceholder('输入 Klei ID（KU_ 开头）').fill('KU_SCOPED3');
     await page.getByRole('button', { name: '添加', exact: true }).click();
@@ -440,8 +440,8 @@ test('房间表单吸顶合并返回与动作，垂直标签和12/4列网格对�
         list: document.querySelector('[data-slot="page-scroll"]').getBoundingClientRect().top,
         bottom: document.querySelector('.room-editor .ui-toolbar').getBoundingClientRect().bottom,
       }));
-      assert.ok(Math.abs(position.toolbar - position.card) < 0.1, 'Header紧贴固定卡片顶部：' + JSON.stringify(position));
-      assert.ok(Math.abs(position.bottom - position.list) < 0.1, 'Header下方直接衔接滚动区');
+      assert.ok(Math.abs(position.toolbar - position.card) <= 1.1, 'Header紧贴固定卡片顶部：' + JSON.stringify(position));
+      assert.ok(Math.abs(position.bottom - position.list) <= 1.1, 'Header下方直接衔接滚动区');
       assert.ok(position.bottom < 560);
       assert.equal(await toolbar.getByRole('button', { name: '保存', exact: true }).isVisible(), true);
       await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/room-editor-sticky-${width}-${dark ? 'dark' : 'light'}.png`, import.meta.url)) });

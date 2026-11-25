@@ -84,7 +84,7 @@ test('配置 Code Block 只读并保留落盘与令牌隐藏状态，复制得�
       const style = window.getComputedStyle(el);
       return { radius: style.borderRadius, border: style.borderWidth, ring: style.boxShadow };
     });
-    assert.deepEqual({ radius: blockStyle.radius, border: blockStyle.border }, { radius: '12px', border: '0px' });
+    assert.deepEqual({ radius: blockStyle.radius, border: blockStyle.border }, { radius: '14px', border: '1px' });
     assert.match(blockStyle.ring, /0px 0px 0px 1px/);
     assert.equal(await preview.getAttribute('data-numbered'), 'true');
     assert.match(await preview.innerText(), /cluster_name = <img src=x onerror=alert\(1\)>/);
@@ -135,7 +135,7 @@ test('配置刷新保留现有 Code Block，加载过程中不切回占位', asy
     assert.equal(await page.getByRole('status', { name: '加载中', exact: true }).count(), 0);
     assert.equal(await page.getByRole('button', { name: '刷新', exact: true }).isDisabled(), true);
     release();
-    await page.waitForFunction(() => [...document.querySelectorAll('.ui-toolbar button')].some(button => button.textContent.trim() === '刷新' && !button.disabled));
+    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.getAttribute('aria-label') === '刷新' && !button.disabled));
     assert.deepEqual(state.errors, []);
   } finally { release(); await page.close(); }
 });
