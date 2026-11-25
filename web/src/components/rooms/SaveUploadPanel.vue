@@ -161,7 +161,7 @@ async function submit() {
                 <b>{{ file?.name || '点击选择或将 .zip 存档拖到这里' }}</b>
                 <span v-if="file">{{ fmtSize(file.size) }}</span>
               </div>
-              <IconAction v-if="file" type="button" variant="outline" icon="folder" label="重新选择" :disabled="busy" @click.stop="openFilePicker" />
+              <IconAction v-if="file" type="button" variant="outline" show-label icon="folder" label="重新选择" :disabled="busy" @click.stop="openFilePicker" />
             </div>
             <input ref="fileInput" class="dropzone-input" type="file" accept=".zip,application/zip" :disabled="busy" aria-label="存档压缩包" @change="onPick">
           </Field>
@@ -229,10 +229,10 @@ async function submit() {
       </div>
 
       <DialogFooter class="shrink-0">
-        <DialogClose v-if="result" as-child><IconAction icon="check" label="完成" /></DialogClose>
+        <DialogClose v-if="result" as-child><IconAction show-label icon="check" label="完成" /></DialogClose>
         <template v-else>
-          <DialogClose as-child><IconAction variant="outline" icon="x" label="取消" :disabled="busy" /></DialogClose>
-          <IconAction icon="upload" :label="busy ? '处理中…' : submitLabel" :disabled="!canSubmit" @click="submit" />
+          <DialogClose as-child><IconAction variant="outline" show-label icon="x" label="取消" :disabled="busy" /></DialogClose>
+          <IconAction show-label icon="upload" :label="busy ? '处理中…' : submitLabel" :disabled="!canSubmit" @click="submit" />
         </template>
       </DialogFooter>
     </DialogContent>

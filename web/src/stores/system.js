@@ -9,6 +9,8 @@ import { toast } from '@/lib/toast.js';
 export const useSystemStore = defineStore('system', () => {
   const installed = ref(false);
   const installing = ref(false);
+  const canceled = ref(false);
+  const canceling = ref(false);
   const progress = ref('');
   const error = ref('');
   const output = ref([]);
@@ -32,6 +34,8 @@ export const useSystemStore = defineStore('system', () => {
   function apply(d) {
     installed.value = !!d.installed;
     installing.value = !!d.installing;
+    canceled.value = !!d.canceled;
+    if (!installing.value) canceling.value = false;
     progress.value = d.progress || '';
     // 后端把 Go 的 nil error 序列化成了 "<nil>"，过滤掉
     error.value = d.error === '<nil>' ? '' : (d.error || '');
@@ -51,7 +55,8 @@ export const useSystemStore = defineStore('system', () => {
     if (installing.value) startPoll();
     // 一轮安装刚结束：给个结论，并停掉轮询
     if (!installing.value && wasInstalling) {
-      toast(error.value ? '安装失败：' + error.value : '服务器文件已就绪', error.value ? 'err' : '');
+      if (canceled.value) toast('已取消安装，已下载的文件已保留');
+      else toast(error.value ? '安装失败：' + error.value : '服务器文件已就绪', error.value ? 'err' : '');
     }
     wasInstalling = installing.value;
     return d;
@@ -78,6 +83,8 @@ export const useSystemStore = defineStore('system', () => {
 
   async function startInstall() {
     await installApi.start();
+    canceled.value = false;
+    canceling.value = false;
     error.value = '';
     output.value = [];
     progress.value = '正在准备安装 DST 专用服务器…';
@@ -86,8 +93,22 @@ export const useSystemStore = defineStore('system', () => {
     startPoll();
   }
 
+  async function cancelInstall() {
+    if (canceling.value || !installing.value) return;
+    canceling.value = true;
+    progress.value = '正在取消安装…';
+    try {
+      await installApi.cancel();
+      await refresh();
+    } finally {
+      if (!installing.value) canceling.value = false;
+    }
+  }
+
   async function update() {
     await installApi.update();
+    canceled.value = false;
+    canceling.value = false;
     error.value = '';
     installing.value = true;
     wasInstalling = true;
@@ -96,9 +117,12 @@ export const useSystemStore = defineStore('system', () => {
 
   async function ensureInstalled() {
     await refresh();
-    if (installed.value && !installing.value && !error.value) return;
+    if (installed.value && !installing.value && !error.value && !canceled.value) return;
     if (!installing.value) await startInstall();
     await startPoll();
+    if (canceled.value) {
+      throw new Error(error.value || '已取消安装（已下载的文件会保留，可随时继续）');
+    }
     if (error.value || !installed.value) {
       throw new Error(error.value || '安装未完成：未找到服务器文件，请重试安装');
     }
@@ -124,9 +148,9 @@ export const useSystemStore = defineStore('system', () => {
   }
 
   return {
-    installed, installing, progress, error, output, version,
+    installed, installing, canceled, canceling, progress, error, output, version,
     external, root, executable, source, arch,
     server, loadServer, saveServer,
-    refresh, startInstall, ensureInstalled, update,
+    refresh, startInstall, cancelInstall, ensureInstalled, update,
   };
 });

@@ -38,7 +38,7 @@ async function refresh() {
 
 <template>
   <Dialog v-model:open="open">
-    <DialogTrigger as-child><IconAction icon="activity" variant="outline" label="故障诊断" :disabled="!rooms.current" /></DialogTrigger>
+    <DialogTrigger as-child><IconAction icon="diagnostics" variant="outline" show-label label="故障诊断" :disabled="!rooms.current" /></DialogTrigger>
     <DialogContent class="max-h-[85dvh] overflow-y-auto sm:max-w-2xl">
       <DialogHeader>
         <DialogTitle>故障诊断</DialogTitle>
@@ -46,7 +46,7 @@ async function refresh() {
       </DialogHeader>
       <div class="flex items-center justify-between gap-3 text-sm">
         <span>{{ rooms.current?.name }}</span>
-        <IconAction icon="refresh" variant="outline" :label="busy ? '诊断中…' : '重新诊断'" :disabled="busy" @click="refresh" />
+        <IconAction icon="refresh" variant="outline" show-label :label="busy ? '诊断中…' : '重新诊断'" :disabled="busy" @click="refresh" />
       </div>
       <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
       <div v-else-if="busy && !report" role="status" aria-label="正在读取最近日志" class="grid gap-3">

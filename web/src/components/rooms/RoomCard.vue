@@ -87,9 +87,9 @@ function ports(s) {
     </div>
 
     <div class="room-actions">
-      <IconAction variant="outline" icon="pencil" label="编辑" @click="$emit('edit', room.id)" />
-      <IconAction variant="outline" icon="upload" label="上传存档" @click="$emit('upload', room.id)" />
-      <IconAction variant="destructive" icon="trash" label="删除" @click="$emit('remove', room.id)" />
+      <IconAction variant="outline" show-label icon="pencil" label="编辑" @click="$emit('edit', room.id)" />
+      <IconAction variant="outline" show-label icon="upload" label="上传存档" @click="$emit('upload', room.id)" />
+      <IconAction variant="destructive" show-label icon="trash" label="删除" @click="$emit('remove', room.id)" />
     </div>
   </article>
 </template>

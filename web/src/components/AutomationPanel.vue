@@ -62,7 +62,7 @@ function date(value) {
   <UiCard>
     <template #title>自动维护</template>
     <template #actions>
-      <IconAction v-if="draft" type="submit" form="automation-plan-form" icon="save" :label="saving ? '保存中…' : '保存计划'" :disabled="saving || !!snapshot?.running" />
+      <IconAction v-if="draft" type="submit" form="automation-plan-form" show-label icon="save" :label="saving ? '保存中…' : '保存计划'" :disabled="saving || !!snapshot?.running" />
     </template>
     <p v-if="error" role="alert" class="mb-4 text-sm text-destructive">{{ error }}</p>
     <form v-if="draft" id="automation-plan-form" class="grid gap-4" @submit.prevent="save">

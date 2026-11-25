@@ -112,8 +112,8 @@ function exportSave(name) {
       </Tooltip>
       <template #actions>
         <MigrationDialog />
-        <RollbackDialog />
-        <IconAction icon="archive" label="立即备份" :disabled="!rooms.current" @click="create" />
+        <RollbackDialog show-label="sm" />
+        <IconAction show-label="sm" icon="archive" label="立即备份" :disabled="!rooms.current" @click="create" />
       </template>
     </UiToolbar>
 

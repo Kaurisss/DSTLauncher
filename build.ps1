@@ -7,13 +7,13 @@ $ErrorActionPreference = 'Stop'
 Push-Location $PSScriptRoot
 try {
     if (-not (Test-Path -LiteralPath 'web/node_modules')) {
-        & npm.cmd --prefix web ci
+        & pnpm --dir web install --frozen-lockfile
         if ($LASTEXITCODE -ne 0) {
             throw "Frontend dependency installation failed (exit $LASTEXITCODE)."
         }
     }
 
-    & npm.cmd --prefix web run build
+    & pnpm --dir web run build
     if ($LASTEXITCODE -ne 0) {
         throw "Frontend build failed (exit $LASTEXITCODE)."
     }

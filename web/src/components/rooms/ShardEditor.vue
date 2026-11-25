@@ -90,7 +90,7 @@ async function removeShard(index) {
   <section class="grid gap-3">
     <div class="flex flex-wrap items-center justify-between gap-2">
       <h3 class="text-xs font-semibold text-muted-foreground">世界（分片）</h3>
-      <IconAction variant="outline" icon="plus" label="添加世界" @click="addShard" />
+      <IconAction variant="outline" show-label icon="plus" label="添加世界" @click="addShard" />
     </div>
 
     <div class="shard-editor-grid grid items-start gap-4 lg:grid-cols-2">

@@ -1869,8 +1869,18 @@ func buildImportSummary(p *saveimport.Parsed, saved *room.Room, notes []string, 
 // 因此这里照常返回状态，另外把来源信息一并带上，
 // 让前端能如实说明「服务器来自哪里」以及「更新该走 Steam」。
 func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
+	action := r.URL.Query().Get("action")
+	// 取消/暂停正在进行的安装或更新（保留已下载的分块，后续可续传）
+	if r.Method == http.MethodDelete || action == "cancel" || action == "stop" {
+		if err := s.steam.Cancel(); err != nil {
+			respond(w, 200, nil, err)
+			return
+		}
+		respond(w, 200, map[string]interface{}{"canceled": true}, nil)
+		return
+	}
 	// 显式触发安装
-	if r.URL.Query().Get("action") == "start" {
+	if action == "start" {
 		s.taskMu.Lock()
 		defer s.taskMu.Unlock()
 		if s.steam.IsExternal() {
@@ -1904,6 +1914,7 @@ func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]interface{}{
 		"installed":  s.steam.IsInstalled(),
 		"installing": s.steam.IsInstalling(),
+		"canceled":   s.steam.IsCanceled(),
 		"progress":   progress,
 		"error":      errStr,
 		"output":     output,

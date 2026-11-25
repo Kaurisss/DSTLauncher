@@ -3,6 +3,7 @@ package steamcmd
 
 import (
 	"archive/zip"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -50,6 +51,8 @@ type Layout struct {
 type Manager struct {
 	workDir     string
 	steamCmdDir string
+	archiveURL  string
+	makeCmd     func(name string, args ...string) *exec.Cmd
 
 	mu         sync.RWMutex
 	layout     Layout
@@ -57,9 +60,12 @@ type Manager struct {
 	external   bool
 	pinned     bool
 	installing bool
+	canceled   bool
 	progress   string
 	errText    string
 	output     []string
+	cancel     context.CancelFunc
+	cmd        *exec.Cmd
 }
 
 // NormalizeArch normalizes an architecture preference. Invalid and empty values fall
@@ -229,6 +235,36 @@ func (m *Manager) IsInstalling() bool {
 	return m.installing
 }
 
+// IsCanceled reports whether the last installation or update was canceled by the user.
+func (m *Manager) IsCanceled() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.canceled
+}
+
+// Cancel stops an active installation or update. Already-downloaded SteamCMD chunks
+// remain on disk so a subsequent install/update can resume from where it stopped.
+func (m *Manager) Cancel() error {
+	m.mu.Lock()
+	if !m.installing {
+		m.mu.Unlock()
+		return fmt.Errorf("当前没有正在进行的服务器安装或更新")
+	}
+	m.canceled = true
+	m.progress = "正在取消安装…"
+	cancel := m.cancel
+	cmd := m.cmd
+	m.mu.Unlock()
+
+	if cancel != nil {
+		cancel()
+	}
+	if cmd != nil {
+		stopSteamCmdProcess(cmd)
+	}
+	return nil
+}
+
 // SteamCmdExists reports whether the panel's SteamCMD bootstrap has been installed.
 func (m *Manager) SteamCmdExists() bool {
 	info, err := os.Stat(filepath.Join(m.steamCmdDir, steamCmdExecutableName()))
@@ -290,7 +326,11 @@ func (m *Manager) startInstall(update bool) {
 		m.mu.Unlock()
 		return
 	}
+	ctx, cancel := context.WithCancel(context.Background())
 	m.installing = true
+	m.canceled = false
+	m.cancel = cancel
+	m.cmd = nil
 	m.errText = ""
 	m.output = nil
 	if update {
@@ -300,18 +340,20 @@ func (m *Manager) startInstall(update bool) {
 	}
 	m.mu.Unlock()
 
-	go m.doInstall()
+	go m.doInstall(ctx, cancel)
 }
 
-func (m *Manager) doInstall() {
+func (m *Manager) doInstall(ctx context.Context, cancel context.CancelFunc) {
+	defer cancel()
+
 	var err error
 	if !m.SteamCmdExists() {
 		m.setProgress("正在下载 SteamCMD…")
-		err = m.downloadSteamCmd()
+		err = m.downloadSteamCmd(ctx)
 	}
 	if err == nil {
 		m.setProgress("正在通过 SteamCMD 安装 DST 专用服务器…")
-		err = m.runSteamCmd()
+		err = m.runSteamCmd(ctx)
 	}
 	if err == nil {
 		err = m.refreshLayout()
@@ -322,7 +364,17 @@ func (m *Manager) doInstall() {
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	canceled := m.canceled || errors.Is(err, context.Canceled) || ctx.Err() != nil
 	m.installing = false
+	m.cancel = nil
+	m.cmd = nil
+	if canceled {
+		m.canceled = true
+		m.errText = "已取消安装（已下载的文件会保留，可随时继续）"
+		m.progress = "已取消安装"
+		m.appendOutputLocked("[!] 已手动取消安装，已下载的文件已保留")
+		return
+	}
 	if err != nil {
 		m.errText = err.Error()
 		m.progress = "安装或更新失败"
@@ -347,7 +399,10 @@ func (m *Manager) refreshLayout() error {
 	return nil
 }
 
-func (m *Manager) runSteamCmd() error {
+func (m *Manager) runSteamCmd(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	m.mu.RLock()
 	steamCmdDir := m.steamCmdDir
 	installRoot := ownRoot(m.workDir)
@@ -361,21 +416,50 @@ func (m *Manager) runSteamCmd() error {
 		return fmt.Errorf("创建服务器目录失败: %w", err)
 	}
 
-	cmd := exec.Command(steamCmd,
+	makeCmd := m.makeCmd
+	if makeCmd == nil {
+		makeCmd = exec.Command
+	}
+	cmd := makeCmd(steamCmd,
 		"+force_install_dir", installRoot,
 		"+login", "anonymous",
 		"+app_update", gameAppID, "validate",
 		"+quit",
 	)
 	cmd.Dir = steamCmdDir
+	configureSteamCmdProcess(cmd)
 	writer := &outputWriter{manager: m}
 	cmd.Stdout = writer
 	cmd.Stderr = writer
-	if err := cmd.Run(); err != nil {
-		writer.flush()
+
+	m.mu.Lock()
+	if m.canceled || ctx.Err() != nil {
+		m.mu.Unlock()
+		return context.Canceled
+	}
+	if err := cmd.Start(); err != nil {
+		m.mu.Unlock()
+		return fmt.Errorf("启动 SteamCMD 失败: %w", err)
+	}
+	m.cmd = cmd
+	m.mu.Unlock()
+
+	defer func() {
+		m.mu.Lock()
+		if m.cmd == cmd {
+			m.cmd = nil
+		}
+		m.mu.Unlock()
+	}()
+
+	err := cmd.Wait()
+	writer.flush()
+	if m.IsCanceled() || ctx.Err() != nil {
+		return context.Canceled
+	}
+	if err != nil {
 		return steamCmdError(err)
 	}
-	writer.flush()
 	return nil
 }
 
@@ -394,17 +478,27 @@ func steamCmdError(err error) error {
 	return fmt.Errorf("SteamCMD 执行失败: %w", err)
 }
 
-func (m *Manager) downloadSteamCmd() error {
+func (m *Manager) downloadSteamCmd(ctx context.Context) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if err := os.MkdirAll(m.steamCmdDir, 0755); err != nil {
 		return fmt.Errorf("创建 SteamCMD 目录失败: %w", err)
 	}
 
-	request, err := http.NewRequest(http.MethodGet, steamCmdArchiveURL(), nil)
+	url := m.archiveURL
+	if url == "" {
+		url = steamCmdArchiveURL()
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("创建 SteamCMD 下载请求失败: %w", err)
 	}
 	response, err := (&http.Client{Timeout: 10 * time.Minute}).Do(request)
 	if err != nil {
+		if ctx.Err() != nil {
+			return context.Canceled
+		}
 		return fmt.Errorf("下载 SteamCMD 失败: %w", err)
 	}
 	defer response.Body.Close()
@@ -422,15 +516,18 @@ func (m *Manager) downloadSteamCmd() error {
 	reader := &downloadReader{reader: response.Body, total: response.ContentLength, manager: m}
 	if _, err := io.Copy(tmp, reader); err != nil {
 		_ = tmp.Close()
+		if ctx.Err() != nil {
+			return context.Canceled
+		}
 		return fmt.Errorf("保存 SteamCMD 下载文件失败: %w", err)
 	}
 	if err := tmp.Close(); err != nil {
 		return fmt.Errorf("关闭 SteamCMD 下载文件失败: %w", err)
 	}
-	return m.extractPlatformArchive(tmpPath, m.steamCmdDir)
+	return m.extractPlatformArchive(ctx, tmpPath, m.steamCmdDir)
 }
 
-func (m *Manager) extractZip(zipPath, destination string) error {
+func (m *Manager) extractZip(ctx context.Context, zipPath, destination string) error {
 	archive, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return fmt.Errorf("打开 SteamCMD 压缩包失败: %w", err)
@@ -438,6 +535,9 @@ func (m *Manager) extractZip(zipPath, destination string) error {
 	defer archive.Close()
 
 	for _, entry := range archive.File {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		target := filepath.Join(destination, entry.Name)
 		rel, err := filepath.Rel(destination, target)
 		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {

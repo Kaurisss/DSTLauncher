@@ -5,6 +5,7 @@ package steamcmd
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
@@ -48,7 +49,7 @@ func TestExtractPlatformArchiveRejectsPathTraversal(t *testing.T) {
 	}
 
 	manager := NewManager(t.TempDir(), ArchAuto)
-	if err := manager.extractPlatformArchive(archivePath, filepath.Join(t.TempDir(), "steamcmd")); err == nil {
+	if err := manager.extractPlatformArchive(context.Background(), archivePath, filepath.Join(t.TempDir(), "steamcmd")); err == nil {
 		t.Fatal("Linux tar 解压接受了路径穿越条目")
 	}
 }

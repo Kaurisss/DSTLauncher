@@ -242,6 +242,44 @@ test('安装进度连接失败时终止自动开服，不永久等待', async ()
   assert.match(useSystemStore(pinia).error, /请刷新页面重试/);
 });
 
+test('安装中提供取消按钮，取消后展示可续传状态且不自动开服', async () => {
+  const system = useSystemStore(pinia);
+  system.installing = true;
+  system.progress = '下载服务器文件 42.50%';
+  const installingHtml = await renderToString(createSSRApp({
+    render: () => h(TooltipProvider, null, () => h(InstallPanel)),
+  }).use(pinia));
+  assert.ok(installingHtml.includes('取消安装'));
+
+  let canceled = false;
+  let statusCalls = 0;
+  mock.method(installApi, 'status', async () => {
+    statusCalls++;
+    if (canceled) return { installed: false, installing: false, canceled: true, progress: '已取消安装', error: '已取消安装（已下载的文件会保留，可随时继续）' };
+    return { installed: false, installing: statusCalls > 1, progress: '下载服务器文件 12.00%' };
+  });
+  mock.method(installApi, 'start', async () => {});
+  const cancelMock = mock.method(installApi, 'cancel', async () => { canceled = true; return { canceled: true }; });
+  const startProc = mock.method(procApi, 'start', async () => {});
+
+  const rooms = roomStore();
+  system.installing = false;
+  const startPromise = rooms.start('Master');
+  await new Promise(resolve => setTimeout(resolve, 20));
+  await system.cancelInstall();
+  await assert.rejects(startPromise, /已取消安装/);
+  assert.equal(cancelMock.mock.callCount(), 1);
+  assert.equal(startProc.mock.callCount(), 0);
+  assert.equal(rooms.starting, false);
+  assert.equal(system.canceled, true);
+
+  const canceledHtml = await renderToString(createSSRApp({
+    render: () => h(TooltipProvider, null, () => h(InstallPanel)),
+  }).use(pinia));
+  assert.ok(canceledHtml.includes('已暂停安装'));
+  assert.ok(canceledHtml.includes('继续安装（支持续传）'));
+});
+
 test('在线房间缺令牌时先提示配置，不下载也不开服', async () => {
   const install = mock.method(installApi, 'start', async () => {});
   const start = mock.method(procApi, 'start', async () => {});

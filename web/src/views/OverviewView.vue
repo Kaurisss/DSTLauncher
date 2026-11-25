@@ -5,7 +5,10 @@ import { computed, ref } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
 import IconAction from '@/components/ui/IconAction.vue';
+import UiProgress from '@/components/ui/UiProgress.vue';
 import UiStat from '@/components/ui/UiStat.vue';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
 import ShardList from '@/components/overview/ShardList.vue';
 import HostResources from '@/components/overview/HostResources.vue';
 import PlayersPanel from '@/components/overview/PlayersPanel.vue';
@@ -19,7 +22,7 @@ import { useProcessControl } from '@/composables/useProcessControl.js';
 import { procApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
 import { fmtSize, roomShardLabel } from '@/lib/format.js';
-import { toast } from '@/lib/toast.js';
+import { guard, toast } from '@/lib/toast.js';
 
 const rooms = useRoomsStore();
 const system = useSystemStore();
@@ -76,6 +79,18 @@ const resTone = computed(() => {
   return res.value.cpu > 50 ? 'warn' : 'info';
 });
 
+const installPercent = computed(() => {
+  const match = /([\d.]+)\s*%/.exec(system.progress || '');
+  if (!match) return -1;
+  const value = Number(match[1]);
+  return Number.isFinite(value) && value >= 0 && value <= 100 ? value : -1;
+});
+const installStage = computed(() => (system.progress || '准备中…').replace(/\s*[\d.]+\s*%/, ''));
+
+function cancelInstall() {
+  guard(() => system.cancelInstall(), { success: '已请求取消安装' });
+}
+
 async function runQuick(action) {
   if (quickBusy.value || !rooms.current) return;
   const room = rooms.current;
@@ -103,6 +118,32 @@ async function runQuick(action) {
        而 Transition 只接受「恰好一个」根元素。多根（fragment）会让切换动画失效，
        表现为来回点导航后右侧内容整个空白。 -->
   <div class="overview-page grid gap-4">
+    <UiCard v-if="system.installing" role="status" aria-label="服务器安装进度">
+      <template #title>
+        <span class="inline-flex items-center gap-2">
+          <span>正在安装服务器</span>
+          <Badge variant="secondary">{{ system.canceling ? '正在取消' : (installPercent >= 0 ? `${installPercent}%` : '进行中') }}</Badge>
+        </span>
+      </template>
+      <template #actions>
+        <IconAction
+          variant="destructive"
+          show-label
+          icon="stop"
+          :label="system.canceling ? '正在取消…' : '取消安装'"
+          :disabled="system.canceling"
+          @click="cancelInstall"
+        />
+      </template>
+      <div class="grid gap-2">
+        <p class="text-sm font-medium">{{ installStage }}</p>
+        <UiProgress :value="installPercent" :aria-label="installStage" />
+        <p class="text-xs text-muted-foreground">
+          {{ rooms.starting ? '安装完成后将自动开服。取消会保留已下载的文件，之后可随时继续。' : '取消会保留已下载的文件，之后可随时继续。' }}
+        </p>
+      </div>
+    </UiCard>
+
     <HostResources>
       <UiStat
         label="运行分片"
@@ -123,24 +164,10 @@ async function runQuick(action) {
         <template #title>分片管理</template>
         <template #actions>
           <DiagnosticsDialog />
+          <Separator orientation="vertical" class="hidden h-4 sm:block" />
           <IconAction
-            variant="outline"
-            icon="save"
-            :label="quickBusy === 'save' ? '等待保存完成…' : '立即保存'"
-            :disabled="!!quickBusy || !anyRunning || rooms.starting"
-            @click="runQuick('save')"
-          />
-          <IconAction
-            variant="outline"
-            icon="skip"
-            :label="quickBusy === 'skipday' ? '等待游戏回执…' : '主世界快进一天'"
-            :disabled="!!quickBusy || !masterRunning || rooms.starting"
-            @click="runQuick('skipday')"
-          />
-          <AnnounceDialog />
-          <RollbackDialog />
-          <IconAction
-            variant="outline"
+            :variant="anyRunning ? 'outline' : 'default'"
+            show-label
             :icon="system.installed ? 'play' : 'download'"
             :label="rooms.starting ? '准备开服中…' : (system.installed ? '全部启动' : '安装并启动')"
             :disabled="!rooms.current || rooms.starting"
@@ -148,6 +175,7 @@ async function runQuick(action) {
           />
           <IconAction
             variant="destructive"
+            show-label
             icon="stop"
             label="全部停止"
             :disabled="!rooms.current || rooms.starting"
@@ -155,6 +183,28 @@ async function runQuick(action) {
           />
         </template>
         <ShardList />
+        <div v-if="rooms.current" role="group" aria-label="快捷运维" class="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
+          <span class="mr-1 text-xs font-medium text-muted-foreground">快捷运维</span>
+          <IconAction
+            variant="outline"
+            show-label
+            icon="save"
+            :label="quickBusy === 'save' ? '等待保存完成…' : '立即保存'"
+            :disabled="!!quickBusy || !anyRunning || rooms.starting"
+            @click="runQuick('save')"
+          />
+          <AnnounceDialog />
+          <RollbackDialog />
+          <IconAction
+            variant="outline"
+            show-label
+            icon="skip"
+            :label="quickBusy === 'skipday' ? '等待游戏回执…' : '主世界快进一天'"
+            :text="quickBusy === 'skipday' ? '等待回执…' : '快进一天'"
+            :disabled="!!quickBusy || !masterRunning || rooms.starting"
+            @click="runQuick('skipday')"
+          />
+        </div>
       </UiCard>
 
       <div class="overview-sidebar h-full">

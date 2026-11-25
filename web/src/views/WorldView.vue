@@ -556,8 +556,8 @@ onMounted(() => selectShard(rooms.shards[0]));
           </div>
           <div v-if="view" class="world-main-actions">
             <Badge variant="secondary" class="world-count" role="status">已改 {{ changedCount }} 项</Badge>
-            <IconAction variant="outline" icon="undo" label="重置" :disabled="!canReset || frozen || loading || saving" @click="resetAll" />
-            <IconAction icon="save" :label="saving ? '保存中…' : '保存'" :disabled="!dirty || frozen || loading || saving" @click="save" />
+            <IconAction variant="outline" show-label="sm" icon="undo" label="重置" :disabled="!canReset || frozen || loading || saving" @click="resetAll" />
+            <IconAction show-label="sm" icon="save" :label="saving ? '保存中…' : '保存'" :disabled="!dirty || frozen || loading || saving" @click="save" />
           </div>
         </div>
         <div v-if="view && !loadError" class="world-toolbar">

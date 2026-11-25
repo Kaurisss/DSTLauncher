@@ -110,7 +110,7 @@ async function onRemove(id) {
       </RoomEditor>
       <UiCard v-else>
         <template #title>房间已不存在</template>
-        <template #actions><IconAction variant="outline" icon="chevron" icon-class="rotate-180" label="返回房间列表" @click="closeEditor" /></template>
+        <template #actions><IconAction variant="outline" show-label icon="chevron" icon-class="rotate-180" label="返回房间列表" @click="closeEditor" /></template>
       </UiCard>
     </template>
 
@@ -119,8 +119,8 @@ async function onRemove(id) {
         <Badge variant="secondary" class="whitespace-nowrap tabular-nums">共 {{ rooms.list.length }} 个房间</Badge>
         <template #actions>
           <RoomProfilesDialog @created="onProfileCreated" />
-          <IconAction id="new-room-button" icon="plus" label="新建房间" :disabled="preparing" @click="openEditor()" />
-          <IconAction variant="outline" icon="upload" label="上传存档" @click="openUpload()" />
+          <IconAction id="new-room-button" show-label="sm" icon="plus" label="新建房间" :disabled="preparing" @click="openEditor()" />
+          <IconAction variant="outline" show-label="sm" icon="upload" label="上传存档" @click="openUpload()" />
           <IconAction variant="outline" icon="refresh" label="刷新" @click="reload" />
         </template>
       </UiToolbar>

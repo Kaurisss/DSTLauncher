@@ -9,7 +9,7 @@
 //      App.vue 用 <Transition> 包裹视图，而 Transition 只接受「恰好一个」根元素。
 //      多根（fragment）不会报错，但会让切换动画失效——表现为来回点导航后右侧内容空白。
 //
-// 用法：npm run lint（先跑本脚本，再跑 eslint）
+// 用法：pnpm run lint（先跑本脚本，再跑 eslint）
 
 import fs from 'fs';
 import path from 'path';

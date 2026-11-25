@@ -37,7 +37,7 @@ const columns = [
   {
     id: 'actions', header: '操作', enableSorting: false,
     cell: ({ row }) => h('div', { class: 'flex justify-end gap-2' }, [
-      h(IconAction, { variant: 'outline', icon: 'clock', label: '回滚', onClick: () => emit('restore', row.original.name) }),
+      h(IconAction, { variant: 'outline', icon: 'undo', label: '回滚', tip: '检查并恢复此备份', onClick: () => emit('restore', row.original.name) }),
       props.syncEnabled ? h(IconAction, { variant: 'outline', icon: 'upload', label: syncResult(row.original.name)?.state === 'failed' ? '重试同步' : '同步', disabled: ['queued', 'syncing'].includes(syncResult(row.original.name)?.state), onClick: () => emit('sync', row.original.name) }) : null,
       h(IconAction, { variant: 'outline', icon: 'download', label: '导出', onClick: () => emit('export', row.original.name) }),
       h(IconAction, { variant: 'destructive', icon: 'trash', label: '删除', onClick: () => emit('remove', row.original.name) }),

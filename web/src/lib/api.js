@@ -318,6 +318,7 @@ export const worldApi = {
 export const installApi = {
   status: () => request('/api/install'),
   start: () => request('/api/install', { params: { action: 'start' } }),
+  cancel: () => request('/api/install', { method: 'DELETE' }),
   update: () => request('/api/install/update'),
 };
 

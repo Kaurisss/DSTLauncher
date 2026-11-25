@@ -84,7 +84,7 @@ async function reset() {
 
 <template>
   <Dialog v-model:open="open">
-    <DialogTrigger as-child><IconAction icon="folder" variant="outline" label="完整迁移" /></DialogTrigger>
+    <DialogTrigger as-child><IconAction icon="migrate" variant="outline" show-label="sm" label="完整迁移" /></DialogTrigger>
     <DialogContent class="max-h-[85dvh] overflow-y-auto sm:max-w-xl" :close-disabled="uploading" @escape-key-down="uploading && $event.preventDefault()" @interact-outside="uploading && $event.preventDefault()">
       <DialogHeader>
         <DialogTitle>完整迁移</DialogTitle>

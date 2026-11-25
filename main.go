@@ -316,6 +316,7 @@ func main() {
 	fmt.Println("\n正在安全关闭…")
 	// 窗口关闭与系统信号共用同一条停服路径，等待全部分片保存并退出。
 	mgr.BeginShutdown()
+	_ = steam.Cancel()
 	api.CancelBackupChecks()
 	stopAutomation()
 	_ = srv.Close()

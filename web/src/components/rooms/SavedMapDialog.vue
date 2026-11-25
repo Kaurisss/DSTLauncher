@@ -63,7 +63,7 @@ function selectLandmark(id) { selectedId.value = id; showLandmarks.value = true;
 
 <template>
   <Dialog v-model:open="open">
-    <DialogTrigger as-child><IconAction icon="pin" variant="outline" label="地图预览" :disabled="!rooms.list.length" /></DialogTrigger>
+    <DialogTrigger as-child><IconAction icon="map" variant="outline" show-label="sm" label="地图预览" :disabled="!rooms.list.length" /></DialogTrigger>
     <DialogContent class="flex max-h-[94dvh] flex-col overflow-y-auto sm:max-w-6xl">
       <DialogHeader class="shrink-0">
         <DialogTitle>存档地图预览</DialogTitle>

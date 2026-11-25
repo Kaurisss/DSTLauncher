@@ -2,10 +2,17 @@ package steamcmd
 
 import (
 	"archive/zip"
+	"context"
+	"net/http"
+	"net/http/httptest"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"reflect"
+	"runtime"
+	"strings"
 	"testing"
+	"time"
 )
 
 func TestNormalizeArch(t *testing.T) {
@@ -105,7 +112,7 @@ func TestExtractZipRejectsPathTraversal(t *testing.T) {
 	}
 
 	manager := NewManager(t.TempDir(), ArchAuto)
-	if err := manager.extractZip(archivePath, filepath.Join(t.TempDir(), "steamcmd")); err == nil {
+	if err := manager.extractZip(context.Background(), archivePath, filepath.Join(t.TempDir(), "steamcmd")); err == nil {
 		t.Fatal("extractZip accepted a path traversal entry")
 	}
 }
@@ -153,6 +160,116 @@ func TestInstallProgressReportsEachStage(t *testing.T) {
 		if got != step.want {
 			t.Errorf("appendOutput(%q): progress = %q, want %q", step.line, got, step.want)
 		}
+	}
+}
+
+func TestCancelInstallRejectsIdle(t *testing.T) {
+	manager := NewManager(t.TempDir(), ArchAuto)
+	if err := manager.Cancel(); err == nil {
+		t.Fatal("Cancel() succeeded when no installation was running")
+	}
+}
+
+func TestCancelInstallAbortsSteamCmdDownload(t *testing.T) {
+	started := make(chan struct{})
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Length", "1048576")
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("partial"))
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		select {
+		case <-started:
+		default:
+			close(started)
+		}
+		<-r.Context().Done()
+	}))
+	defer srv.Close()
+
+	manager := NewManager(t.TempDir(), ArchAuto)
+	manager.archiveURL = srv.URL
+	manager.Install()
+
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for SteamCMD download request")
+	}
+
+	if err := manager.Cancel(); err != nil {
+		t.Fatalf("Cancel() failed: %v", err)
+	}
+
+	deadline := time.Now().Add(3 * time.Second)
+	for manager.IsInstalling() && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if manager.IsInstalling() {
+		t.Fatal("installation remained running after Cancel()")
+	}
+	if !manager.IsCanceled() {
+		t.Fatal("IsCanceled() = false after Cancel()")
+	}
+	progress, errText, _ := manager.Progress()
+	if progress != "已取消安装" {
+		t.Errorf("progress = %q, want 已取消安装", progress)
+	}
+	if !strings.Contains(errText, "已取消安装") {
+		t.Errorf("errText = %q, want cancellation message", errText)
+	}
+}
+
+func TestCancelInstallTerminatesRunningSteamCmdProcess(t *testing.T) {
+	workDir := t.TempDir()
+	manager := NewManager(workDir, ArchAuto)
+	mustWriteFile(t, filepath.Join(manager.steamCmdDir, steamCmdExecutableName()))
+
+	started := make(chan struct{}, 1)
+	manager.makeCmd = func(_ string, _ ...string) *exec.Cmd {
+		select {
+		case started <- struct{}{}:
+		default:
+		}
+		if runtime.GOOS == "windows" {
+			return exec.Command("ping", "-n", "30", "127.0.0.1")
+		}
+		return exec.Command("sleep", "30")
+	}
+
+	manager.Install()
+
+	select {
+	case <-started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("timed out waiting for SteamCMD subprocess to start")
+	}
+	// Wait until Manager records the running cmd.
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		manager.mu.RLock()
+		hasCmd := manager.cmd != nil
+		manager.mu.RUnlock()
+		if hasCmd {
+			break
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+
+	if err := manager.Cancel(); err != nil {
+		t.Fatalf("Cancel() failed: %v", err)
+	}
+
+	waitDeadline := time.Now().Add(5 * time.Second)
+	for manager.IsInstalling() && time.Now().Before(waitDeadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if manager.IsInstalling() {
+		t.Fatal("SteamCMD subprocess did not exit after Cancel()")
+	}
+	if !manager.IsCanceled() {
+		t.Fatal("IsCanceled() = false after terminating SteamCMD subprocess")
 	}
 }
 

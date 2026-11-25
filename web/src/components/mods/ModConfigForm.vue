@@ -201,8 +201,8 @@ async function save() {
     </div>
     <div v-if="!loading && !loadError && hasOptions" class="flex shrink-0 items-center justify-end gap-2 border-t bg-background p-4">
       <span v-if="dirty" role="status" class="mr-auto text-sm text-amber-700 dark:text-amber-400">未保存</span>
-      <IconAction type="button" variant="ghost" icon="undo" label="撤销修改" :disabled="!dirty || saving || disabled" @click="reset" />
-      <IconAction type="submit" icon="save" :label="saving ? '保存中…' : '保存配置'" :disabled="saving || disabled" />
+      <IconAction type="button" variant="ghost" show-label icon="undo" label="撤销修改" :disabled="!dirty || saving || disabled" @click="reset" />
+      <IconAction type="submit" show-label icon="save" :label="saving ? '保存中…' : '保存配置'" :disabled="saving || disabled" />
     </div>
   </form>
 </template>

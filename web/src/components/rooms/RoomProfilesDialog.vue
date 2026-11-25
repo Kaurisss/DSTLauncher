@@ -82,7 +82,7 @@ function importFile(event) {
 
 <template>
   <Dialog v-model:open="open">
-    <DialogTrigger as-child><IconAction icon="folder" variant="outline" label="配置方案" /></DialogTrigger>
+    <DialogTrigger as-child><IconAction icon="templates" variant="outline" show-label="sm" label="配置方案" /></DialogTrigger>
     <DialogContent class="max-h-[85dvh] overflow-y-auto sm:max-w-xl" :close-disabled="busy" @escape-key-down="busy && $event.preventDefault()" @interact-outside="busy && $event.preventDefault()">
       <DialogHeader>
         <DialogTitle>配置方案</DialogTitle>

@@ -78,6 +78,10 @@ function update() {
   guard(() => system.update(), { success: '更新任务已启动' });
 }
 
+function cancel() {
+  guard(() => system.cancelInstall(), { success: '已请求取消安装' });
+}
+
 onMounted(async () => {
   await guard(() => system.refresh());
   await guard(() => system.loadServer());
@@ -87,9 +91,19 @@ onMounted(async () => {
 <template>
   <div class="flex flex-col gap-4">
     <template v-if="system.installing">
-      <div class="flex items-center justify-between gap-4">
-        <Badge variant="secondary">安装中</Badge>
-        <span v-if="percent >= 0" class="text-sm font-semibold tabular-nums" aria-live="polite">{{ percent }}%</span>
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <Badge variant="secondary">{{ system.canceling ? '正在取消' : '安装中' }}</Badge>
+          <span v-if="percent >= 0" class="text-sm font-semibold tabular-nums" aria-live="polite">{{ percent }}%</span>
+        </div>
+        <IconAction
+          variant="destructive"
+          show-label
+          icon="stop"
+          :label="system.canceling ? '正在取消…' : '取消安装'"
+          :disabled="system.canceling"
+          @click="cancel"
+        />
       </div>
       <div class="flex flex-col gap-2">
         <p class="text-sm font-medium">{{ stage }}</p>
@@ -97,7 +111,7 @@ onMounted(async () => {
         <p v-if="percent >= 0" class="text-sm text-muted-foreground">当前阶段进度，切换阶段时重新计算。</p>
       </div>
       <p class="text-sm text-muted-foreground">
-        {{ rooms.starting ? '安装成功后自动开服，请保持此页面打开' : '完成后会自动刷新，无需手动操作' }}
+        {{ rooms.starting ? '安装成功后自动开服，请保持此页面打开。取消会保留已下载文件，可随时继续。' : '完成后会自动刷新。取消会保留已下载文件，可随时继续。' }}
       </p>
     </template>
 
@@ -116,7 +130,7 @@ onMounted(async () => {
       <p v-if="system.external" class="text-sm text-muted-foreground">
         更新请在 Steam 中更新「Don't Starve Together Dedicated Server」工具，面板会自动使用最新版本。
       </p>
-      <IconAction v-else variant="outline" class="self-start" icon="refresh" label="检查更新" :disabled="busy" @click="update" />
+      <IconAction v-else variant="outline" show-label class="self-start" icon="cloudCheck" label="检查更新" :disabled="busy" @click="update" />
       <Alert v-if="busy">
         <AlertTitle>更新前请先停止所有分片</AlertTitle>
         <AlertDescription>运行中的服务器会占用文件，更新可能失败或只更新一半。</AlertDescription>
@@ -134,7 +148,7 @@ onMounted(async () => {
       </p>
       <AlertDialog>
         <AlertDialogTrigger as-child>
-          <IconAction variant="outline" class="self-start" icon="download" :label="system.error ? '重试安装（支持续传）' : '仅安装服务器（约 4.5GB）'" :disabled="busy || rooms.starting || installRequested" />
+          <IconAction variant="outline" show-label class="self-start" icon="download" :label="system.canceled ? '继续安装（支持续传）' : (system.error ? '重试安装（支持续传）' : '仅安装服务器（约 4.5GB）')" :disabled="busy || rooms.starting || installRequested" />
         </AlertDialogTrigger>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -149,7 +163,11 @@ onMounted(async () => {
       </AlertDialog>
     </template>
 
-    <Alert v-if="system.error" variant="destructive">
+    <Alert v-if="system.canceled && !system.installing">
+      <AlertTitle>已暂停安装</AlertTitle>
+      <AlertDescription>已下载的服务器文件已保留，随时可点击重新开始续传。</AlertDescription>
+    </Alert>
+    <Alert v-else-if="system.error" variant="destructive">
       <AlertTitle>安装或更新失败</AlertTitle>
       <AlertDescription>{{ system.error }}</AlertDescription>
     </Alert>
@@ -169,7 +187,7 @@ onMounted(async () => {
               <FieldLabel for="srv_dir">安装目录</FieldLabel>
               <Input id="srv_dir" v-model="draftDir" :disabled="locked" placeholder="留空 = 自动探测 Steam 库" />
               <FieldDescription>填「Don't Starve Together Dedicated Server」那一层，也可以粘贴里面的 bin 目录。</FieldDescription>
-              <IconAction class="self-start" icon="check" label="应用" :disabled="locked" @click="apply(draftDir)" />
+              <IconAction show-label class="self-start" icon="check" label="应用" :disabled="locked" @click="apply(draftDir)" />
             </Field>
             <Field :data-disabled="locked || undefined">
               <FieldLabel for="srv_arch">架构</FieldLabel>
@@ -184,11 +202,11 @@ onMounted(async () => {
             <div v-for="candidate in server.candidates" :key="candidate.root" class="flex flex-wrap items-center gap-2">
               <span class="min-w-0 flex-1 break-all text-sm">{{ candidate.root }}</span>
               <Badge variant="secondary">{{ candidate.source }}</Badge>
-              <IconAction variant="outline" icon="check" :label="candidate.root === server.root ? '使用中' : '使用'" :disabled="locked || candidate.root === server.root" @click="useCandidate(candidate.root)" />
+              <IconAction variant="outline" show-label icon="check" :label="candidate.root === server.root ? '使用中' : '使用'" :disabled="locked || candidate.root === server.root" @click="useCandidate(candidate.root)" />
             </div>
           </template>
           <div class="flex flex-wrap items-center gap-2">
-            <IconAction variant="outline" icon="undo" label="恢复自动探测" :disabled="locked || !server.pinned" @click="resetAuto" />
+            <IconAction variant="outline" show-label icon="undo" label="恢复自动探测" :disabled="locked || !server.pinned" @click="resetAuto" />
             <span class="text-sm text-muted-foreground">{{ server.pinned ? '当前为手动指定' : '当前为自动探测' }}</span>
           </div>
           <p class="break-all text-sm text-muted-foreground">配置保存在 {{ server.configPath }}，重启面板后依然有效。</p>

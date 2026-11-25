@@ -65,8 +65,8 @@ async function test() {
   <UiCard>
     <template #title>事件通知</template>
     <template #actions>
-      <IconAction icon="send" variant="outline" label="测试已保存的通知设置" :disabled="busy || !snapshot?.url" @click="test" />
-      <IconAction v-if="draft" type="submit" form="notification-settings" icon="save" :label="busy ? '处理中…' : '保存通知设置'" :disabled="busy" />
+      <IconAction icon="send" variant="outline" show-label="sm" label="测试已保存的通知设置" text="测试通知" :disabled="busy || !snapshot?.url" @click="test" />
+      <IconAction v-if="draft" type="submit" form="notification-settings" show-label icon="save" :label="busy ? '处理中…' : '保存通知设置'" :text="busy ? '处理中…' : '保存设置'" :disabled="busy" />
     </template>
     <p v-if="error" role="alert" class="mb-4 text-sm text-destructive">{{ error }}</p>
     <form v-if="draft" id="notification-settings" @submit.prevent="save">

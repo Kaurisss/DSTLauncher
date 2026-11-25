@@ -305,7 +305,7 @@ async function blockPlayer(entry) {
         </div>
       </form>
       <template #actions>
-        <IconAction :variant="selected.size ? 'destructive' : 'ghost'" icon="trash" :label="`删除所选（${selected.size}）`" :disabled="!selected.size || deleting || !!blocking || loading" @click="removeEntries([...selected])" />
+        <IconAction :variant="selected.size ? 'destructive' : 'ghost'" show-label="lg" icon="trash" :label="`删除所选（${selected.size}）`" :disabled="!selected.size || deleting || !!blocking || loading" @click="removeEntries([...selected])" />
         <IconAction variant="outline" icon="refresh" :icon-class="loading ? 'animate-spin motion-reduce:animate-none' : ''" label="刷新记录" :disabled="loading || !rooms.currentId || !shard" @click="refresh" />
       </template>
     </UiToolbar>

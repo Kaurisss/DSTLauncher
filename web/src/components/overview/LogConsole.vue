@@ -35,7 +35,7 @@ watch([() => rooms.currentId, () => rooms.shards.join(',')], ([roomId], [previou
             </TabsTrigger>
           </TabsList>
           <CodeBlockActions class="log-pane-tools">
-            <IconAction variant="ghost" icon="clean" label="清屏" @click="clear(active)" />
+            <IconAction variant="ghost" show-label="sm" icon="clean" label="清屏" @click="clear(active)" />
           </CodeBlockActions>
         </CodeBlockHeader>
         <KeepAlive :key="rooms.currentId">

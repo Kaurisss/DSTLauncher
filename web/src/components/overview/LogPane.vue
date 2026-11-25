@@ -162,7 +162,7 @@ async function submit() {
         :disabled="!running"
         :placeholder="running ? '控制台命令，如 c_save() / c_listallplayers()' : label + ' 未运行'"
       />
-      <IconAction type="submit" icon="terminal" label="执行" :disabled="!running" />
+      <IconAction type="submit" show-label="sm" icon="terminal" label="执行" :disabled="!running" />
     </form>
   </TabsContent>
 </template>

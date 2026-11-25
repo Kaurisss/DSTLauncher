@@ -4,11 +4,12 @@
 # 前端产物通过 go:embed 打进 Go 二进制，必须先构建 web/dist 再编译 Go。
 FROM node:24-bookworm-slim AS web
 WORKDIR /src/web
-# 先只复制依赖清单，利用层缓存：依赖不变时 npm ci 不会重跑
-COPY web/package.json web/package-lock.json ./
-RUN npm ci
+RUN corepack enable
+# 先只复制依赖清单，利用层缓存：依赖不变时 pnpm install 不会重跑
+COPY web/package.json web/pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile
 COPY web/ ./
-RUN npm run build
+RUN pnpm run build
 
 # ── 阶段 2：编译 Go 二进制 ───────────────────────────────────────
 FROM golang:1.25-bookworm AS build

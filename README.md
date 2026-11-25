@@ -46,7 +46,7 @@
 
 前端产物通过 `go:embed` 打进二进制，**构建产物只有一个 exe**。改了前端代码后，必须先重新构建前端再编译 Go：
 
-Windows 可在仓库根目录运行一键构建脚本（需要 Node.js/npm 和 Go；首次自动安装前端依赖）：
+Windows 可在仓库根目录运行一键构建脚本（需要 Node.js/pnpm 和 Go；首次自动安装前端依赖）：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1
@@ -76,8 +76,8 @@ go build -tags desktop -ldflags "-H=windowsgui" -o dst-desktop.exe .
 ```bash
 # 前端（修改 web/ 下代码后需要重新构建）
 cd web
-npm install
-npm run build   # 产物输出到 web/dist，编译时嵌入 exe
+pnpm install
+pnpm run build   # 产物输出到 web/dist，编译时嵌入 exe
 
 # 后端（在仓库根目录，要求 web/dist 已存在）
 cd ..

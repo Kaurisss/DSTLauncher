@@ -217,8 +217,8 @@ function preventWhileBusy(event) {
             </Select>
             <p v-if="actionError" role="alert" class="break-words text-sm text-destructive">{{ actionError }}</p>
             <div class="flex justify-end gap-2">
-              <DialogClose as-child><IconAction type="button" variant="outline" icon="x" label="取消" :disabled="busy" /></DialogClose>
-              <IconAction type="submit" icon="pin" :label="busy ? '执行中…' : '确认传送'" :disabled="busy || !validTarget" />
+              <DialogClose as-child><IconAction type="button" variant="outline" show-label icon="x" label="取消" :disabled="busy" /></DialogClose>
+              <IconAction type="submit" show-label icon="pin" :label="busy ? '执行中…' : '确认传送'" :disabled="busy || !validTarget" />
             </div>
           </form>
         </DialogContent>

@@ -10,6 +10,10 @@ import UiField from '@/components/ui/UiField.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard } from '@/lib/toast.js';
 
+defineProps({
+  showLabel: { type: [Boolean, String], default: true },
+});
+
 const rooms = useRoomsStore();
 const open = ref(false);
 const count = ref(1);
@@ -54,7 +58,7 @@ function preventWhileBusy(event) {
 <template>
   <Dialog v-model:open="open">
     <DialogTrigger as-child>
-      <IconAction variant="outline" icon="clock" :label="rooms.rollingBack ? '正在请求回档…' : remaining > 0 ? `回档中（${remaining}秒）` : '回档'" :disabled="!rooms.current || rooms.rollingBack || remaining > 0" />
+      <IconAction variant="outline" :show-label="showLabel" icon="rollback" :label="rooms.rollingBack ? '正在请求回档…' : remaining > 0 ? `回档中（${remaining}秒）` : '回档'" :disabled="!rooms.current || rooms.rollingBack || remaining > 0" />
     </DialogTrigger>
     <DialogContent
       class="sm:max-w-md overflow-y-auto overscroll-contain"
@@ -76,9 +80,9 @@ function preventWhileBusy(event) {
         <p v-else-if="!valid" role="alert" class="text-sm text-destructive">请输入 1–{{ maxCount }} 之间的整数；实际可回退数量由游戏中保留的存档决定。</p>
         <DialogFooter>
           <DialogClose as-child>
-            <IconAction type="button" variant="outline" icon="x" label="取消" :disabled="rooms.rollingBack" />
+            <IconAction type="button" variant="outline" show-label icon="x" label="取消" :disabled="rooms.rollingBack" />
           </DialogClose>
-          <IconAction type="submit" variant="destructive" icon="clock" :label="rooms.rollingBack ? '正在请求回档…' : '确认回档'" :disabled="!valid || !!unavailable || rooms.rollingBack || remaining > 0" />
+          <IconAction type="submit" variant="destructive" show-label icon="rollback" :label="rooms.rollingBack ? '正在请求回档…' : '确认回档'" :disabled="!valid || !!unavailable || rooms.rollingBack || remaining > 0" />
         </DialogFooter>
       </form>
     </DialogContent>

@@ -5,11 +5,15 @@ package steamcmd
 import (
 	"archive/tar"
 	"compress/gzip"
+	"context"
+	"errors"
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 )
 
 const linuxSteamCMDURL = "https://client-update.steamstatic.com/installer/steamcmd_linux.tar.gz"
@@ -18,7 +22,21 @@ func steamCmdExecutableName() string { return "steamcmd.sh" }
 
 func steamCmdArchiveURL() string { return linuxSteamCMDURL }
 
-func (m *Manager) extractPlatformArchive(archivePath, destination string) error {
+func configureSteamCmdProcess(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+}
+
+func stopSteamCmdProcess(cmd *exec.Cmd) {
+	if cmd == nil || cmd.Process == nil || cmd.Process.Pid <= 0 {
+		return
+	}
+	// steamcmd.sh 会再启动 linux32/steamcmd，必须杀整组进程才能真正停下。
+	if err := syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
+		_ = cmd.Process.Kill()
+	}
+}
+
+func (m *Manager) extractPlatformArchive(ctx context.Context, archivePath, destination string) error {
 	file, err := os.Open(archivePath)
 	if err != nil {
 		return fmt.Errorf("打开 SteamCMD 压缩包失败: %w", err)
@@ -33,6 +51,9 @@ func (m *Manager) extractPlatformArchive(archivePath, destination string) error 
 
 	archive := tar.NewReader(compressed)
 	for {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		header, err := archive.Next()
 		if err == io.EOF {
 			return nil

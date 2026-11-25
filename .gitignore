@@ -44,11 +44,5 @@ __pycache__/
 /data/
 /.env
 
-# pi 本地任务/截图等不提交，仅允许项目级代理定义进入版本控制
-/.pi/*
-!/.pi/agents/
-/.pi/agents/*
-!/.pi/agents/*.md
-
-# 本地 MCP 运行痕迹
-/.serena/
+# graphify-out
+/graphify-out/

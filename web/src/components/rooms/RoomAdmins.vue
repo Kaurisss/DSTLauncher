@@ -143,7 +143,7 @@ async function remove(id) {
           spellcheck="false"
           @keydown.enter="add"
         />
-        <IconAction icon="plus" label="添加" :disabled="busy || !input.trim()" @click="add" />
+        <IconAction show-label icon="plus" label="添加" :disabled="busy || !input.trim()" @click="add" />
       </div>
       <Select v-if="candidates.length" :model-value="picked" :disabled="busy" @update:model-value="onPick">
         <SelectTrigger class="mt-2 max-w-xl" aria-label="从进过房间的玩家选择">

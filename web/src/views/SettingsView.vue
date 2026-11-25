@@ -114,8 +114,8 @@ async function saveApiKey() {
           <UiPill :tone="auth.enabled ? 'ok' : ''">
             {{ auth.envManaged ? '启动参数锁定' : (auth.enabled ? '已启用' : '未启用') }}
           </UiPill>
-          <IconAction v-if="auth.enabled" variant="destructive" icon="logout" label="退出登录" @click="logout" />
-          <IconAction v-if="!auth.envManaged" type="submit" form="settings-password-form" icon="save" :label="savingPwd ? '保存中…' : '保存密码'" :disabled="savingPwd || (!auth.enabled && !newPwd.trim()) || (auth.enabled && !currentPwd)" />
+          <IconAction v-if="auth.enabled" variant="destructive" show-label icon="logout" label="退出登录" @click="logout" />
+          <IconAction v-if="!auth.envManaged" type="submit" form="settings-password-form" show-label icon="save" :label="savingPwd ? '保存中…' : '保存密码'" :disabled="savingPwd || (!auth.enabled && !newPwd.trim()) || (auth.enabled && !currentPwd)" />
         </template>
 
         <p v-if="auth.envManaged" class="text-sm text-muted-foreground">
@@ -154,7 +154,7 @@ async function saveApiKey() {
           >
             申请 Key
           </a>
-          <IconAction type="submit" form="settings-api-key-form" icon="save" :label="savingKey ? '保存中…' : '保存 Key'" :disabled="savingKey" />
+          <IconAction type="submit" form="settings-api-key-form" show-label icon="save" :label="savingKey ? '保存中…' : '保存 Key'" :disabled="savingKey" />
         </template>
 
         <form id="settings-api-key-form" class="grid max-w-md gap-4" @submit.prevent="saveApiKey">

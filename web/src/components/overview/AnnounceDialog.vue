@@ -69,7 +69,8 @@ async function submit() {
     <DialogTrigger as-child>
       <IconAction
         variant="outline"
-        icon="send"
+        show-label
+        icon="megaphone"
         :label="busy ? '正在发送…' : '全服公告'"
         :disabled="!canAnnounce"
       />
@@ -97,9 +98,9 @@ async function submit() {
         <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
         <DialogFooter>
           <DialogClose as-child>
-            <IconAction type="button" variant="outline" icon="x" label="取消" :disabled="busy" />
+            <IconAction type="button" variant="outline" show-label icon="x" label="取消" :disabled="busy" />
           </DialogClose>
-          <IconAction type="submit" icon="send" :label="busy ? '发送中…' : '发送全服公告'" :disabled="busy || !validMessage" />
+          <IconAction type="submit" show-label icon="send" :label="busy ? '发送中…' : '发送全服公告'" :text="busy ? '发送中…' : '发送公告'" :disabled="busy || !validMessage" />
         </DialogFooter>
       </form>
     </DialogContent>

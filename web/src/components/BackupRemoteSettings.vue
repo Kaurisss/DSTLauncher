@@ -70,8 +70,8 @@ async function retry(item) {
   <UiCard>
     <template #title>异地备份</template>
     <template #actions>
-      <IconAction icon="activity" variant="outline" label="测试已保存的备份目标" :disabled="busy || !snapshot || (snapshot.kind === 'directory' ? !snapshot.directory : !snapshot.url)" @click="test" />
-      <IconAction v-if="draft" type="submit" form="backup-remote-settings" icon="save" :label="busy ? '处理中…' : '保存异地备份设置'" :disabled="busy" />
+      <IconAction icon="plug" variant="outline" show-label="sm" label="测试已保存的备份目标" text="测试连接" :disabled="busy || !snapshot || (snapshot.kind === 'directory' ? !snapshot.directory : !snapshot.url)" @click="test" />
+      <IconAction v-if="draft" type="submit" form="backup-remote-settings" show-label icon="save" :label="busy ? '处理中…' : '保存异地备份设置'" :text="busy ? '处理中…' : '保存设置'" :disabled="busy" />
     </template>
     <p v-if="error" role="alert" class="mb-4 text-sm text-destructive">{{ error }}</p>
     <form v-if="draft" id="backup-remote-settings" @submit.prevent="save">

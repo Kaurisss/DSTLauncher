@@ -143,7 +143,7 @@ async function change(id, remove = false) {
         <p v-if="needRestart" role="status" class="text-sm text-muted-foreground">房间正在运行，名单修改需下次重启后生效。</p>
         <form class="flex flex-wrap gap-2" @submit.prevent="change(input)">
           <Input v-model="input" :aria-label="`${selected.title} Klei ID`" class="min-w-0 flex-1 basis-48 font-mono" placeholder="KU_ 开头的玩家 ID" autocomplete="off" :disabled="busy" />
-          <IconAction type="submit" icon="plus" :label="`添加到${selected.title}`" :disabled="busy || !input.trim()" />
+          <IconAction type="submit" show-label icon="plus" :label="`添加到${selected.title}`" text="添加" :disabled="busy || !input.trim()" />
           <Select v-if="candidates.length" :model-value="picked" :disabled="busy" @update:model-value="onPick">
             <SelectTrigger class="w-full min-w-0 basis-full" aria-label="从进过房间的玩家选择">
               <SelectValue placeholder="从进过房间的玩家选择" />

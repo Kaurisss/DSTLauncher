@@ -3,11 +3,14 @@
 package steamcmd
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
+	"syscall"
 )
 
 const windowsSteamCMDURL = "https://client-update.steamstatic.com/installer/steamcmd.zip"
@@ -18,8 +21,24 @@ func steamCmdExecutableName() string { return "steamcmd.exe" }
 
 func steamCmdArchiveURL() string { return windowsSteamCMDURL }
 
-func (m *Manager) extractPlatformArchive(archivePath, destination string) error {
-	return m.extractZip(archivePath, destination)
+func (m *Manager) extractPlatformArchive(ctx context.Context, archivePath, destination string) error {
+	return m.extractZip(ctx, archivePath, destination)
+}
+
+func configureSteamCmdProcess(cmd *exec.Cmd) {
+	cmd.SysProcAttr = &syscall.SysProcAttr{
+		CreationFlags: syscall.CREATE_NEW_PROCESS_GROUP,
+	}
+}
+
+func stopSteamCmdProcess(cmd *exec.Cmd) {
+	if cmd == nil || cmd.Process == nil || cmd.Process.Pid <= 0 {
+		return
+	}
+	// SteamCMD 可能拉起自更新子进程，优先按进程树强制结束，失败再退回直接 Kill。
+	if err := exec.Command("taskkill", "/T", "/F", "/PID", strconv.Itoa(cmd.Process.Pid)).Run(); err != nil {
+		_ = cmd.Process.Kill()
+	}
 }
 
 func serverPaths(root, arch string) (serverDir, executable string) {
