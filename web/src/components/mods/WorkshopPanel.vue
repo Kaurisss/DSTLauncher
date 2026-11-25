@@ -110,7 +110,12 @@ async function query(nextPage) {
           </div>
         </div>
         <div v-else-if="results.length && !error" class="grid gap-3">
-          <article v-for="item in results" :key="item.id" class="workshop-item flex min-w-0 items-center gap-3 rounded-lg border bg-background p-3">
+          <article
+            v-for="(item, index) in results"
+            :key="item.id"
+            class="workshop-item flex min-w-0 items-center gap-3 rounded-lg border bg-background p-3"
+            :style="{ '--workshop-enter-delay': `${Math.min(index, 10) * 50}ms` }"
+          >
             <div class="grid size-14 shrink-0 place-items-center overflow-hidden rounded-lg bg-muted" aria-hidden="true">
               <img v-if="item.previewUrl" :src="item.previewUrl" class="size-full object-cover outline outline-1 -outline-offset-1 outline-black/10 dark:outline-white/10" loading="lazy" decoding="async" alt="" @error="$event.target.style.display = 'none'" />
               <Icon v-else name="package" :size="24" />
@@ -147,3 +152,23 @@ async function query(nextPage) {
     </DialogContent>
   </Dialog>
 </template>
+
+<style scoped>
+.workshop-item {
+  animation: workshop-fade-in 180ms ease-out both;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .workshop-item {
+    animation: workshop-enter-rise 260ms cubic-bezier(0.2, 0, 0, 1) var(--workshop-enter-delay, 0ms) both;
+  }
+}
+@keyframes workshop-fade-in {
+  from { opacity: 0; }
+}
+@keyframes workshop-enter-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+</style>

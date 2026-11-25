@@ -6,7 +6,7 @@
 // 任意一个房间点效果都一样。服务器启动时带 -skip_update_server_mods，
 // 只加载不下载，所以启动前必须先把模组更新到位。
 
-import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import {
   DialogRoot, DialogPortal, DialogOverlay, DialogContent,
   DialogTitle, DialogDescription, DialogClose,
@@ -17,7 +17,6 @@ import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import UiPill from '@/components/ui/UiPill.vue';
-import { Skeleton } from '@/components/ui/skeleton';
 import UiToolbarFilters from '@/components/ui/UiToolbarFilters.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -53,6 +52,7 @@ function labelOf(item) {
 const frozen = computed(() => rooms.starting || rooms.current?.running
   || rooms.statuses.some(status => ['running', 'starting', 'stopping'].includes(status.state)));
 
+const INITIAL_CARD_SLOTS = 8;
 const mods = ref([]);
 const loading = ref(false);
 const streaming = ref(false);
@@ -60,14 +60,25 @@ const expectedTotal = ref(0);
 const loadError = ref('');
 const workshopDetails = ref({});
 const workshopError = ref('');
-const pendingDetails = new Set();
+const pendingDetails = reactive(new Set());
+const queuedWorkshopIds = reactive(new Set());
 const search = ref('');
 const filter = ref('all');
+const slotEpoch = ref(0);
+const slotKeyByModId = reactive(new Map());
 const enabledCount = computed(() => mods.value.filter(mod => mod.enabled).length);
-const tailSkeletonCount = computed(() => {
-  if (!streaming.value || !mods.value.length) return 0;
-  const remaining = expectedTotal.value - mods.value.length;
-  return remaining > 0 ? Math.min(3, remaining) : 1;
+const isInitialLoading = computed(() => !rooms.loaded || (loading.value && !mods.value.length));
+const pendingSlotCount = computed(() => {
+  if (!rooms.loaded) return INITIAL_CARD_SLOTS;
+  if (loading.value && !mods.value.length) {
+    return expectedTotal.value > 0 ? Math.min(expectedTotal.value, 12) : INITIAL_CARD_SLOTS;
+  }
+  if (!streaming.value) return 0;
+  // 保留首屏卡片壳不闪退：已有条目继续就地填充，超出后仅预留少量尾卡壳
+  const target = expectedTotal.value > 0
+    ? Math.min(expectedTotal.value, Math.max(INITIAL_CARD_SLOTS, mods.value.length + 3))
+    : Math.max(INITIAL_CARD_SLOTS, mods.value.length + 1);
+  return Math.max(0, target - mods.value.length);
 });
 const visibleMods = computed(() => {
   const query = search.value.trim().toLowerCase();
@@ -80,6 +91,26 @@ const visibleMods = computed(() => {
     return true;
   });
 });
+const cardSlots = computed(() => {
+  const epoch = slotEpoch.value;
+  const rows = visibleMods.value.map(mod => ({
+    key: slotKeyByModId.get(mod.id) || `mod:${epoch}:${mod.id}`,
+    mod,
+  }));
+  // 仅在未加筛选时渲染尾部占位卡壳，避免搜索/筛选时出现空白占位卡
+  if (!search.value.trim() && filter.value === 'all') {
+    const start = mods.value.length;
+    for (let i = 0; i < pendingSlotCount.value; i++) {
+      rows.push({ key: `slot:${epoch}:${start + i}`, mod: null });
+    }
+  }
+  return rows;
+});
+function isWorkshopPending(mod) {
+  if (!mod || !/^workshop-\d+$/.test(mod.id)) return false;
+  const id = mod.id.slice('workshop-'.length);
+  return !workshopDetails.value[id] && (pendingDetails.has(id) || queuedWorkshopIds.has(id));
+}
 let loadRequest = 0;
 let loadController = null;
 let workshopBatch = [];
@@ -91,11 +122,18 @@ function flushWorkshopBatch() {
   if (!workshopBatch.length) return;
   const batch = workshopBatch;
   workshopBatch = [];
+  for (const mod of batch) {
+    if (/^workshop-\d+$/.test(mod.id)) queuedWorkshopIds.delete(mod.id.slice('workshop-'.length));
+  }
   loadWorkshopDetails(batch);
 }
 
 function queueWorkshopCheck(mod) {
   if (!mod || (mod.iconUrl && mod.name && mod.name !== mod.id)) return;
+  if (/^workshop-\d+$/.test(mod.id)) {
+    const wid = mod.id.slice('workshop-'.length);
+    if (!workshopDetails.value[wid]) queuedWorkshopIds.add(wid);
+  }
   workshopBatch.push(mod);
   if (workshopBatch.length >= 12) {
     flushWorkshopBatch();
@@ -149,6 +187,7 @@ async function load() {
   clearTimeout(workshopBatchTimer);
   workshopBatchTimer = null;
   workshopBatch = [];
+  queuedWorkshopIds.clear();
 
   const room = rooms.current;
   const target = shard.value;
@@ -165,6 +204,7 @@ async function load() {
   loadController = controller;
   const progressive = mods.value.length === 0;
   const buffered = [];
+  const epoch = slotEpoch.value;
   const isCurrent = () => !disposed && request === loadRequest && shard.value === target && rooms.currentId === room.id;
 
   loading.value = true;
@@ -183,6 +223,8 @@ async function load() {
       onMod(mod) {
         if (!isCurrent()) return;
         if (progressive) {
+          const idx = mods.value.length;
+          if (!slotKeyByModId.has(mod.id)) slotKeyByModId.set(mod.id, `slot:${epoch}:${idx}`);
           mods.value.push(mod);
           queueWorkshopCheck(mod);
         } else {
@@ -194,6 +236,9 @@ async function load() {
         if (progressive) {
           flushWorkshopBatch();
         } else {
+          buffered.forEach((mod, idx) => {
+            if (!slotKeyByModId.has(mod.id)) slotKeyByModId.set(mod.id, `mod:${epoch}:${mod.id}:${idx}`);
+          });
           mods.value = buffered;
           loadWorkshopDetails(buffered.filter(mod => !mod.iconUrl || !mod.name || mod.name === mod.id));
         }
@@ -470,6 +515,8 @@ watch([() => rooms.current, shard], () => {
   checking.value = false;
   checkResult.value = null;
   mods.value = [];
+  slotEpoch.value++;
+  slotKeyByModId.clear();
   configOpen.value = false;
   busyItems.value = [];
   load();
@@ -523,30 +570,15 @@ watch([() => rooms.current, shard], () => {
         </div>
       </div>
 
-      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="模组列表">
-        <div v-if="!rooms.loaded || (loading && !mods.length)" role="status" aria-label="加载中">
-          <div v-for="i in 4" :key="i" class="mod flex flex-wrap items-center gap-4">
-            <div class="flex min-w-0 flex-1 items-center gap-3.5">
-              <Skeleton class="size-14 shrink-0 rounded-lg" />
-              <div class="grid min-w-0 flex-1 gap-2">
-                <Skeleton class="h-4 w-44" />
-                <Skeleton class="h-3.5 w-32" />
-              </div>
-            </div>
-            <div class="ml-auto flex items-center gap-2">
-              <Skeleton class="h-5 w-16 rounded-full" />
-              <Skeleton class="size-7 rounded-md" />
-              <Skeleton class="size-7 rounded-md" />
-            </div>
-          </div>
-        </div>
-        <UiEmpty v-else-if="!rooms.current">
+      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="模组列表" :aria-busy="loading">
+        <UiEmpty v-if="rooms.loaded && !rooms.current">
           <span>请先在「房间管理」页新建一个房间</span>
           <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
         </UiEmpty>
         <UiEmpty v-else-if="loadError" :text="'读取模组失败：' + loadError" />
 
         <template v-else>
+          <span v-if="isInitialLoading || streaming" class="sr-only" role="status">{{ isInitialLoading ? '正在加载模组…' : '正在继续加载模组…' }}</span>
           <div v-if="frozen" class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm" role="status">
             <Icon name="info" size="16" />
             <span>服务器运行中，模组修改已冻结。</span>
@@ -586,38 +618,24 @@ watch([() => rooms.current, shard], () => {
               {{ workshopError }}。当前显示本地名称或 ID，可点击「刷新」重试。
             </AlertDescription>
           </Alert>
-          <template v-if="visibleMods.length || tailSkeletonCount">
+          <template v-if="cardSlots.length">
             <ModItem
-              v-for="m in visibleMods"
-              :key="`${shard}:${m.id}`"
-              :mod="m"
+              v-for="(slot, index) in cardSlots"
+              :key="slot.key"
+              :mod="slot.mod"
               :shard="shard"
-              :update-info="updateMap[m.id] || null"
-              :downloading="busyIds.includes(m.id)"
+              :enter-index="index"
+              :workshop-loading="isWorkshopPending(slot.mod)"
+              :update-info="slot.mod ? (updateMap[slot.mod.id] || null) : null"
+              :downloading="slot.mod ? busyIds.includes(slot.mod.id) : false"
               :updating="updating || queueing"
               @changed="load"
               @update="startOne"
-              @toggled="enabled => onToggled(m.id, enabled)"
-              @cover-needed="loadWorkshopDetails([m])"
+              @toggled="enabled => slot.mod && onToggled(slot.mod.id, enabled)"
+              @cover-needed="slot.mod && loadWorkshopDetails([slot.mod])"
               @config-open="configOpen = $event"
-              @busy="setItemBusy(m.id, $event)"
+              @busy="slot.mod && setItemBusy(slot.mod.id, $event)"
             />
-            <div v-if="tailSkeletonCount" role="status" aria-label="继续加载模组">
-              <div v-for="i in tailSkeletonCount" :key="`stream-sk-${i}`" class="mod flex flex-wrap items-center gap-4">
-                <div class="flex min-w-0 flex-1 items-center gap-3.5">
-                  <Skeleton class="size-14 shrink-0 rounded-lg" />
-                  <div class="grid min-w-0 flex-1 gap-2">
-                    <Skeleton class="h-4 w-44" />
-                    <Skeleton class="h-3.5 w-32" />
-                  </div>
-                </div>
-                <div class="ml-auto flex items-center gap-2">
-                  <Skeleton class="h-5 w-16 rounded-full" />
-                  <Skeleton class="size-7 rounded-md" />
-                  <Skeleton class="size-7 rounded-md" />
-                </div>
-              </div>
-            </div>
           </template>
           <div v-else class="grid justify-items-center gap-3 rounded-lg border border-dashed p-10">
             <UiEmpty :text="mods.length ? '没有匹配的模组' : '还没有模组'" />
