@@ -40,14 +40,15 @@ export function useProcessControl() {
     },
 
     async restart(shard) {
+      const target = label(shard);
       const ok = await confirmAction({
-        title: `重启 ${shard}？`,
-        description: '将先自动保存存档。',
-        confirmText: '重启分片',
+        title: shard ? `重启 ${shard} 分片？` : '重启全部分片？',
+        description: '将先自动保存存档，再重新启动分片进程。',
+        confirmText: shard ? '重启分片' : '全部重启',
         destructive: true,
       });
       if (!ok) return false;
-      return run(() => rooms.restart(shard), `${shard} 已重启`);
+      return run(() => rooms.restart(shard), `${target}分片已重启`);
     },
   };
 }

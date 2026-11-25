@@ -208,7 +208,7 @@ function preventWhileBusy(event) {
         </div>
         <p v-if="actionError && !teleportOpen" role="alert" class="mb-2 break-words text-sm text-destructive">{{ actionError }}</p>
 
-        <div v-if="players.length" class="max-h-60 flex-1 divide-y divide-border overflow-y-auto overscroll-contain pr-0.5">
+        <div v-if="players.length" class="max-h-96 flex-1 divide-y divide-border overflow-y-auto overscroll-contain pr-0.5">
           <article
             v-for="player in players" :key="`${player.shard}:${player.userid}`"
             :aria-label="`${player.name || player.userid} ${player.userid} ${labelOf(player.shard)}`"

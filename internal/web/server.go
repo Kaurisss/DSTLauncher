@@ -94,6 +94,9 @@ type Server struct {
 	backupRemote    *backupremote.Engine
 	backupRemoteErr error
 	backupChecks    *backupChecks
+	publicIPMu      sync.Mutex
+	publicIPCache   publicIPState
+	publicIPFetcher func(context.Context) publicIPState
 }
 
 // NewServer 创建 HTTP 服务。
@@ -156,8 +159,10 @@ func (s *Server) Handler() http.Handler {
 
 	// 房间（配置的唯一事实来源）
 	mux.HandleFunc("/api/rooms", s.handleRooms)
+	mux.HandleFunc("/api/rooms/connect", s.handleRoomConnect)
 	mux.HandleFunc("/api/rooms/meta", s.handleRoomMeta)
 	mux.HandleFunc("/api/rooms/copy", s.handleProfileApply)
+	mux.HandleFunc("/api/network/public-ip", s.handlePublicIP)
 	mux.HandleFunc("/api/profiles", s.handleProfiles)
 	mux.HandleFunc("/api/migration/export", s.handleMigrationExport)
 	mux.HandleFunc("/api/migration/upload", s.handleMigrationUpload)
@@ -307,12 +312,34 @@ type roomView struct {
 	Statuses  []server.Status `json:"statuses"`
 	HasSave   bool            `json:"hasSave"`
 	NeedToken bool            `json:"needToken"`
+	ModCount  int             `json:"modCount"`
 	// Locations 是各分片存档里实际写着的世界位置（forest / cave /
 	// shipwrecked / volcanoworld），键是分片名。
 	//
 	// 分片目录名叫 Cave 但里面可能是火山，所以界面上的分片名不能靠名字猜；
 	// 也不写回 rooms.json：世界类型是存档的事实，不是面板的配置。
 	Locations map[string]string `json:"locations,omitempty"`
+}
+
+func (s *Server) enabledModCount(rm *room.Room) int {
+	clusterDir := rm.ClusterDir(s.rootDir, s.confDir)
+	seen := make(map[string]struct{})
+	for _, sh := range rm.Shards {
+		if sh.Disabled {
+			continue
+		}
+		raw, err := os.ReadFile(filepath.Join(clusterDir, sh.Name, "modoverrides.lua"))
+		if err != nil {
+			continue
+		}
+		ov := modmgr.ParseOverrides(string(raw))
+		for id, enabled := range ov.Enabled {
+			if enabled {
+				seen[id] = struct{}{}
+			}
+		}
+	}
+	return len(seen)
 }
 
 // shardLocations 读出每个分片的实际世界位置。
@@ -353,6 +380,7 @@ func (s *Server) roomViews() []roomView {
 			Statuses:  sts,
 			HasSave:   rm.ExistsSave(s.rootDir, s.confDir),
 			NeedToken: rm.NeedsToken() && !rm.HasToken(),
+			ModCount:  s.enabledModCount(rm),
 			Locations: s.shardLocations(rm),
 		})
 	}

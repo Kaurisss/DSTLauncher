@@ -36,6 +36,7 @@ export const useUiStore = defineStore('ui', () => {
       label: '当前房间',
       items: [
         { key: 'overview', label: '概览', icon: 'dashboard', scope: 'room' },
+        { key: 'console', label: '控制台', icon: 'terminal', scope: 'room' },
         { key: 'world', label: '世界配置', icon: 'globe', scope: 'room' },
         { key: 'mods', label: '模组', icon: 'package', scope: 'room' },
         { key: 'logs', label: '玩家管理', icon: 'users', scope: 'room' },

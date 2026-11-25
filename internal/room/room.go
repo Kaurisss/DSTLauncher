@@ -77,6 +77,12 @@ type Room struct {
 
 	MaxSnapshots int `json:"maxSnapshots"` // 回档点数
 
+	// ConnectIP / ConnectPort / ConnectPorts 是可选的自定义直连地址（用于内网穿透或端口映射）。
+	// 留空 / 为 0 时，前端自动使用探测到的外网 IP 与对应分片的 serverPort 拼接 c_connect。
+	ConnectIP    string         `json:"connectIp,omitempty"`
+	ConnectPort  int            `json:"connectPort,omitempty"`
+	ConnectPorts map[string]int `json:"connectPorts,omitempty"`
+
 	// Shards 是房间的全部分片定义，是分片的唯一事实来源。
 	// 数组里可以有多条，启停与配置生成都按它遍历；是否启用看 Shard.Disabled。
 	Shards []Shard `json:"shards"`
@@ -257,6 +263,24 @@ func (r *Room) Normalize() {
 	if r.MasterPort < 1024 || r.MasterPort > 65535 {
 		r.MasterPort = 21000
 	}
+	r.ConnectIP = strings.TrimSpace(r.ConnectIP)
+	if r.ConnectPort < 0 || r.ConnectPort > 65535 {
+		r.ConnectPort = 0
+	}
+	if len(r.ConnectPorts) > 0 {
+		cleaned := make(map[string]int, len(r.ConnectPorts))
+		for k, v := range r.ConnectPorts {
+			k = strings.TrimSpace(k)
+			if k != "" && v >= 1 && v <= 65535 {
+				cleaned[k] = v
+			}
+		}
+		if len(cleaned) == 0 {
+			r.ConnectPorts = nil
+		} else {
+			r.ConnectPorts = cleaned
+		}
+	}
 
 	// 分片端口缺失时（例如旧数据）补一套不与自身冲突的值
 	r.normalizeShards()
@@ -347,8 +371,36 @@ func (r *Room) normalizeShards() {
 	}
 }
 
+// ValidateConnect 校验可选的自定义直连地址，避免写入非法字符破坏 c_connect 命令。
+func ValidateConnect(ip string, port int, ports map[string]int) error {
+	ip = strings.TrimSpace(ip)
+	if len(ip) > 253 {
+		return fmt.Errorf("自定义直连地址过长（最多 253 字符）")
+	}
+	for _, r := range ip {
+		if r <= 32 || r == 127 || r == '"' || r == '\'' || r == '\\' || r == '`' {
+			return fmt.Errorf("自定义直连地址不能包含空格、引号或控制字符")
+		}
+	}
+	if port < 0 || port > 65535 {
+		return fmt.Errorf("自定义直连端口必须在 1–65535 之间（留空则使用分片默认端口）")
+	}
+	for shard, p := range ports {
+		if strings.TrimSpace(shard) == "" {
+			return fmt.Errorf("分片映射端口缺少分片名称")
+		}
+		if p < 0 || p > 65535 {
+			return fmt.Errorf("分片 %s 的映射端口必须在 1–65535 之间", shard)
+		}
+	}
+	return nil
+}
+
 // Validate 校验房间配置。返回的错误直接展示给用户，因此要说清是哪一项不对。
 func (r *Room) Validate() error {
+	if err := ValidateConnect(r.ConnectIP, r.ConnectPort, r.ConnectPorts); err != nil {
+		return err
+	}
 	if strings.TrimSpace(r.Name) == "" {
 		return fmt.Errorf("房间名不能为空")
 	}

@@ -219,6 +219,17 @@ func (s *Store) Update(r *Room) (*Room, error) {
 	// 补齐端口：编辑时前端可能没回传未启用分片的端口
 	old := s.rooms[idx]
 	fillMissingShardPorts(r, old)
+	// 房间表单不直接编辑自定义直连地址时，保留已设置的直连覆盖，避免被误清空
+	if strings.TrimSpace(r.ConnectIP) == "" && r.ConnectPort == 0 && len(r.ConnectPorts) == 0 && (old.ConnectIP != "" || old.ConnectPort != 0 || len(old.ConnectPorts) > 0) {
+		r.ConnectIP = old.ConnectIP
+		r.ConnectPort = old.ConnectPort
+		if len(old.ConnectPorts) > 0 {
+			r.ConnectPorts = make(map[string]int, len(old.ConnectPorts))
+			for k, v := range old.ConnectPorts {
+				r.ConnectPorts[k] = v
+			}
+		}
+	}
 
 	r.Normalize()
 	// 新增的分片（前端刚加的）还没有端口，在这里从全局端口池补
@@ -239,6 +250,55 @@ func (s *Store) Update(r *Room) (*Room, error) {
 		return nil, err
 	}
 	return clone(r), nil
+}
+
+// UpdateConnect 仅更新房间的自定义直连地址与分片映射端口，不影响分片端口池与 ini 配置。
+func (s *Store) UpdateConnect(id int, ip string, port int, ports map[string]int) (*Room, error) {
+	ip = strings.TrimSpace(ip)
+	if err := ValidateConnect(ip, port, ports); err != nil {
+		return nil, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	idx := -1
+	for i, e := range s.rooms {
+		if e.ID == id {
+			idx = i
+			break
+		}
+	}
+	if idx < 0 {
+		return nil, fmt.Errorf("房间不存在: %d", id)
+	}
+
+	old := s.rooms[idx]
+	next := clone(old)
+	next.ConnectIP = ip
+	next.ConnectPort = port
+	if len(ports) > 0 {
+		cleaned := make(map[string]int, len(ports))
+		for k, v := range ports {
+			k = strings.TrimSpace(k)
+			if k != "" && v >= 1 && v <= 65535 {
+				cleaned[k] = v
+			}
+		}
+		if len(cleaned) > 0 {
+			next.ConnectPorts = cleaned
+		} else {
+			next.ConnectPorts = nil
+		}
+	} else {
+		next.ConnectPorts = nil
+	}
+	s.rooms[idx] = next
+	if err := s.save(); err != nil {
+		s.rooms[idx] = old
+		return nil, err
+	}
+	return clone(next), nil
 }
 
 // Delete 删除房间定义。
@@ -393,5 +453,11 @@ func clone(r *Room) *Room {
 	}
 	c := *r
 	c.Shards = append([]Shard(nil), r.Shards...)
+	if len(r.ConnectPorts) > 0 {
+		c.ConnectPorts = make(map[string]int, len(r.ConnectPorts))
+		for k, v := range r.ConnectPorts {
+			c.ConnectPorts[k] = v
+		}
+	}
 	return &c
 }

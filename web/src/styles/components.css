@@ -633,6 +633,11 @@ input[type="radio"] {
   font-size: 12px;
   line-height: 1.7;
 }
+.console.is-full {
+  height: auto;
+  flex: 1 1 0%;
+  min-height: 0;
+}
 .console:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .log-line { white-space: pre-wrap; word-break: break-all; }
 .log-line.k-start .log-text, .log-line.k-ready .log-text { color: var(--ok); }

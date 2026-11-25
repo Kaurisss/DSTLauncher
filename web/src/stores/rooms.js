@@ -153,6 +153,17 @@ export const useRoomsStore = defineStore('rooms', () => {
     return result;
   }
 
+  async function updateConnect(id, payload) {
+    const updated = await roomApi.updateConnect(id, payload);
+    const inList = list.value.find(r => r.id === Number(id));
+    if (inList && updated) {
+      inList.connectIp = updated.connectIp || '';
+      inList.connectPort = updated.connectPort || 0;
+      inList.connectPorts = updated.connectPorts || null;
+    }
+    return updated;
+  }
+
   async function remove(id) {
     const data = await roomApi.remove(id);
     if (currentId.value === Number(id)) currentId.value = null;
@@ -220,7 +231,7 @@ export const useRoomsStore = defineStore('rooms', () => {
     rollingBack, rollbackDeadlines,
     current, shards, running, hasToken,
     load, loadMeta, refreshStatus, select,
-    create, update, remove,
+    create, update, updateConnect, remove,
     start, stop, restart, sendCmd, rollback,
   };
 });

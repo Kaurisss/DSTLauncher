@@ -124,6 +124,7 @@ export const roomApi = {
   list: () => request('/api/rooms'),
   create: body => request('/api/rooms', { method: 'POST', body }),
   update: body => request('/api/rooms', { method: 'PUT', body }),
+  updateConnect: (id, body) => request('/api/rooms/connect', { method: 'PUT', params: { room: id }, body }),
   remove: id => request('/api/rooms', { method: 'DELETE', params: { room: id } }),
   meta: () => request('/api/rooms/meta'),
 };
@@ -187,6 +188,14 @@ export const playerApi = {
 export const hostApi = {
   stats: () => request('/api/host'),
 };
+
+export const networkApi = {
+  publicIp: (refresh = false) => request('/api/network/public-ip', {
+    params: refresh ? { refresh: '1' } : undefined,
+    timeoutMs: 10000,
+  }),
+};
+
 
 /* ---------- 进程控制 ---------- */
 

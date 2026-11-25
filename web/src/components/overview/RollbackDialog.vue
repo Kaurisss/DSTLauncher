@@ -4,6 +4,7 @@ import {
   Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter,
   DialogTitle, DialogDescription, DialogClose,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import UiField from '@/components/ui/UiField.vue';
@@ -24,12 +25,13 @@ onUnmounted(() => clearInterval(timer));
 
 const remaining = computed(() => Math.max(0, Math.ceil(((rooms.rollbackDeadlines[rooms.currentId] || 0) - now.value) / 1000)));
 const maxCount = computed(() => Math.max(0, Math.min(99, (rooms.current?.maxSnapshots || 10) - 1)));
+const quickSteps = computed(() => [1, 2, 3, 5].filter(n => n <= maxCount.value));
 const allRunning = computed(() => rooms.shards.length > 0 && rooms.shards.every(shard =>
   rooms.statuses.some(status => status.shard === shard && status.state === 'running')));
 const valid = computed(() => Number.isInteger(Number(count.value)) && Number(count.value) >= 1 && Number(count.value) <= maxCount.value);
 const unavailable = computed(() => {
   if (rooms.starting) return '正在准备开服，请等待世界加载完成。';
-  if (!allRunning.value) return '请先在概览页启动房间所有启用的世界，等待各世界加载并连接完成。';
+  if (!allRunning.value) return '请先启动房间所有启用的世界，等待各世界加载并连接完成。';
   if (!maxCount.value) return '房间仅保留一个存档点，请先增加回档点数并等待产生新存档。';
   return '';
 });
@@ -41,7 +43,7 @@ async function submit() {
   if (!valid.value || unavailable.value || rooms.rollingBack || remaining.value) return;
   const name = rooms.current.name;
   const { ok } = await guard(() => rooms.rollback(Number(count.value)), {
-    success: `「${name}」回档请求已发送，正在重新加载世界，请查看实时日志确认。`,
+    success: `「${name}」回档请求已发送，正在重新加载世界，请前往控制台查看日志确认。`,
   });
   if (ok) {
     now.value = Date.now();
@@ -72,7 +74,24 @@ function preventWhileBusy(event) {
         </DialogDescription>
       </DialogHeader>
       <form class="grid gap-4" @submit.prevent="submit">
-        <UiField label="回退存档次数" for-id="rollback-count" block tip="1 表示回到最新存档之前的一个存档点。存档点通常每天产生，手动保存也会产生存档点。">
+        <div v-if="quickSteps.length" class="grid gap-1.5">
+          <span class="text-xs font-medium text-muted-foreground">快捷档位</span>
+          <div class="flex flex-wrap gap-1.5">
+            <Button
+              v-for="step in quickSteps"
+              :key="step"
+              type="button"
+              size="sm"
+              :variant="Number(count) === step ? 'default' : 'outline'"
+              class="h-7 px-2.5 text-xs tabular-nums"
+              :disabled="rooms.rollingBack"
+              @click="count = step"
+            >
+              回退 {{ step }} 天
+            </Button>
+          </div>
+        </div>
+        <UiField label="自定义回退次数" for-id="rollback-count" block tip="1 表示回到最新存档之前的一个存档点。存档点通常每天产生，手动保存也会产生存档点。">
           <Input id="rollback-count" v-model="count" type="number" min="1" :max="maxCount || 1" step="1" :disabled="rooms.rollingBack" />
         </UiField>
         <p class="text-sm text-destructive">当前未保存进度及目标之后的存档点将被丢弃。建议先到备份页保留一份整房间备份。</p>
@@ -82,7 +101,7 @@ function preventWhileBusy(event) {
           <DialogClose as-child>
             <IconAction type="button" variant="outline" show-label icon="x" label="取消" :disabled="rooms.rollingBack" />
           </DialogClose>
-          <IconAction type="submit" variant="destructive" show-label icon="rollback" :label="rooms.rollingBack ? '正在请求回档…' : '确认回档'" :disabled="!valid || !!unavailable || rooms.rollingBack || remaining > 0" />
+          <IconAction type="submit" variant="destructive" show-label icon="rollback" :label="rooms.rollingBack ? '正在请求回档…' : `确认回档 ${valid ? count : ''} 次`" :disabled="!valid || !!unavailable || rooms.rollingBack || remaining > 0" />
         </DialogFooter>
       </form>
     </DialogContent>

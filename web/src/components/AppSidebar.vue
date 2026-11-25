@@ -2,7 +2,7 @@
 import { computed, onMounted } from 'vue';
 import iconUrl from '@/assets/icon.png';
 import {
-  PhArchive, PhCaretRight, PhFolder, PhGear, PhGlobe, PhPackage, PhSquaresFour, PhStack, PhUsers,
+  PhArchive, PhCaretRight, PhFolder, PhGear, PhGlobe, PhPackage, PhSquaresFour, PhStack, PhTerminalWindow, PhUsers,
 } from '@phosphor-icons/vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
@@ -21,7 +21,7 @@ const system = useSystemStore();
 const { isMobile, setOpenMobile, state } = useSidebar();
 
 const icons = {
-  dashboard: PhSquaresFour, server: PhStack, globe: PhGlobe,
+  dashboard: PhSquaresFour, terminal: PhTerminalWindow, server: PhStack, globe: PhGlobe,
   package: PhPackage, users: PhUsers, archive: PhArchive, folder: PhFolder,
   settings: PhGear,
 };

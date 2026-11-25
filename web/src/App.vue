@@ -28,6 +28,7 @@ import { guard } from '@/lib/toast.js';
 /** 标签 key -> 视图组件。加新页面时在这里登记一行。 */
 const VIEWS = {
   overview: OverviewView,
+  console: defineAsyncComponent(() => import('@/views/ConsoleView.vue')),
   rooms: defineAsyncComponent(() => import('@/views/RoomsView.vue')),
   world: defineAsyncComponent(() => import('@/views/WorldView.vue')),
   mods: defineAsyncComponent(() => import('@/views/ModsView.vue')),
@@ -40,7 +41,7 @@ const VIEWS = {
 
 /** 兜底：万一 activeTab 与 VIEWS 不一致，也不会渲染出空白页。 */
 const currentView = computed(() => VIEWS[ui.activeTab] || OverviewView);
-const cardScroll = computed(() => ['rooms', 'mods', 'world', 'logs', 'backups', 'saves'].includes(ui.activeTab));
+const cardScroll = computed(() => ['console', 'rooms', 'mods', 'world', 'logs', 'backups', 'saves'].includes(ui.activeTab));
 // 全局管理页保留草稿；房间业务页重建实例，隔离旧房间的异步响应和草稿。
 const viewKey = computed(() => ui.isGlobalTab ? ui.activeTab : `${ui.activeTab}:${rooms.currentId}`);
 

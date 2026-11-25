@@ -1,23 +1,21 @@
 <script setup>
-// 概览页：资源指标、分片管理与实时日志。
+// 概览页：顶部「房间概览与直连 / 资源监控」两大卡 + 底部「分片管理 / 在线玩家」两大卡（2×2 平衡布局）。
 
 import { computed, ref } from 'vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import UiProgress from '@/components/ui/UiProgress.vue';
-import UiStat from '@/components/ui/UiStat.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import RoomConnectBar from '@/components/overview/RoomConnectBar.vue';
 import ShardList from '@/components/overview/ShardList.vue';
 import HostResources from '@/components/overview/HostResources.vue';
 import PlayersPanel from '@/components/overview/PlayersPanel.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import AnnounceDialog from '@/components/overview/AnnounceDialog.vue';
-import LogConsole from '@/components/overview/LogConsole.vue';
 import DiagnosticsDialog from '@/components/overview/DiagnosticsDialog.vue';
 import SavedMapDialog from '@/components/rooms/SavedMapDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -36,32 +34,9 @@ const proc = useProcessControl();
 
 const quickBusy = ref('');
 
-const shardTotal = computed(() => rooms.shards.length);
-const shardRunning = computed(() => rooms.statuses.filter(s => s.state === 'running').length);
-
 const master = computed(() => rooms.current?.shards?.find(shard => shard.isMaster && !shard.disabled));
 const masterRunning = computed(() => master.value && rooms.statuses.some(status => status.shard === master.value.name && status.state === 'running'));
 const anyRunning = computed(() => rooms.statuses.some(status => status.state === 'running'));
-
-const shardTone = computed(() => {
-  if (!shardTotal.value) return '';
-  if (shardRunning.value === shardTotal.value) return 'ok';
-  return shardRunning.value > 0 ? 'warn' : '';
-});
-
-const shardPct = computed(() => (shardTotal.value ? (shardRunning.value / shardTotal.value) * 100 : 0));
-
-const shardDotClass = computed(() => {
-  if (!shardTotal.value || !shardRunning.value) return 'bg-muted-foreground/35';
-  return shardRunning.value === shardTotal.value ? 'bg-emerald-500' : 'bg-amber-500';
-});
-
-const shardSub = computed(() => {
-  if (!rooms.current || !shardTotal.value) return '未启用分片';
-  if (rooms.starting) return '正在准备开服…';
-  if (shardRunning.value === shardTotal.value) return '全部运行中';
-  return shardRunning.value > 0 ? '部分运行中' : '全部已停止';
-});
 
 /** 运行中分片的资源合计。优先展示内存占用（DST 更易受内存限制），副标题展示 CPU 占比。 */
 const res = computed(() => {
@@ -84,11 +59,6 @@ const resSub = computed(() => {
   if (!r.count) return '未运行';
   const cpuText = !r.cpu ? '—' : (r.cpu < 0.05 ? '< 0.1%' : r.cpu.toFixed(1) + '%');
   return `CPU ${cpuText}`;
-});
-
-const resTone = computed(() => {
-  if (!res.value.count) return '';
-  return res.value.cpu > 50 ? 'warn' : 'info';
 });
 
 const installPercent = computed(() => {
@@ -114,13 +84,23 @@ async function runQuick(action) {
   quickBusy.value = action;
   try {
     if (action === 'skipday') {
-      if (!await confirmAction(`让「${room.name}」的主世界快进一天？\n\n会改变主世界的时间与实体状态，不能撤销；建议先保存并备份。该操作执行后一分钟内不能再次快进或回档。`)) return;
+      if (!await confirmAction(`让「${room.name}」的主世界快进一天？\n\n会改变主世界的时间与实体状态，不能撤销；建议先保存并备份。该操作执行后一分钟内不能再次快进、回档或重置。`)) return;
+    } else if (action === 'regenerate') {
+      if (!await confirmAction({
+        title: `永久重置「${room.name}」的世界？`,
+        description: '将执行 c_regenerateworld() 清空当前全部世界的地形、建筑与天数并重新生成新世界，无法撤销！建议先前往「备份与回档」保留一份完整备份。',
+        confirmText: '确认重置世界',
+        destructive: true,
+      })) return;
     }
     const labels = new Map(room.shards.map(shard => [shard.name, roomShardLabel(room, shard)]));
     const result = await procApi.quick(roomId, { action });
     const failures = Object.entries(result.errors || {}).map(([shard, reason]) => `${labels.get(shard) || shard}：${reason}`);
-    if (failures.length) toast(`「${room.name}」部分分片${action === 'save' ? '保存' : '快进'}失败：${failures.join('、')}`, 'err');
-    else toast(`「${room.name}」${action === 'save' ? '已确认存档保存' : '主世界已执行快进'}`);
+    const actionName = action === 'save' ? '保存' : action === 'skipday' ? '快进' : '重置世界';
+    if (failures.length) toast(`「${room.name}」部分分片${actionName}失败：${failures.join('、')}`, 'err');
+    else if (action === 'save') toast(`「${room.name}」已确认存档保存`);
+    else if (action === 'skipday') toast(`「${room.name}」主世界已执行快进`);
+    else toast(`「${room.name}」世界重置指令已发出，正在重新生成世界，可在控制台查看进度`);
   } catch (err) {
     toast(`「${room.name}」${err.message}`, 'err');
   } finally {
@@ -179,31 +159,18 @@ async function runQuick(action) {
       </AlertDescription>
     </Alert>
 
-    <HostResources>
-      <UiStat
-        label="运行分片"
-        :value="`${shardRunning} / ${shardTotal}`"
-        :sub="shardSub"
-        :tone="shardTone"
-      >
-        <template #value>
-          <span class="inline-flex items-center gap-2 tabular-nums">
-            <span aria-hidden="true" :class="['size-2 shrink-0 rounded-full', shardDotClass]" />
-            <span>{{ shardRunning }} / {{ shardTotal }}</span>
-          </span>
-        </template>
-        <Progress class="mt-2 h-1" :model-value="shardPct" aria-label="运行分片占比" />
-      </UiStat>
-      <UiStat
-        label="进程资源占用"
-        :value="resValue"
-        :sub="resSub"
-        :tone="resTone"
-      >
-        <Progress class="mt-2 h-1" :model-value="res.count ? Math.min(100, res.cpu) : 0" aria-label="进程 CPU 占比" />
-      </UiStat>
-    </HostResources>
+    <!-- 顶行两大卡：房间概览与按分片直连 | 资源监控 -->
+    <div class="overview-workspace">
+      <RoomConnectBar />
+      <HostResources
+        :process-value="resValue"
+        :process-sub="resSub"
+        :process-cpu="res.cpu"
+        :process-running="res.count > 0"
+      />
+    </div>
 
+    <!-- 底行两大卡：分片管理与快捷运维 | 在线玩家 -->
     <div class="overview-workspace">
       <UiCard class="h-full" fill>
         <template #title>分片管理</template>
@@ -219,6 +186,14 @@ async function runQuick(action) {
             @click="proc.start('')"
           />
           <IconAction
+            variant="outline"
+            show-label="sm"
+            icon="restart"
+            label="全部重启"
+            :disabled="!rooms.current || !anyRunning || rooms.starting || system.installing"
+            @click="proc.restart('')"
+          />
+          <IconAction
             variant="destructive"
             show-label
             icon="stop"
@@ -229,28 +204,39 @@ async function runQuick(action) {
         </template>
         <div class="flex min-h-0 flex-1 flex-col justify-between gap-3">
           <ShardList />
-          <div v-if="rooms.current" role="group" aria-label="快捷运维" class="flex flex-wrap items-center gap-1.5 border-t border-border/75 pt-3">
-            <span class="mr-1 text-xs font-medium text-muted-foreground">快捷运维</span>
-            <IconAction
-              variant="outline"
-              show-label
-              icon="save"
-              :label="quickBusy === 'save' ? '等待保存完成…' : '立即保存'"
-              :disabled="!!quickBusy || !anyRunning || rooms.starting"
-              @click="runQuick('save')"
-            />
-            <AnnounceDialog />
-            <RollbackDialog />
-            <IconAction
-              variant="outline"
-              show-label
-              icon="skip"
-              :label="quickBusy === 'skipday' ? '等待游戏回执…' : '主世界快进一天'"
-              :text="quickBusy === 'skipday' ? '等待回执…' : '快进一天'"
-              :disabled="!!quickBusy || !masterRunning || rooms.starting"
-              @click="runQuick('skipday')"
-            />
-            <SavedMapDialog :show-label="true" />
+          <div v-if="rooms.current" role="group" aria-label="快捷运维" class="grid gap-2 border-t border-border/75 pt-3">
+            <span class="text-[11.5px] font-medium text-muted-foreground">快捷运维</span>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <IconAction
+                variant="outline"
+                show-label
+                icon="save"
+                :label="quickBusy === 'save' ? '等待保存完成…' : '立即保存'"
+                :disabled="!!quickBusy || !anyRunning || rooms.starting"
+                @click="runQuick('save')"
+              />
+              <AnnounceDialog />
+              <RollbackDialog />
+              <IconAction
+                variant="outline"
+                show-label
+                icon="skip"
+                :label="quickBusy === 'skipday' ? '等待游戏回执…' : '主世界快进一天'"
+                :text="quickBusy === 'skipday' ? '等待回执…' : '快进一天'"
+                :disabled="!!quickBusy || !masterRunning || rooms.starting"
+                @click="runQuick('skipday')"
+              />
+              <IconAction
+                variant="outline"
+                show-label
+                icon="undo"
+                class="text-destructive hover:text-destructive"
+                :label="quickBusy === 'regenerate' ? '等待世界重置…' : '重置世界'"
+                :disabled="!!quickBusy || !masterRunning || rooms.starting"
+                @click="runQuick('regenerate')"
+              />
+              <SavedMapDialog :show-label="true" />
+            </div>
           </div>
         </div>
       </UiCard>
@@ -259,7 +245,5 @@ async function runQuick(action) {
         <PlayersPanel />
       </div>
     </div>
-
-    <LogConsole />
   </div>
 </template>

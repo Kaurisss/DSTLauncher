@@ -177,6 +177,14 @@ async function refreshSnapshots(id, requestGeneration) {
         </span>
       </div>
       <WorldState :snapshot="s.snapshot" :loading="loadingSnapshots" :error="snapshotError" />
+      <div
+        v-if="isLive(s)"
+        class="flex flex-wrap items-center gap-x-2.5 gap-y-0.5 border-t border-border/60 pt-1.5 text-[11.5px] text-muted-foreground tabular-nums"
+      >
+        <span>CPU {{ cpuText(s) }}</span>
+        <span>内存 {{ memText(s) }}</span>
+        <span v-if="s.port">端口 {{ s.port }}</span>
+      </div>
     </div>
   </section>
 </template>

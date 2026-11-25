@@ -231,11 +231,12 @@ test('房间选择持久化，列表轮询保留对象身份与当前选择', as
   assert.equal(rooms.currentId, 2);
 });
 
-test('八个页面按房间/全局分组，选择持久化且拒绝未知页面与旧配置页', async () => {
+test('九个页面按房间/全局分组，选择持久化且拒绝未知页面与旧配置页', async () => {
   const ui = useUiStore(pinia);
   assert.equal(ui.navGroups.length, 2);
   assert.deepEqual(ui.navGroups.map(g => g.label), ['当前房间', '全局管理']);
-  assert.equal(ui.tabs.length, 8);
+  assert.equal(ui.tabs.length, 9);
+  assert.ok(ui.tabs.some(t => t.key === 'console' && t.scope === 'room'), '包含独立控制台页');
   assert.equal(ui.isGlobalTab, false);
   for (const tab of ui.tabs) ui.select(tab.key);
   await Promise.resolve();

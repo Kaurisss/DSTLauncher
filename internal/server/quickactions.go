@@ -27,7 +27,7 @@ type QuickResult struct {
 
 func (a QuickAction) Validate() error {
 	switch a.Action {
-	case "save", "skipday":
+	case "save", "skipday", "regenerate":
 		if a.Message != "" {
 			return fmt.Errorf("此操作不接受公告内容")
 		}
@@ -108,13 +108,14 @@ func (m *Manager) Quick(ctx context.Context, clusterKey string, a QuickAction) (
 	if !running {
 		return result, fmt.Errorf("主分片正在启停，请稍后重试")
 	}
-	if a.Action == "skipday" {
+	worldMutation := a.Action == "skipday" || a.Action == "regenerate"
+	if worldMutation {
 		// Share the existing world-mutation cooldown with rollback. A lost reply
-		// must not cause a retry to advance the world twice.
+		// must not cause a retry to advance or regenerate the world twice.
 		m.rollbackMu.Lock()
 		if time.Now().Before(m.rollbackUntil[clusterKey]) {
 			m.rollbackMu.Unlock()
-			return result, fmt.Errorf("该房间刚执行过世界时间或回档操作，请等待一分钟后再试")
+			return result, fmt.Errorf("该房间刚执行过世界时间、回档或重置操作，请等待一分钟后再试")
 		}
 		if m.rollbackUntil == nil {
 			m.rollbackUntil = map[string]time.Time{}
@@ -124,7 +125,7 @@ func (m *Manager) Quick(ctx context.Context, clusterKey string, a QuickAction) (
 	}
 	accepted, err := m.quickRequest(ctx, clusterKey, master, a)
 	if err != nil {
-		if a.Action == "skipday" && !accepted {
+		if worldMutation && !accepted {
 			m.rollbackMu.Lock()
 			delete(m.rollbackUntil, clusterKey)
 			m.rollbackMu.Unlock()
@@ -188,6 +189,10 @@ func luaMessage(s string) string {
 }
 
 func quickCommand(marker string, a QuickAction) string {
+	if a.Action == "regenerate" {
+		// c_regenerateworld() 会立即重载世界，因此校验就绪后先回执再触发，防止重载吞掉回执日志。
+		return fmt.Sprintf(`local function panelquick() local function reply(v) print(%q..":"..v) end; if not TheWorld or not TheWorld.ismastersim or not TheWorld.ismastershard or type(c_regenerateworld)~="function" then reply("not_ready"); return end; reply("ok"); c_regenerateworld() end; panelquick()`, marker)
+	}
 	body := "c_skip(1)"
 	if a.Action == "announce" {
 		body = "c_announce(" + luaMessage(strings.TrimSpace(a.Message)) + ")"
