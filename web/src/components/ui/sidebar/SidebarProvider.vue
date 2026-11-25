@@ -7,7 +7,7 @@ import {
 } from "@vueuse/core";
 import { cn } from "cn";
 import { TooltipProvider } from "reka-ui";
-import { computed, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import {
   provideSidebarContext,
   SIDEBAR_COOKIE_MAX_AGE,
@@ -34,18 +34,28 @@ const props = defineProps({
 const emits = defineEmits(["update:open"]);
 
 const isMobile = useMediaQuery("(max-width: 767px)");
+const isCompact = useMediaQuery("(max-width: 1023px)");
 const openMobile = ref(false);
+const desktopPreferredOpen = ref(props.defaultOpen ?? false);
 
 const open = useVModel(props, "open", emits, {
-  defaultValue: props.defaultOpen ?? false,
+  defaultValue: isCompact.value ? false : desktopPreferredOpen.value,
   passive: props.open === undefined,
+});
+
+watch(isCompact, (compact) => {
+  if (isMobile.value) return;
+  open.value = compact ? false : desktopPreferredOpen.value;
 });
 
 function setOpen(value) {
   open.value = value; // emits('update:open', value)
 
-  // This sets the cookie to keep the sidebar state.
-  document.cookie = `${SIDEBAR_COOKIE_NAME}=${open.value}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+  // 窄屏（<= 1023px）自动收起不覆盖宽屏记忆；仅宽屏下的主动切换写入 cookie。
+  if (!isCompact.value) {
+    desktopPreferredOpen.value = open.value;
+    document.cookie = `${SIDEBAR_COOKIE_NAME}=${open.value}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
+  }
 }
 
 function setOpenMobile(value) {

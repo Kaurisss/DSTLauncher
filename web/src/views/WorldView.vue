@@ -640,7 +640,6 @@ onMounted(() => selectShard(rooms.shards[0]));
                 <span class="seg-count">{{ categoryCounts.worldgen }}</span>
               </button>
             </div>
-            <span v-if="category === 'worldgen' && worldGenerated" class="world-readonly-note" role="status"><Icon name="info" size="14" />地图已生成，仅供查看</span>
           </div>
           <div class="world-search-wrap">
             <PhMagnifyingGlass class="world-search-icon" aria-hidden="true" />
