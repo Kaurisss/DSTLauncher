@@ -964,6 +964,27 @@ input[type="radio"] {
 }
 .world-group-nav button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .world-group-nav button:disabled { opacity: .36; cursor: default; }
+.world-skeleton-nav-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 34px;
+  padding: 0 10px 0 12px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  flex-shrink: 0;
+}
+.world-skeleton-nav-item.is-active {
+  background: var(--card);
+  border-color: var(--border);
+  box-shadow: var(--shadow-xs);
+}
+[data-theme="dark"] .world-skeleton-nav-item.is-active {
+  background: var(--surface-3);
+  border-color: transparent;
+  box-shadow: none;
+}
 
 /* 只有存在改动的分组才亮起主题色数字徽章，固定高度避免切态抽动 */
 .world-group-changes {
@@ -1440,7 +1461,8 @@ input[type="radio"] {
     border-right: 0;
     border-bottom: 1px solid var(--border);
   }
-  .world-group-nav button { flex-shrink: 0; height: 30px; padding: 0 10px; font-size: 12px; }
+  .world-group-nav button,
+  .world-skeleton-nav-item { flex-shrink: 0; height: 30px; padding: 0 10px; font-size: 12px; }
   .world-group-content { padding: 12px; }
   /* 分片卡片：窄屏下端口单列，名字与类型各占一行 */
   .shard-ports { grid-template-columns: 1fr; }

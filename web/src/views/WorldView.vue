@@ -40,6 +40,9 @@ const view = ref(null);
 const loading = ref(false);
 const saving = ref(false);
 const loadError = ref('');
+const isInitialLoading = computed(() => !rooms.loaded || (loading.value && !view.value));
+const SKELETON_NAV_WIDTHS = ['w-9', 'w-9', 'w-12', 'w-9', 'w-16', 'w-24', 'w-9', 'w-16', 'w-9', 'w-16'];
+const SKELETON_OPT_WIDTHS = ['w-12', 'w-10', 'w-14', 'w-16', 'w-20', 'w-14', 'w-16', 'w-24', 'w-20', 'w-16', 'w-20', 'w-14'];
 
 const enabled = ref(true);
 const worldgenPreset = ref('');
@@ -558,34 +561,41 @@ onMounted(() => selectShard(rooms.shards[0]));
       <div ref="header" class="world-control-header z-10 shrink-0">
         <div class="world-heading-row">
           <div class="world-shard-controls">
-            <TabsList class="world-shard-tabs" aria-label="配置分片">
+            <TabsList v-if="rooms.shards.length" class="world-shard-tabs" aria-label="配置分片">
               <TabsTrigger v-for="s in rooms.shards" :key="s" :value="s" class="shard-tab" :disabled="saving">
                 <span>{{ labelOf(s) }}</span>
                 <span v-if="isShardDirty(s)" class="shard-tab-dirty" aria-hidden="true" />
               </TabsTrigger>
             </TabsList>
-            <Badge v-if="view" variant="outline" class="world-type-label rounded-md">{{ worldLabel }}</Badge>
-            <PopoverRoot v-if="view" :key="shard">
-              <PopoverTrigger as-child>
-                <Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-foreground" aria-label="路径与说明" title="路径与说明">
-                  <Icon name="info" size="16" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverPortal>
-                <PopoverContent class="world-details-popover" align="start" :side-offset="8" :collision-padding="12" aria-labelledby="world-details-title">
-                  <div class="flex items-center justify-between gap-3">
-                    <h3 id="world-details-title" class="text-sm font-semibold">路径与说明</h3>
-                    <PopoverClose as-child>
-                      <Button variant="ghost" size="icon-sm" aria-label="关闭路径与说明"><Icon name="x" size="14" /></Button>
-                    </PopoverClose>
-                  </div>
-                  <code class="world-details-path block break-all text-xs">{{ view.file }}</code>
-                  <p class="text-xs leading-relaxed text-muted-foreground">世界规则在重启后生效；世界生成只在建图时读取，已有地图不会重新生成。</p>
-                  <p v-if="levelDataInUse" class="text-xs leading-relaxed text-muted-foreground">此存档使用游戏生成的 leveldataoverride.lua，仅保存修改过的世界规则。</p>
-                  <p v-else class="text-xs leading-relaxed text-muted-foreground">使用 worldgenoverride.lua 覆写世界规则与生成项；预设与启用开关已直接展示在下方配置栏。</p>
-                </PopoverContent>
-              </PopoverPortal>
-            </PopoverRoot>
+            <Skeleton v-else-if="isInitialLoading" class="h-[31px] w-[198px] rounded-lg" aria-hidden="true" />
+            <template v-if="view">
+              <Badge variant="outline" class="world-type-label rounded-md">{{ worldLabel }}</Badge>
+              <PopoverRoot :key="shard">
+                <PopoverTrigger as-child>
+                  <Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-foreground" aria-label="路径与说明" title="路径与说明">
+                    <Icon name="info" size="16" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverPortal>
+                  <PopoverContent class="world-details-popover" align="start" :side-offset="8" :collision-padding="12" aria-labelledby="world-details-title">
+                    <div class="flex items-center justify-between gap-3">
+                      <h3 id="world-details-title" class="text-sm font-semibold">路径与说明</h3>
+                      <PopoverClose as-child>
+                        <Button variant="ghost" size="icon-sm" aria-label="关闭路径与说明"><Icon name="x" size="14" /></Button>
+                      </PopoverClose>
+                    </div>
+                    <code class="world-details-path block break-all text-xs">{{ view.file }}</code>
+                    <p class="text-xs leading-relaxed text-muted-foreground">世界规则在重启后生效；世界生成只在建图时读取，已有地图不会重新生成。</p>
+                    <p v-if="levelDataInUse" class="text-xs leading-relaxed text-muted-foreground">此存档使用游戏生成的 leveldataoverride.lua，仅保存修改过的世界规则。</p>
+                    <p v-else class="text-xs leading-relaxed text-muted-foreground">使用 worldgenoverride.lua 覆写世界规则与生成项；预设与启用开关已直接展示在下方配置栏。</p>
+                  </PopoverContent>
+                </PopoverPortal>
+              </PopoverRoot>
+            </template>
+            <template v-else-if="isInitialLoading">
+              <Skeleton class="h-5 w-[54px] rounded-md" aria-hidden="true" />
+              <Skeleton class="size-7 rounded-lg" aria-hidden="true" />
+            </template>
           </div>
           <div v-if="view" class="world-main-actions">
             <Badge variant="outline" class="world-count rounded-md" :class="{ 'is-changed': changedCount > 0, 'is-dirty': dirty }" role="status">
@@ -594,6 +604,11 @@ onMounted(() => selectShard(rooms.shards[0]));
             </Badge>
             <IconAction variant="outline" show-label="sm" icon="undo" label="重置" :disabled="!canReset || frozen || loading || saving" @click="resetAll" />
             <IconAction show-label="sm" icon="save" :label="saving ? '保存中…' : '保存'" :disabled="!dirty || frozen || loading || saving" @click="save" />
+          </div>
+          <div v-else-if="isInitialLoading" class="world-main-actions" aria-hidden="true">
+            <Skeleton class="h-5 w-[66px] rounded-md" />
+            <Skeleton class="h-7 w-7 sm:w-[63px] rounded-lg" />
+            <Skeleton class="h-7 w-7 sm:w-[63px] rounded-lg" />
           </div>
         </div>
         <div v-if="view && !loadError" class="world-toolbar">
@@ -645,24 +660,52 @@ onMounted(() => selectShard(rooms.shards[0]));
             <span>只看已改动</span>
           </label>
         </div>
+        <div v-else-if="isInitialLoading" class="world-toolbar" aria-hidden="true">
+          <div class="world-category-controls">
+            <Skeleton class="h-[31px] w-full sm:w-[210px] rounded-lg" />
+          </div>
+          <div class="world-search-wrap">
+            <Skeleton class="h-[30px] sm:h-8 w-full rounded-md" />
+          </div>
+          <div class="world-only-changed">
+            <Skeleton class="h-[18px] w-8 rounded-full" />
+            <Skeleton class="h-3.5 w-[60px] rounded" />
+          </div>
+        </div>
       </div>
 
       <TabsContent ref="content" :value="shard" class="min-h-0 flex-1 overflow-hidden outline-none" aria-label="世界配置列表">
-        <div v-if="!rooms.loaded || (loading && !view)" role="status" aria-label="正在加载世界配置" class="world-workspace">
+        <div v-if="isInitialLoading" role="status" aria-label="正在加载世界配置" class="flex h-full min-h-0 flex-col overflow-hidden">
           <span class="sr-only">正在加载世界配置…</span>
-          <div class="world-group-nav">
-            <Skeleton v-for="i in 6" :key="i" class="h-8 w-full rounded-md" />
-          </div>
-          <div class="world-group-content">
-            <div class="opt-group-head">
-              <Skeleton class="h-5 w-24" />
+          <div class="world-workspace">
+            <div class="world-group-nav" aria-hidden="true">
+              <div
+                v-for="(w, idx) in SKELETON_NAV_WIDTHS"
+                :key="idx"
+                class="world-skeleton-nav-item"
+                :class="{ 'is-active': idx === 0 }"
+              >
+                <Skeleton class="h-3.5 rounded" :class="w" />
+                <Skeleton v-if="idx === 0" class="h-[18px] w-5 rounded-full" />
+              </div>
             </div>
-            <div class="opt-group-body">
-              <div v-for="i in 8" :key="i" class="opt-row">
-                <Skeleton class="size-14 shrink-0 rounded-md" />
-                <div class="grid min-w-0 flex-1 gap-1.5">
-                  <Skeleton class="h-3.5 w-20" />
-                  <Skeleton class="h-4 w-16" />
+            <div class="world-group-content" aria-hidden="true">
+              <div class="opt-group-head">
+                <div class="opt-group-meta">
+                  <Skeleton class="h-4 w-10 rounded" />
+                  <Skeleton class="h-3 w-12 rounded" />
+                </div>
+                <Skeleton class="h-4 w-[84px] rounded" />
+              </div>
+              <div class="opt-group-body">
+                <div v-for="(w, idx) in SKELETON_OPT_WIDTHS" :key="idx" class="opt-row">
+                  <Skeleton class="size-14 shrink-0 rounded-[6px]" />
+                  <div class="opt-row-main">
+                    <Skeleton class="h-3.5 rounded" :class="w" />
+                    <Skeleton class="h-4 w-12 rounded" />
+                    <Skeleton class="mt-0.5 h-[2.5px] w-[84px] max-w-full rounded-full" />
+                  </div>
+                  <Skeleton class="h-[29px] w-[53px] shrink-0 rounded-[6px]" />
                 </div>
               </div>
             </div>
