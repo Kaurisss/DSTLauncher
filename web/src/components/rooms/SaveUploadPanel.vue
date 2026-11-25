@@ -216,7 +216,7 @@ async function submit() {
             <div class="import-row"><span>世界数据</span><b>{{ result.hasSave ? '已导入' : '存档包里没有世界数据' }}</b></div>
             <div class="import-row">
               <span>模组</span>
-              <b v-if="result.modsTotal">已导入 {{ result.modsTotal }} 个<template v-if="(result.modsMissing || []).length">，其中 {{ result.modsMissing.length }} 个未下载，需到「模组」页点「更新模组」</template></b>
+              <b v-if="result.modsTotal">已导入 {{ result.modsTotal }} 个<template v-if="(result.modsMissing || []).length">，其中 {{ result.modsMissing.length }} 个未下载，需到「模组」页点「下载缺失」</template></b>
               <b v-else>存档里没有模组配置，房间原有模组保持不变</b>
             </div>
             <div class="import-row"><span>令牌</span><b>{{ result.tokenSource }}</b></div>

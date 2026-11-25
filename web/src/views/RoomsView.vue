@@ -13,10 +13,12 @@ import SaveUploadPanel from '@/components/rooms/SaveUploadPanel.vue';
 import RoomProfilesDialog from '@/components/rooms/RoomProfilesDialog.vue';
 import MigrationDialog from '@/components/backups/MigrationDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
+import { useUiStore } from '@/stores/ui.js';
 import { guard, toast } from '@/lib/toast.js';
 import { confirmAction } from '@/lib/confirm.js';
 
 const rooms = useRoomsStore();
+const ui = useUiStore();
 const editor = ref({ open: false, roomId: null, key: 0 });
 const preparing = ref(false);
 const uploader = ref({ open: false, roomId: null, key: 0 });
@@ -26,6 +28,8 @@ const editingRoom = computed(() => rooms.list.find(room => room.id === editor.va
 onMounted(async () => {
   await guard(() => rooms.load());
   if (!rooms.meta) await guard(() => rooms.loadMeta());
+  const pending = ui.consumePendingEditRoom();
+  if (pending !== null) await openEditor(pending || null);
 });
 
 function reload() {

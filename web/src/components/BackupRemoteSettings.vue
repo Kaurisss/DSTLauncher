@@ -31,7 +31,7 @@ async function refresh() {
     const data = await backupRemoteApi.get();
     if (disposed) return;
     snapshot.value = data;
-    if (!draft.value) draft.value = { enabled: data.enabled, kind: data.kind, directory: data.directory, url: data.url, username: data.username, keep: data.keep };
+    if (!draft.value) draft.value = { enabled: !!data?.enabled, kind: data?.kind || 'directory', directory: data?.directory || '', url: data?.url || '', username: data?.username || '', keep: data?.keep ?? 3 };
     error.value = '';
   } catch (err) { if (!disposed) error.value = err.message; }
   finally { if (!disposed) timer = setTimeout(refresh, 3000); }
@@ -102,7 +102,7 @@ async function retry(item) {
         <Skeleton class="h-9 w-full" />
       </div>
     </div>
-    <section v-if="snapshot?.results.length" class="mt-4 border-t pt-4" aria-label="最近备份同步">
+    <section v-if="snapshot?.results?.length" class="mt-4 border-t pt-4" aria-label="最近备份同步">
       <h3 class="mb-3 text-sm font-medium">最近同步</h3>
       <ul class="grid gap-3">
         <li v-for="item in snapshot.results" :key="item.id" class="grid min-w-0 gap-2 border-t pt-3 first:border-t-0 first:pt-0">

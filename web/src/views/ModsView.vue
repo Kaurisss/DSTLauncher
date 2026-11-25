@@ -24,17 +24,20 @@ import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
 import { CodeBlock, CodeBlockActions, CodeBlockContent, CodeBlockCopyButton } from '@/components/ui/code-block';
 import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import ModItem from '@/components/mods/ModItem.vue';
 import WorkshopPanel from '@/components/mods/WorkshopPanel.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
+import { useUiStore } from '@/stores/ui.js';
 import { modApi, modUpdateApi, workshopApi } from '@/lib/api.js';
 import { guard, toast } from '@/lib/toast.js';
 import { confirmAction } from '@/lib/confirm.js';
 import { shardLabel } from '@/lib/format.js';
 
 const rooms = useRoomsStore();
+const ui = useUiStore();
 const shard = ref('');
 const shards = computed(() => rooms.current?.shards || []);
 const configOpen = ref(false);
@@ -478,17 +481,17 @@ watch([() => rooms.current, shard], () => {
     <UiCard flush fill class="mods-workspace">
       <div class="mods-toolbar z-10 flex shrink-0 items-center justify-between gap-3" role="region" aria-label="模组工具栏">
         <div class="mods-toolbar-left">
+          <Select v-if="rooms.current" v-model="shard" :disabled="configOpen || busyItems.length > 0 || workshopOpen || queueing || pendingIds.length > 0">
+            <SelectTrigger aria-label="模组分片" class="mods-shard w-20 shrink-0 sm:w-28">
+              <SelectValue placeholder="选择分片" />
+            </SelectTrigger>
+            <SelectContent position="popper" align="start">
+              <SelectGroup>
+                <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ labelOf(item) }}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
           <UiToolbarFilters v-slot="{ compact }" label="模组筛选" :active="filter !== 'all'">
-            <Select v-if="rooms.current" v-model="shard" :disabled="configOpen || busyItems.length > 0 || workshopOpen || queueing || pendingIds.length > 0">
-              <SelectTrigger aria-label="模组分片" :class="compact ? 'w-full' : 'mods-shard'">
-                <SelectValue placeholder="选择分片" />
-              </SelectTrigger>
-              <SelectContent position="popper" align="start">
-                <SelectGroup>
-                  <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ labelOf(item) }}</SelectItem>
-                </SelectGroup>
-              </SelectContent>
-            </Select>
             <Select v-if="compact" v-model="filter">
               <SelectTrigger aria-label="模组状态" class="w-full"><SelectValue /></SelectTrigger>
               <SelectContent position="popper" align="start">
@@ -510,14 +513,13 @@ watch([() => rooms.current, shard], () => {
           <IconAction variant="outline" show-label="lg" icon="cloudCheck" :icon-class="checking ? 'animate-pulse motion-reduce:animate-none' : ''" :label="checking ? '检查中…' : '检查更新'" :disabled="!rooms.current || updating || checking || queueing" @click="checkUpdates" />
           <IconAction ref="addModButton" show-label="lg" icon="plus" label="添加模组" :disabled="!rooms.current" aria-haspopup="dialog" @click="workshopOpen = true" />
           <IconAction v-if="updating || output.length || updateError || pollError" ref="updateLogButton" variant="outline" show-label="lg" icon="fileCode" label="更新日志" aria-haspopup="dialog" :aria-expanded="updateOpen" @click="updateOpen = true" />
-          <div class="inline-flex border-l border-border pl-2">
-            <Tooltip>
-              <TooltipTrigger as="span" :as-child="!(loading || !rooms.current)" class="inline-flex" :tabindex="loading || !rooms.current ? 0 : undefined">
-                <Button variant="ghost" size="icon-sm" class="text-muted-foreground" :disabled="loading || !rooms.current" aria-label="刷新" @click="load"><Icon name="refresh" size="16" /></Button>
-              </TooltipTrigger>
-              <TooltipContent>刷新本地模组列表</TooltipContent>
-            </Tooltip>
-          </div>
+          <Separator orientation="vertical" class="mx-0.5 h-4 self-center" />
+          <Tooltip>
+            <TooltipTrigger as="span" :as-child="!(loading || !rooms.current)" class="inline-flex" :tabindex="loading || !rooms.current ? 0 : undefined">
+              <Button variant="ghost" size="icon-sm" class="text-muted-foreground" :disabled="loading || !rooms.current" aria-label="刷新" @click="load"><Icon name="refresh" size="16" /></Button>
+            </TooltipTrigger>
+            <TooltipContent>刷新本地模组列表</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
@@ -538,13 +540,17 @@ watch([() => rooms.current, shard], () => {
             </div>
           </div>
         </div>
-        <UiEmpty v-else-if="!rooms.current" text="请先在「房间」页新建一个房间" />
+        <UiEmpty v-else-if="!rooms.current">
+          <span>请先在「房间管理」页新建一个房间</span>
+          <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
+        </UiEmpty>
         <UiEmpty v-else-if="loadError" :text="'读取模组失败：' + loadError" />
 
         <template v-else>
-          <div v-if="frozen" class="mb-4 flex items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm" role="status">
+          <div v-if="frozen" class="mb-4 flex flex-wrap items-center gap-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm" role="status">
             <Icon name="info" size="16" />
             <span>服务器运行中，模组修改已冻结。</span>
+            <Button size="sm" variant="outline" class="ml-auto h-7 px-2.5 text-xs" @click="ui.select('overview')">前往概览</Button>
           </div>
           <div v-else-if="missingCount" class="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3 text-sm">
             <Icon name="download" size="16" />

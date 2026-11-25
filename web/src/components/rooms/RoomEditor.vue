@@ -200,7 +200,7 @@ async function save() {
         </TooltipTrigger>
         <TooltipContent>返回房间列表</TooltipContent>
       </Tooltip>
-      <Separator orientation="vertical" class="h-4 data-[orientation=vertical]:self-center" />
+      <Separator orientation="vertical" class="h-4 self-center" />
       <h2 class="truncate text-sm font-semibold">{{ isNew ? '新建房间' : '编辑房间：' + form.name }}</h2>
       <Badge v-if="!isNew" variant="secondary" class="hidden shrink-0 font-mono text-[10px] lg:inline-flex">{{ room.key || 'Cluster_' + form.id }}</Badge>
       <template #actions>

@@ -6,6 +6,7 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiToolbar from '@/components/ui/UiToolbar.vue';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -14,11 +15,13 @@ import BackupTable from '@/components/backups/BackupTable.vue';
 import BackupInspectionDialog from '@/components/backups/BackupInspectionDialog.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
+import { useUiStore } from '@/stores/ui.js';
 import { backupApi, backupRemoteApi } from '@/lib/api.js';
 import { guard, toast } from '@/lib/toast.js';
 import { confirmAction } from '@/lib/confirm.js';
 
 const rooms = useRoomsStore();
+const ui = useUiStore();
 
 const items = ref([]);
 const loading = ref(false);
@@ -110,6 +113,7 @@ function exportSave(name) {
         <TooltipContent class="max-w-sm break-all">{{ backupDir }}</TooltipContent>
       </Tooltip>
       <template #actions>
+        <IconAction variant="outline" show-label="lg" icon="plug" label="异地备份设置" text="异地备份" @click="ui.openSettings('maintenance')" />
         <RollbackDialog show-label="sm" />
         <IconAction show-label="sm" icon="archive" label="立即备份" :disabled="!rooms.current" @click="create" />
       </template>
@@ -131,7 +135,10 @@ function exportSave(name) {
           </div>
         </div>
       </div>
-      <UiEmpty v-else-if="!rooms.current" text="请先在「房间」页新建一个房间" />
+      <UiEmpty v-else-if="!rooms.current">
+        <span>请先在「房间管理」页新建一个房间</span>
+        <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
+      </UiEmpty>
       <UiEmpty v-else-if="loadError" :text="'读取备份失败：' + loadError" />
       <UiEmpty v-else-if="!items.length" text="暂无备份" />
       <BackupTable v-else :items="items" :sync-enabled="!!remote?.enabled" :sync-results="(remote?.results || []).filter(item => item.room === rooms.currentId)" @restore="restore" @remove="remove" @export="exportSave" @sync="sync" />

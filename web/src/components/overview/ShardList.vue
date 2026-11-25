@@ -6,16 +6,19 @@ import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import WorldState from '@/components/overview/WorldState.vue';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { worldStateApi } from '@/lib/api.js';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
+import { useUiStore } from '@/stores/ui.js';
 import { useProcessControl } from '@/composables/useProcessControl.js';
 import { STATE_LABEL, fmtSize, shardLabel } from '@/lib/format.js';
 
 const rooms = useRoomsStore();
 const system = useSystemStore();
+const ui = useUiStore();
 const proc = useProcessControl();
 const snapshots = ref([]);
 const snapshotError = ref('');
@@ -110,7 +113,10 @@ async function refreshSnapshots(id, requestGeneration) {
 </script>
 
 <template>
-  <UiEmpty v-if="!rooms.current" text="请先在「房间」页新建一个房间" />
+  <UiEmpty v-if="!rooms.current">
+    <span>请先在「房间管理」页新建一个房间</span>
+    <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
+  </UiEmpty>
 
   <section v-else aria-label="分片状态" class="divide-y divide-border">
     <div v-for="s in rows" :key="s.shard" class="shard-row" :aria-label="label(s)">

@@ -20,7 +20,7 @@
 /* 概览工作区：左右两列各占 50%，与上方四张指标卡严格对齐；双卡等高占满背景 */
 .overview-workspace {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1.45fr) minmax(0, 1fr);
   align-items: stretch;
   gap: 16px;
 }

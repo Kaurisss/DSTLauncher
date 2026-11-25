@@ -476,16 +476,16 @@ test('选项名称与值为普通文本，步进切换未知值，单项还原�
   } finally { await page.close(); }
 });
 
-test('普通文件的预设与启用开关收进说明面板，关服前所有编辑控件冻结', async () => {
+test('普通文件的预设与启用开关直接展示在配置栏，关服前所有编辑控件冻结', async () => {
   const { page, requests } = await openWorldPage(ordinaryWorld(true), { running: true });
   try {
-    await page.getByText('服务器运行中，配置已冻结。请先在「总览」关闭服务器再修改。', { exact: true }).waitFor();
+    await page.getByText('服务器运行中，配置已冻结。请先在「概览」关闭服务器再修改。', { exact: true }).waitFor();
+    await page.getByRole('button', { name: '前往概览', exact: true }).waitFor();
     for (const control of await page.locator('.opt-row button, .opt-row input').all()) assert.equal(await control.isDisabled(), true);
-    await page.getByRole('button', { name: '路径与说明', exact: true }).click();
-    const details = page.getByRole('dialog', { name: '路径与说明', exact: true });
-    assert.equal(await details.getByRole('combobox', { name: '世界生成预设', exact: true }).isDisabled(), true);
-    assert.equal(await details.getByRole('combobox', { name: '世界规则预设', exact: true }).isDisabled(), true);
-    assert.equal(await details.getByRole('switch', { name: '启用本文件', exact: true }).isDisabled(), true);
+    const presets = page.getByRole('region', { name: '预设与启用', exact: true });
+    assert.equal(await presets.getByRole('combobox', { name: '世界生成预设', exact: true }).isDisabled(), true);
+    assert.equal(await presets.getByRole('combobox', { name: '世界规则预设', exact: true }).isDisabled(), true);
+    assert.equal(await presets.getByRole('switch', { name: '启用本文件', exact: true }).isDisabled(), true);
     assert.equal(requests.filter(r => r.method === 'PUT').length, 0);
   } finally { await page.close(); }
 });

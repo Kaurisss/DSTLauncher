@@ -7,7 +7,9 @@ import UiCard from '@/components/ui/UiCard.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import UiProgress from '@/components/ui/UiProgress.vue';
 import UiStat from '@/components/ui/UiStat.vue';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import ShardList from '@/components/overview/ShardList.vue';
 import HostResources from '@/components/overview/HostResources.vue';
@@ -16,8 +18,10 @@ import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import AnnounceDialog from '@/components/overview/AnnounceDialog.vue';
 import LogConsole from '@/components/overview/LogConsole.vue';
 import DiagnosticsDialog from '@/components/overview/DiagnosticsDialog.vue';
+import SavedMapDialog from '@/components/rooms/SavedMapDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
+import { useUiStore } from '@/stores/ui.js';
 import { useProcessControl } from '@/composables/useProcessControl.js';
 import { procApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
@@ -26,6 +30,7 @@ import { guard, toast } from '@/lib/toast.js';
 
 const rooms = useRoomsStore();
 const system = useSystemStore();
+const ui = useUiStore();
 const proc = useProcessControl();
 
 const quickBusy = ref('');
@@ -50,7 +55,7 @@ const shardSub = computed(() => {
   return shardRunning.value > 0 ? '部分运行中' : '全部已停止';
 });
 
-/** 运行中分片的资源合计。CPU 为各分片之和，口径是「占整机」。 */
+/** 运行中分片的资源合计。优先展示内存占用（DST 更易受内存限制），副标题展示 CPU 占比。 */
 const res = computed(() => {
   const live = rooms.statuses.filter(s => s.state === 'running');
   return {
@@ -63,15 +68,14 @@ const res = computed(() => {
 const resValue = computed(() => {
   const r = res.value;
   if (!r.count) return '—';
-  // 首次采样没有基准，后端给 0；此时显示「—」而不是「0.0%」
-  if (!r.cpu) return '—';
-  return r.cpu < 0.05 ? '< 0.1%' : r.cpu.toFixed(1) + '%';
+  return r.mem ? fmtSize(r.mem) : '—';
 });
 
 const resSub = computed(() => {
   const r = res.value;
   if (!r.count) return '未运行';
-  return `内存 ${fmtSize(r.mem)}`;
+  const cpuText = !r.cpu ? '—' : (r.cpu < 0.05 ? '< 0.1%' : r.cpu.toFixed(1) + '%');
+  return `CPU ${cpuText}`;
 });
 
 const resTone = computed(() => {
@@ -89,6 +93,10 @@ const installStage = computed(() => (system.progress || '准备中…').replace(
 
 function cancelInstall() {
   guard(() => system.cancelInstall(), { success: '已请求取消安装' });
+}
+
+function resumeInstall() {
+  guard(() => system.startInstall(), { success: '已继续服务器安装' });
 }
 
 async function runQuick(action) {
@@ -144,6 +152,25 @@ async function runQuick(action) {
       </div>
     </UiCard>
 
+    <Alert v-else-if="system.canceled || system.error" :variant="system.canceled ? 'default' : 'destructive'">
+      <AlertTitle>{{ system.canceled ? '服务器安装已暂停' : '服务器安装或更新失败' }}</AlertTitle>
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
+        <span>{{ system.canceled ? '已下载的分块已保留，随时可以继续续传。' : system.error }}</span>
+        <span class="flex shrink-0 items-center gap-2">
+          <Button size="sm" variant="outline" @click="ui.openSettings('server')">服务器设置</Button>
+          <Button size="sm" :disabled="anyRunning || rooms.starting" @click="resumeInstall">{{ system.canceled ? '继续安装' : '重试安装' }}</Button>
+        </span>
+      </AlertDescription>
+    </Alert>
+
+    <Alert v-if="rooms.current?.needToken" class="border-amber-500/40 bg-amber-500/5">
+      <AlertTitle>当前房间缺少 Klei 服务器令牌</AlertTitle>
+      <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
+        <span>在线模式开服需要配置 <code>cluster_token.txt</code> 令牌，局域网或离线模式可在房间设置中关闭在线校验。</span>
+        <Button size="sm" variant="outline" @click="ui.openRoomEditor(rooms.current.id)">前往配置令牌</Button>
+      </AlertDescription>
+    </Alert>
+
     <HostResources>
       <UiStat
         label="运行分片"
@@ -164,7 +191,7 @@ async function runQuick(action) {
         <template #title>分片管理</template>
         <template #actions>
           <DiagnosticsDialog />
-          <Separator orientation="vertical" class="hidden h-4 sm:block" />
+          <Separator orientation="vertical" class="hidden h-4 self-center sm:block" />
           <IconAction
             :variant="anyRunning ? 'outline' : 'default'"
             show-label
@@ -204,6 +231,7 @@ async function runQuick(action) {
             :disabled="!!quickBusy || !masterRunning || rooms.starting"
             @click="runQuick('skipday')"
           />
+          <SavedMapDialog />
         </div>
       </UiCard>
 

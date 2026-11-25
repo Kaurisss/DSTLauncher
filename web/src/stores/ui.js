@@ -60,6 +60,8 @@ export const useUiStore = defineStore('ui', () => {
   const activeTab = ref(readStoredTab(tabs.map(t => t.key)) || 'overview');
   const activeTabMeta = computed(() => tabs.find(t => t.key === activeTab.value) || tabs[0]);
   const isGlobalTab = computed(() => activeTabMeta.value?.scope === 'global');
+  const settingsSection = ref('maintenance');
+  const pendingEditRoomId = ref(null);
 
   // 与 rooms.js 的房间记忆同理：切换就落盘，刷新后停在原页面
   watch(activeTab, storeTab);
@@ -68,5 +70,24 @@ export const useUiStore = defineStore('ui', () => {
     if (tabs.some(t => t.key === key)) activeTab.value = key;
   }
 
-  return { navGroups, tabs, activeTab, activeTabMeta, isGlobalTab, select };
+  function openSettings(section = 'maintenance') {
+    settingsSection.value = section;
+    select('settings');
+  }
+
+  function openRoomEditor(roomId = null) {
+    pendingEditRoomId.value = roomId ? Number(roomId) : 0;
+    select('rooms');
+  }
+
+  function consumePendingEditRoom() {
+    const id = pendingEditRoomId.value;
+    pendingEditRoomId.value = null;
+    return id;
+  }
+
+  return {
+    navGroups, tabs, activeTab, activeTabMeta, isGlobalTab,
+    settingsSection, select, openSettings, openRoomEditor, consumePendingEditRoom,
+  };
 });

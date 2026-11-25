@@ -26,10 +26,12 @@ import OptionGroupPanel from '@/components/world/OptionGroupPanel.vue';
 import { worldApi } from '@/lib/api.js';
 import { iconOf } from '@/lib/worldIcons.js';
 import { useRoomsStore } from '@/stores/rooms.js';
+import { useUiStore } from '@/stores/ui.js';
 import { guard, toast } from '@/lib/toast.js';
 import { WORLD_TYPE_LABEL, MOD_LABEL, shardLabel } from '@/lib/format.js';
 
 const rooms = useRoomsStore();
+const ui = useUiStore();
 
 const shard = ref('');
 const loadedShard = ref('');
@@ -522,34 +524,7 @@ onMounted(() => selectShard(rooms.shards[0]));
                   <code class="block break-all bg-transparent p-0 text-xs">{{ view.file }}</code>
                   <p class="text-xs leading-relaxed text-muted-foreground">世界规则在重启后生效；世界生成只在建图时读取，已有地图不会重新生成。</p>
                   <p v-if="levelDataInUse" class="text-xs text-muted-foreground">此存档使用游戏生成的 leveldataoverride.lua，仅保存修改过的世界规则。</p>
-                  <template v-else>
-                    <div class="world-presets">
-                      <UiField block label="世界生成预设" for-id="w-worldgen">
-                        <Select v-model="worldgenPreset" :disabled="worldgenFrozen || loading || saving">
-                          <SelectTrigger id="w-worldgen" class="w-full"><SelectValue :placeholder="worldgenPreset || '选择预设'" /></SelectTrigger>
-                          <SelectContent position="popper" align="start">
-                            <SelectGroup>
-                              <SelectItem v-for="p in worldgenPresets" :key="p.data" :value="p.data">{{ p.label ? p.label + '（' + p.data + '）' : p.data }}</SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </UiField>
-                      <UiField block label="世界规则预设" for-id="w-settings">
-                        <Select v-model="settingsPreset" :disabled="frozen || loading || saving">
-                          <SelectTrigger id="w-settings" class="w-full"><SelectValue :placeholder="settingsPreset || '选择预设'" /></SelectTrigger>
-                          <SelectContent position="popper" align="start">
-                            <SelectGroup>
-                              <SelectItem v-for="p in settingsPresets" :key="p.data" :value="p.data">{{ p.label ? p.label + '（' + p.data + '）' : p.data }}</SelectItem>
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </UiField>
-                    </div>
-                    <label class="world-enabled">
-                      <Switch v-model="enabled" aria-label="启用本文件" :disabled="frozen || loading || saving" />
-                      <span>启用本文件</span>
-                    </label>
-                  </template>
+                  <p v-else class="text-xs text-muted-foreground">使用 worldgenoverride.lua 覆写世界规则与生成项；预设与启用开关已直接展示在下方配置栏。</p>
                 </PopoverContent>
               </PopoverPortal>
             </PopoverRoot>
@@ -600,15 +575,49 @@ onMounted(() => selectShard(rooms.shards[0]));
             </div>
           </div>
         </div>
-        <UiEmpty v-else-if="!rooms.current" text="请先在「房间」页新建一个房间" />
+        <UiEmpty v-else-if="!rooms.current">
+          <span>请先在「房间管理」页新建一个房间</span>
+          <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
+        </UiEmpty>
         <p v-else-if="loadError" role="alert" class="p-4 text-sm text-destructive">读取失败：{{ loadError }}</p>
         <div v-else-if="view" data-slot="page-scroll" class="flex h-full min-h-0 flex-col overflow-hidden">
+          <div v-if="!levelDataInUse" role="region" aria-label="预设与启用" class="shrink-0 border-b bg-muted/20 px-[var(--panel-padding)] py-2.5">
+            <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
+              <UiField block label="世界生成预设" for-id="w-worldgen" class="min-w-[180px] flex-1 max-w-xs">
+                <Select v-model="worldgenPreset" :disabled="worldgenFrozen || loading || saving">
+                  <SelectTrigger id="w-worldgen" class="h-8 w-full bg-background text-xs"><SelectValue :placeholder="worldgenPreset || '选择预设'" /></SelectTrigger>
+                  <SelectContent position="popper" align="start">
+                    <SelectGroup>
+                      <SelectItem v-for="p in worldgenPresets" :key="p.data" :value="p.data">{{ p.label ? p.label + '（' + p.data + '）' : p.data }}</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </UiField>
+              <UiField block label="世界规则预设" for-id="w-settings" class="min-w-[180px] flex-1 max-w-xs">
+                <Select v-model="settingsPreset" :disabled="frozen || loading || saving">
+                  <SelectTrigger id="w-settings" class="h-8 w-full bg-background text-xs"><SelectValue :placeholder="settingsPreset || '选择预设'" /></SelectTrigger>
+                  <SelectContent position="popper" align="start">
+                    <SelectGroup>
+                      <SelectItem v-for="p in settingsPresets" :key="p.data" :value="p.data">{{ p.label ? p.label + '（' + p.data + '）' : p.data }}</SelectItem>
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </UiField>
+              <label class="world-enabled flex h-8 items-center gap-2 text-xs font-medium">
+                <Switch v-model="enabled" aria-label="启用本文件" :disabled="frozen || loading || saving" />
+                <span>启用本文件</span>
+              </label>
+            </div>
+          </div>
           <div v-if="frozen || (!enabled && !levelDataInUse) || presetMismatch" class="world-notices shrink-0">
-            <p v-if="frozen" role="status">服务器运行中，配置已冻结。请先在「总览」关闭服务器再修改。</p>
+            <p v-if="frozen" role="status" class="flex flex-wrap items-center gap-2">
+              <span>服务器运行中，配置已冻结。请先在「概览」关闭服务器再修改。</span>
+              <Button size="sm" variant="outline" class="h-6 px-2 text-xs" @click="ui.select('overview')">前往概览</Button>
+            </p>
             <p v-if="!enabled && !levelDataInUse">已关闭 override_enabled，本文件中的设置不会应用。</p>
             <p v-if="presetMismatch" role="alert">
               预设 {{ worldgenPreset }} 与 {{ shardHint }} 类型不一致。
-              {{ worldGenerated ? '地图已生成，修改预设不会重建地图。' : '请在「路径与说明」中选择匹配的预设后再启动。' }}
+              {{ worldGenerated ? '地图已生成，修改预设不会重建地图。' : '请在上方「世界生成预设」中选择匹配的预设后再启动。' }}
             </p>
           </div>
           <div class="world-workspace">

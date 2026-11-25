@@ -62,7 +62,7 @@ async function openPage(tab, { width = 1280, badCheck = false, running = false }
 test('异地备份用自定义 Select 切换 WebDAV，保存凭据不回填密码，连接失败可见', async () => {
   const { page, state } = await openPage('settings');
   try {
-    await page.getByRole('navigation', { name: '设置导航' }).getByRole('button', { name: '异地备份', exact: true }).click();
+    await page.getByRole('navigation', { name: '设置导航' }).getByRole('button', { name: '自动维护与异地备份', exact: true }).click();
     const target = page.getByRole('combobox', { name: '备份目标', exact: true });
     assert.equal(await target.evaluate(el => el.tagName), 'BUTTON');
     await target.click(); await page.getByRole('option', { name: 'WebDAV', exact: true }).click();

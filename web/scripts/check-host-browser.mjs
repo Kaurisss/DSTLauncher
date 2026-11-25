@@ -212,7 +212,7 @@ test('概览统一四项资源指标，服务器配置仅在设置页提供', as
     assert.equal(await page.getByRole('button', { name: '检查更新', exact: true }).count(), 0);
     const nav = page.locator('#app-navigation');
     await nav.getByRole('button', { name: '系统设置', exact: true }).click();
-    await page.getByRole('button', { name: '文件与架构', exact: true }).click();
+    await page.getByRole('button', { name: '服务器与创意工坊', exact: true }).click();
     await page.getByRole('heading', { name: '服务器文件与架构', exact: true }).waitFor();
     await page.getByText('更改服务器文件位置', { exact: true }).click();
     await page.getByLabel('安装目录', { exact: true }).waitFor();
