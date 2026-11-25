@@ -15,6 +15,10 @@ import { mapApi } from '@/lib/api.js';
 import { fmtTime, shardLabel } from '@/lib/format.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 
+defineProps({
+  showLabel: { type: [Boolean, String], default: 'sm' },
+});
+
 const rooms = useRoomsStore();
 const SKELETON_LANDMARKS = [
   { name: '64%', coord: '58px' },
@@ -77,7 +81,7 @@ function selectLandmark(id) { selectedId.value = id; showLandmarks.value = true;
 
 <template>
   <Dialog v-model:open="open">
-    <DialogTrigger as-child><IconAction icon="map" variant="outline" show-label="sm" label="地图预览" :disabled="!rooms.list.length" /></DialogTrigger>
+    <DialogTrigger as-child><IconAction icon="map" variant="outline" :show-label="showLabel" label="地图预览" :disabled="!rooms.list.length" /></DialogTrigger>
     <DialogContent class="flex max-h-[94dvh] flex-col overflow-y-auto sm:max-w-6xl">
       <DialogHeader class="shrink-0">
         <DialogTitle>存档地图预览</DialogTitle>

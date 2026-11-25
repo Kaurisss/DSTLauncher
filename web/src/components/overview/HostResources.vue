@@ -68,7 +68,12 @@ onUnmounted(() => {
         <template #loading>
           <Skeleton class="mt-2 h-1 w-full rounded-full" />
         </template>
-        <Progress v-if="memory" class="mt-2 h-1" :model-value="memoryUsed / memory.totalBytes * 100" aria-label="宿主机内存使用率" />
+        <Progress
+          v-if="memory"
+          :class="['mt-2 h-1', memoryLow && '[&>[data-slot=progress-indicator]]:bg-amber-500']"
+          :model-value="memoryUsed / memory.totalBytes * 100"
+          aria-label="宿主机内存使用率"
+        />
       </UiStat>
       <Tooltip :disabled="!snapshot?.diskPath">
         <TooltipTrigger as-child>
@@ -83,7 +88,12 @@ onUnmounted(() => {
             <template #loading>
               <Skeleton class="mt-2 h-1 w-full rounded-full" />
             </template>
-            <Progress v-if="disk" class="mt-2 h-1" :model-value="(disk.totalBytes - disk.availableBytes) / disk.totalBytes * 100" aria-label="存档盘已用空间" />
+            <Progress
+              v-if="disk"
+              :class="['mt-2 h-1', diskLow && '[&>[data-slot=progress-indicator]]:bg-amber-500']"
+              :model-value="(disk.totalBytes - disk.availableBytes) / disk.totalBytes * 100"
+              aria-label="存档盘已用空间"
+            />
           </UiStat>
         </TooltipTrigger>
         <TooltipContent class="break-all">{{ snapshot?.diskPath }}</TooltipContent>
@@ -91,9 +101,13 @@ onUnmounted(() => {
     </div>
     <div v-if="container" class="host-container flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" :class="{ 'is-warn': containerLow }">
       <span>容器内存配额</span>
-      <strong class="font-medium text-foreground">{{ fmtSize(container.availableBytes) }}</strong>
-      <span>剩余可用 / 限额 {{ fmtSize(container.totalBytes) }}</span>
-      <Progress class="h-1 w-24" :model-value="(container.totalBytes - container.availableBytes) / container.totalBytes * 100" aria-label="容器内存使用率" />
+      <strong class="font-medium text-foreground tabular-nums">{{ fmtSize(container.availableBytes) }}</strong>
+      <span class="tabular-nums">剩余可用 / 限额 {{ fmtSize(container.totalBytes) }}</span>
+      <Progress
+        :class="['h-1 w-24', containerLow && '[&>[data-slot=progress-indicator]]:bg-amber-500']"
+        :model-value="(container.totalBytes - container.availableBytes) / container.totalBytes * 100"
+        aria-label="容器内存使用率"
+      />
     </div>
     <div v-if="errors.length" role="status" class="grid gap-1 break-words rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-400">
       <p v-for="message in errors" :key="message">{{ message }}</p>

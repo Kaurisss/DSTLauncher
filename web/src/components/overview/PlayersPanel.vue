@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue';
+import { PhUsers } from '@phosphor-icons/vue';
 import {
   DialogRoot, DialogPortal, DialogOverlay, DialogContent,
   DialogTitle, DialogDescription, DialogClose,
@@ -7,6 +8,7 @@ import {
 
 import UiCard from '@/components/ui/UiCard.vue';
 import IconAction from '@/components/ui/IconAction.vue';
+import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { adminApi, playerApi } from '@/lib/api.js';
@@ -33,6 +35,23 @@ let disposed = false;
 let timer;
 
 const labelOf = name => shardLabel(name, rooms.current?.locations?.[name]);
+
+const emptyState = computed(() => {
+  if (!rooms.current) return { title: '请先选择房间', desc: '在房间管理中创建或切换一个房间' };
+  if (!rooms.statusLoaded) return { title: '等待分片状态', desc: '正在同步当前房间的运行状态' };
+  if (!canQuery.value && rooms.statuses.some(status => status.state === 'running')) {
+    return { title: '等待玩家进入世界', desc: '分片正在初始化世界，就绪后自动查询' };
+  }
+  if (!canQuery.value) {
+    return rooms.running
+      ? { title: '等待分片启动', desc: '分片完成启动后将自动拉取在线玩家' }
+      : { title: '房间未运行', desc: '启动分片后可在此查看并管理在线玩家' };
+  }
+  if (!loading.value && !loadError.value && !players.value.length && !Object.keys(errors.value).length) {
+    return { title: '暂无在线玩家', desc: '有玩家进入世界后将实时展示并支持快捷操作' };
+  }
+  return null;
+});
 
 const LABELS = { kick: '踢出', ban: '封禁', revive: '复活', teleport: '传送', admin: '设为管理员' };
 const targets = computed(() => teleport.value ? players.value.filter(player =>
@@ -145,58 +164,80 @@ function preventWhileBusy(event) {
 </script>
 
 <template>
-  <section aria-label="在线玩家" class="flex min-w-0 flex-col">
-    <UiCard>
-      <template #title>在线玩家</template>
+  <section aria-label="在线玩家" class="flex h-full min-w-0 flex-col">
+    <UiCard class="h-full" fill>
+      <template #title>
+        <span class="inline-flex items-center gap-2">
+          <span>在线玩家</span>
+          <Badge v-if="canQuery" variant="secondary" class="h-5 px-1.5 text-[11px] font-medium tabular-nums">
+            {{ players.length }} 人
+          </Badge>
+        </span>
+      </template>
       <template #actions>
         <IconAction variant="outline" icon="refresh" :label="loading ? '查询中…' : '刷新玩家'" :disabled="!canQuery || loading || busy" @click="load" />
       </template>
 
-      <p v-if="!rooms.current" class="text-sm text-muted-foreground">请先选择房间</p>
-      <p v-else-if="!rooms.statusLoaded" class="text-sm text-muted-foreground">等待分片状态</p>
-      <p v-else-if="!canQuery && rooms.statuses.some(status => status.state === 'running')" class="text-sm text-muted-foreground">等待玩家进入世界</p>
-      <p v-else-if="!canQuery" class="text-sm text-muted-foreground">{{ rooms.running ? '等待分片启动' : '房间未运行' }}</p>
-      <div v-else-if="loading && !players.length" role="status" aria-label="正在查询玩家" class="flex h-5 items-center">
-        <Skeleton class="h-3.5 w-28" />
+      <div v-if="emptyState" class="flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-center">
+        <span class="grid size-9 place-items-center rounded-full bg-muted text-muted-foreground">
+          <PhUsers class="size-4" aria-hidden="true" />
+        </span>
+        <div class="grid gap-0.5">
+          <p class="text-sm font-medium text-foreground">{{ emptyState.title }}</p>
+          <p class="text-xs text-muted-foreground">{{ emptyState.desc }}</p>
+        </div>
       </div>
-      <p v-else-if="loadError" role="alert" class="break-words text-sm text-destructive">{{ loadError }}</p>
-      <p v-else-if="!players.length && !Object.keys(errors).length" class="text-sm text-muted-foreground">
-        暂无在线玩家
-      </p>
-      <div v-if="Object.keys(errors).length" role="status" class="mb-3 grid gap-1 break-words text-sm text-amber-700 dark:text-amber-400">
-        <p v-for="(message, shard) in errors" :key="shard">{{ labelOf(shard) }}：{{ message }}</p>
-      </div>
-      <p v-if="actionError && !teleportOpen" role="alert" class="mb-3 break-words text-sm text-destructive">{{ actionError }}</p>
 
-      <div v-if="players.length" class="max-h-80 divide-y divide-border overflow-y-auto overscroll-contain">
-        <article
-          v-for="player in players" :key="`${player.shard}:${player.userid}`"
-          :aria-label="`${player.name || player.userid} ${player.userid} ${labelOf(player.shard)}`"
-          class="flex min-w-0 flex-wrap items-center justify-between gap-3 py-3 first:pt-0 last:pb-0"
-        >
-          <div class="min-w-0 flex-1 basis-48">
-            <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
-              <strong class="break-all font-medium">{{ player.name || player.userid }}</strong>
-              <span class="break-all font-mono text-xs text-muted-foreground">{{ player.userid }}</span>
-              <span v-if="player.admin" class="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">管理员</span>
-              <span v-else-if="player.adminSaved" class="text-xs text-muted-foreground">管理员待重启生效</span>
-            </div>
-            <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
-              <span>{{ labelOf(player.shard) }}</span>
-              <span>{{ CHARACTERS[player.prefab] || player.prefab || '选角中' }}</span>
-              <span>{{ player.days == null ? '天数未知' : player.days + ' 天' }}</span>
-              <span v-if="player.ghost" class="font-medium text-destructive">幽灵</span>
-            </p>
+      <div v-else-if="loading && !players.length" role="status" aria-label="正在查询玩家" class="grid gap-2.5">
+        <div v-for="i in 3" :key="i" class="flex items-center justify-between gap-3 rounded-lg border border-border/75 bg-muted/20 px-3 py-2.5">
+          <div class="grid gap-1.5">
+            <Skeleton class="h-3.5 w-32" />
+            <Skeleton class="h-3 w-44" />
           </div>
-          <div class="flex max-w-full flex-wrap gap-1.5">
-            <IconAction variant="outline" icon="logout" label="踢出" :disabled="busy" @click="act(player, 'kick')" />
-            <IconAction variant="destructive" icon="ban" label="封禁" :disabled="busy" @click="act(player, 'ban')" />
-            <IconAction variant="outline" icon="heart" label="复活" :disabled="busy || !player.inWorld || !player.ghost" @click="act(player, 'revive')" />
-            <IconAction variant="outline" icon="pin" label="传送" :disabled="busy || !canTeleport(player)" @click="openTeleport(player)" />
-            <IconAction variant="outline" icon="users" label="设为管理员" :disabled="busy || player.admin || player.adminSaved || !/^KU_[A-Za-z0-9_-]{1,32}$/.test(player.userid)" @click="act(player, 'admin')" />
+          <div class="flex gap-1.5">
+            <Skeleton class="size-7 rounded-md" />
+            <Skeleton class="size-7 rounded-md" />
           </div>
-        </article>
+        </div>
       </div>
+
+      <template v-else>
+        <p v-if="loadError" role="alert" class="mb-2 break-words text-sm text-destructive">{{ loadError }}</p>
+        <div v-if="Object.keys(errors).length" role="status" class="mb-2 grid gap-1 break-words text-sm text-amber-700 dark:text-amber-400">
+          <p v-for="(message, shard) in errors" :key="shard">{{ labelOf(shard) }}：{{ message }}</p>
+        </div>
+        <p v-if="actionError && !teleportOpen" role="alert" class="mb-2 break-words text-sm text-destructive">{{ actionError }}</p>
+
+        <div v-if="players.length" class="max-h-60 flex-1 divide-y divide-border overflow-y-auto overscroll-contain pr-0.5">
+          <article
+            v-for="player in players" :key="`${player.shard}:${player.userid}`"
+            :aria-label="`${player.name || player.userid} ${player.userid} ${labelOf(player.shard)}`"
+            class="flex min-w-0 flex-wrap items-center justify-between gap-2.5 py-2.5 first:pt-0 last:pb-0"
+          >
+            <div class="min-w-0 flex-1 basis-44">
+              <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 text-sm">
+                <strong class="break-all font-medium">{{ player.name || player.userid }}</strong>
+                <span class="break-all font-mono text-xs text-muted-foreground">{{ player.userid }}</span>
+                <span v-if="player.admin" class="rounded bg-primary/10 px-1.5 py-0.5 text-xs font-medium text-primary">管理员</span>
+                <span v-else-if="player.adminSaved" class="text-xs text-muted-foreground">管理员待重启生效</span>
+              </div>
+              <p class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground tabular-nums">
+                <span>{{ labelOf(player.shard) }}</span>
+                <span>{{ CHARACTERS[player.prefab] || player.prefab || '选角中' }}</span>
+                <span>{{ player.days == null ? '天数未知' : player.days + ' 天' }}</span>
+                <span v-if="player.ghost" class="font-medium text-destructive">幽灵</span>
+              </p>
+            </div>
+            <div class="flex max-w-full flex-wrap gap-1">
+              <IconAction variant="outline" icon="logout" label="踢出" :disabled="busy" @click="act(player, 'kick')" />
+              <IconAction variant="destructive" icon="ban" label="封禁" :disabled="busy" @click="act(player, 'ban')" />
+              <IconAction variant="outline" icon="heart" label="复活" :disabled="busy || !player.inWorld || !player.ghost" @click="act(player, 'revive')" />
+              <IconAction variant="outline" icon="pin" label="传送" :disabled="busy || !canTeleport(player)" @click="openTeleport(player)" />
+              <IconAction variant="outline" icon="users" label="设为管理员" :disabled="busy || player.admin || player.adminSaved || !/^KU_[A-Za-z0-9_-]{1,32}$/.test(player.userid)" @click="act(player, 'admin')" />
+            </div>
+          </article>
+        </div>
+      </template>
     </UiCard>
 
     <DialogRoot v-model:open="teleportOpen">

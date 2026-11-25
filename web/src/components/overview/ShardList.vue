@@ -59,6 +59,26 @@ function label(s) {
   return shardLabel(s.shard, rooms.current?.locations?.[s.shard]);
 }
 
+function dotClass(s) {
+  if (s.state === 'running') return 'bg-emerald-500';
+  if (s.state === 'starting' || s.state === 'stopping') return 'bg-amber-500';
+  if (s.state === 'crashed' || s.state === 'failed') return 'bg-destructive';
+  return 'bg-muted-foreground/35';
+}
+
+function badgeClass(s) {
+  if (s.state === 'running') {
+    return 'border-emerald-500/25 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400';
+  }
+  if (s.state === 'starting' || s.state === 'stopping') {
+    return 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400';
+  }
+  if (s.state === 'crashed' || s.state === 'failed') {
+    return 'border-destructive/30 bg-destructive/10 text-destructive';
+  }
+  return '';
+}
+
 function meta(s) {
   return [
     s.uptime,
@@ -118,14 +138,25 @@ async function refreshSnapshots(id, requestGeneration) {
     <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
   </UiEmpty>
 
-  <section v-else aria-label="分片状态" class="divide-y divide-border">
+  <section
+    v-else
+    aria-label="分片状态"
+    :class="['shard-grid grid gap-2.5', rows.length > 1 ? 'sm:grid-cols-2' : 'grid-cols-1']"
+  >
     <div v-for="s in rows" :key="s.shard" class="shard-row" :aria-label="label(s)">
-      <div class="min-w-0 space-y-2">
+      <div class="shard-row-head">
         <div class="shard-main">
-          <span class="shard-name">{{ label(s) }}</span>
+          <span aria-hidden="true" :class="['size-2 shrink-0 rounded-full', dotClass(s)]" />
+          <span class="shard-name truncate">{{ label(s) }}</span>
           <Tooltip :disabled="!meta(s) && !isLive(s)">
             <TooltipTrigger as-child>
-              <Badge variant="secondary" :tabindex="meta(s) || isLive(s) ? 0 : undefined">{{ s.placeholder ? '未启动' : STATE_LABEL[s.state] || s.state }}</Badge>
+              <Badge
+                variant="secondary"
+                :class="['h-5 shrink-0 px-1.5 text-[11px] font-medium', badgeClass(s)]"
+                :tabindex="meta(s) || isLive(s) ? 0 : undefined"
+              >
+                {{ s.placeholder ? '未启动' : STATE_LABEL[s.state] || s.state }}
+              </Badge>
             </TooltipTrigger>
             <TooltipContent>
               <p v-if="meta(s)">{{ meta(s) }}</p>
@@ -137,15 +168,15 @@ async function refreshSnapshots(id, requestGeneration) {
             <TooltipContent>{{ staleTip(s) }}</TooltipContent>
           </Tooltip>
         </div>
-        <WorldState :snapshot="s.snapshot" :loading="loadingSnapshots" :error="snapshotError" />
+        <span class="shard-actions">
+          <template v-if="isLive(s)">
+            <IconAction variant="destructive" show-label="sm" icon="stop" label="停止" :disabled="rooms.starting" @click="proc.stop(s.shard)" />
+            <IconAction variant="outline" show-label="sm" icon="restart" label="重启" :disabled="rooms.starting || system.installing" @click="proc.restart(s.shard)" />
+          </template>
+          <IconAction v-else variant="outline" show-label="sm" :icon="system.installed ? 'play' : 'download'" :label="rooms.starting ? '请稍候…' : (system.installed ? '启动' : '安装并启动')" :disabled="rooms.starting" @click="proc.start(s.shard)" />
+        </span>
       </div>
-      <span class="shard-actions">
-        <template v-if="isLive(s)">
-          <IconAction variant="destructive" show-label="sm" icon="stop" label="停止" :disabled="rooms.starting" @click="proc.stop(s.shard)" />
-          <IconAction variant="outline" show-label="sm" icon="restart" label="重启" :disabled="rooms.starting || system.installing" @click="proc.restart(s.shard)" />
-        </template>
-        <IconAction v-else variant="outline" show-label="sm" :icon="system.installed ? 'play' : 'download'" :label="rooms.starting ? '请稍候…' : (system.installed ? '启动' : '安装并启动')" :disabled="rooms.starting" @click="proc.start(s.shard)" />
-      </span>
+      <WorldState :snapshot="s.snapshot" :loading="loadingSnapshots" :error="snapshotError" />
     </div>
   </section>
 </template>

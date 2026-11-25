@@ -10,6 +10,7 @@ import UiStat from '@/components/ui/UiStat.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import ShardList from '@/components/overview/ShardList.vue';
 import HostResources from '@/components/overview/HostResources.vue';
@@ -46,6 +47,13 @@ const shardTone = computed(() => {
   if (!shardTotal.value) return '';
   if (shardRunning.value === shardTotal.value) return 'ok';
   return shardRunning.value > 0 ? 'warn' : '';
+});
+
+const shardPct = computed(() => (shardTotal.value ? (shardRunning.value / shardTotal.value) * 100 : 0));
+
+const shardDotClass = computed(() => {
+  if (!shardTotal.value || !shardRunning.value) return 'bg-muted-foreground/35';
+  return shardRunning.value === shardTotal.value ? 'bg-emerald-500' : 'bg-amber-500';
 });
 
 const shardSub = computed(() => {
@@ -125,7 +133,7 @@ async function runQuick(action) {
   <!-- 必须保持单一根节点：App.vue 用 <Transition> 包裹视图组件，
        而 Transition 只接受「恰好一个」根元素。多根（fragment）会让切换动画失效，
        表现为来回点导航后右侧内容整个空白。 -->
-  <div class="overview-page grid gap-4">
+  <div class="overview-page grid gap-3">
     <UiCard v-if="system.installing" role="status" aria-label="服务器安装进度">
       <template #title>
         <span class="inline-flex items-center gap-2">
@@ -177,17 +185,27 @@ async function runQuick(action) {
         :value="`${shardRunning} / ${shardTotal}`"
         :sub="shardSub"
         :tone="shardTone"
-      />
+      >
+        <template #value>
+          <span class="inline-flex items-center gap-2 tabular-nums">
+            <span aria-hidden="true" :class="['size-2 shrink-0 rounded-full', shardDotClass]" />
+            <span>{{ shardRunning }} / {{ shardTotal }}</span>
+          </span>
+        </template>
+        <Progress class="mt-2 h-1" :model-value="shardPct" aria-label="运行分片占比" />
+      </UiStat>
       <UiStat
         label="进程资源占用"
         :value="resValue"
         :sub="resSub"
         :tone="resTone"
-      />
+      >
+        <Progress class="mt-2 h-1" :model-value="res.count ? Math.min(100, res.cpu) : 0" aria-label="进程 CPU 占比" />
+      </UiStat>
     </HostResources>
 
     <div class="overview-workspace">
-      <UiCard class="h-full">
+      <UiCard class="h-full" fill>
         <template #title>分片管理</template>
         <template #actions>
           <DiagnosticsDialog />
@@ -209,29 +227,31 @@ async function runQuick(action) {
             @click="proc.stop('')"
           />
         </template>
-        <ShardList />
-        <div v-if="rooms.current" role="group" aria-label="快捷运维" class="mt-3 flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <span class="mr-1 text-xs font-medium text-muted-foreground">快捷运维</span>
-          <IconAction
-            variant="outline"
-            show-label
-            icon="save"
-            :label="quickBusy === 'save' ? '等待保存完成…' : '立即保存'"
-            :disabled="!!quickBusy || !anyRunning || rooms.starting"
-            @click="runQuick('save')"
-          />
-          <AnnounceDialog />
-          <RollbackDialog />
-          <IconAction
-            variant="outline"
-            show-label
-            icon="skip"
-            :label="quickBusy === 'skipday' ? '等待游戏回执…' : '主世界快进一天'"
-            :text="quickBusy === 'skipday' ? '等待回执…' : '快进一天'"
-            :disabled="!!quickBusy || !masterRunning || rooms.starting"
-            @click="runQuick('skipday')"
-          />
-          <SavedMapDialog />
+        <div class="flex min-h-0 flex-1 flex-col justify-between gap-3">
+          <ShardList />
+          <div v-if="rooms.current" role="group" aria-label="快捷运维" class="flex flex-wrap items-center gap-1.5 border-t border-border/75 pt-3">
+            <span class="mr-1 text-xs font-medium text-muted-foreground">快捷运维</span>
+            <IconAction
+              variant="outline"
+              show-label
+              icon="save"
+              :label="quickBusy === 'save' ? '等待保存完成…' : '立即保存'"
+              :disabled="!!quickBusy || !anyRunning || rooms.starting"
+              @click="runQuick('save')"
+            />
+            <AnnounceDialog />
+            <RollbackDialog />
+            <IconAction
+              variant="outline"
+              show-label
+              icon="skip"
+              :label="quickBusy === 'skipday' ? '等待游戏回执…' : '主世界快进一天'"
+              :text="quickBusy === 'skipday' ? '等待回执…' : '快进一天'"
+              :disabled="!!quickBusy || !masterRunning || rooms.starting"
+              @click="runQuick('skipday')"
+            />
+            <SavedMapDialog :show-label="true" />
+          </div>
         </div>
       </UiCard>
 

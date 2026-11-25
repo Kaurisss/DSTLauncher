@@ -25,11 +25,11 @@ watch([() => rooms.currentId, () => rooms.shards.join(',')], ([roomId], [previou
     <UiEmpty v-if="!rooms.shards.length" text="还没有可用的房间。先在「房间」页新建一个，再回来看日志。" />
     <TabsRoot v-else v-model="active" class="min-w-0">
       <CodeBlock size="sm">
-        <CodeBlockHeader class="flex-wrap border-b border-border px-4 py-3">
+        <CodeBlockHeader class="flex-wrap border-b border-border/75 bg-muted/30 px-3 py-2">
           <TabsList aria-label="日志分片" class="log-tabs">
             <TabsTrigger v-for="shard in rooms.shards" :key="shard" :value="shard" class="log-tab">
               <span class="log-tab-dot" :class="channels[shard]?.connected ? 'is-connected' : ''" aria-hidden="true" />
-              {{ label(shard) }}
+              <span>{{ label(shard) }}</span>
               <span class="log-pane-sub">{{ shard }}</span>
               <span class="sr-only">{{ channels[shard]?.connected ? '已连接' : '重连中' }}</span>
             </TabsTrigger>
