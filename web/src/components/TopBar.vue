@@ -1,12 +1,10 @@
 <script setup>
 import { computed, ref } from 'vue';
-import iconUrl from '@/assets/icon.png';
 import { PhDesktop, PhMoon, PhSignOut, PhSun } from '@phosphor-icons/vue';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
+import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useAuthStore } from '@/stores/auth.js';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -19,10 +17,10 @@ const auth = useAuthStore();
 const rooms = useRoomsStore();
 const ui = useUiStore();
 const theme = useTheme();
-const { state } = useSidebar();
 const loggingOut = ref(false);
 
 const pageTitle = computed(() => ui.activeTabMeta?.label || '控制台');
+const groupLabel = computed(() => (ui.isGlobalTab ? '全局管理' : '当前房间'));
 const roomDetails = computed(() => {
   const room = rooms.current;
   if (!room) return '';
@@ -56,41 +54,45 @@ async function onLogout() {
 </script>
 
 <template>
-  <header data-slot="app-header" class="relative z-20 flex h-14 w-full min-w-0 shrink-0 items-center justify-between bg-sidebar text-sidebar-foreground">
-    <div class="flex min-w-0 flex-1 items-center">
-      <!-- 品牌与触发区域：桌面端宽度与侧边栏严格同步（展开 220px，收起 48px），移动端仅保留触发按钮 -->
-      <div
-        class="flex h-14 shrink-0 items-center overflow-hidden transition-[width] duration-180 ease-[cubic-bezier(0.2,0,0,1)]"
-        :class="state === 'expanded' ? 'w-12 md:w-[220px]' : 'w-12'"
-      >
-        <!-- 侧边栏折叠按钮：固定在左侧 48px 区域内居中，中心点 x=24px 与下方导航图标严格共线 -->
-        <div class="flex h-14 w-12 shrink-0 items-center justify-center">
-          <Tooltip>
-            <TooltipTrigger as-child>
-              <SidebarTrigger aria-controls="app-navigation" aria-label="切换导航" size="icon-sm" class="shrink-0 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground" />
-            </TooltipTrigger>
-            <TooltipContent>展开或收起导航</TooltipContent>
-          </Tooltip>
-        </div>
+  <header
+    data-slot="app-header"
+    class="relative z-20 flex h-12 w-full min-w-0 shrink-0 items-center justify-between gap-3 border-b border-border/75 bg-background px-3 text-foreground"
+  >
+    <div class="flex min-w-0 flex-1 items-center gap-2">
+      <Tooltip>
+        <TooltipTrigger as-child>
+          <SidebarTrigger
+            aria-controls="app-navigation"
+            aria-label="切换导航"
+            size="icon-sm"
+            class="size-7 shrink-0 rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          />
+        </TooltipTrigger>
+        <TooltipContent>展开或收起导航 (Ctrl+B)</TooltipContent>
+      </Tooltip>
 
-        <!-- 品牌标识：仅在桌面端展开时展示 -->
-        <div class="hidden md:flex min-w-0 flex-1 items-center gap-2 pr-3">
-          <img :src="iconUrl" alt="DST" width="28" height="28" class="size-7 shrink-0 rounded-lg object-cover" />
-          <span class="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">DST 开服控制台</span>
-        </div>
-      </div>
+      <span aria-hidden="true" class="h-4 w-px shrink-0 bg-border/80" />
 
-      <!-- 当前页面标题：移动端紧随触发按钮，桌面端从侧边栏分界处起排 -->
-      <div class="flex min-w-0 items-center gap-2 pl-1 md:pl-3">
-        <h1 class="truncate text-sm font-semibold sm:text-base text-sidebar-foreground">{{ pageTitle }}</h1>
-        <Badge v-if="ui.isGlobalTab" variant="outline" class="hidden shrink-0 text-[11px] font-normal text-muted-foreground sm:inline-flex">全局</Badge>
+      <div class="flex min-w-0 items-center gap-1.5">
+        <span class="hidden shrink-0 text-xs font-medium text-muted-foreground sm:inline">{{ groupLabel }}</span>
+        <span aria-hidden="true" class="hidden shrink-0 select-none text-xs text-muted-foreground/45 sm:inline">/</span>
+        <h1 class="truncate text-sm font-semibold text-foreground">{{ pageTitle }}</h1>
       </div>
     </div>
 
-    <!-- 右侧：房间选择（仅当前房间作用域显示）+ 切换主题 + 退出登录（启用密码时显示） -->
-    <div class="flex min-w-0 shrink-0 items-center gap-2 pr-3">
-      <Select v-if="!ui.isGlobalTab" :model-value="rooms.currentId ? String(rooms.currentId) : ''" :disabled="!rooms.list.length" @update:model-value="rooms.select">
-        <SelectTrigger id="roomSelect" aria-label="房间" size="sm" class="w-auto min-w-[140px] max-w-[200px] sm:max-w-[340px] md:max-w-[420px] lg:max-w-[500px] bg-card h-7 px-2.5 text-xs">
+    <div class="flex min-w-0 shrink-0 items-center gap-1.5">
+      <Select
+        v-if="!ui.isGlobalTab"
+        :model-value="rooms.currentId ? String(rooms.currentId) : ''"
+        :disabled="!rooms.list.length"
+        @update:model-value="rooms.select"
+      >
+        <SelectTrigger
+          id="roomSelect"
+          aria-label="房间"
+          size="sm"
+          class="h-7.5 w-auto min-w-[140px] max-w-[200px] rounded-lg border-border/80 bg-background px-2.5 text-xs shadow-none hover:bg-muted/50 sm:max-w-[340px] md:max-w-[420px] lg:max-w-[480px]"
+        >
           <SelectValue as-child>
             <span class="flex min-w-0 flex-1 items-center gap-1.5">
               <span
@@ -100,7 +102,12 @@ async function onLogout() {
                 :class="['size-2 shrink-0 rounded-full', isRoomRunning(rooms.current) ? 'bg-emerald-500' : 'bg-muted-foreground/35']"
               />
               <span class="truncate text-xs font-medium">{{ rooms.current?.name || (rooms.list.length ? '选择房间' : '（暂无房间）') }}</span>
-              <span v-if="roomDetails" class="hidden sm:inline-flex shrink-0 items-center rounded bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums leading-none">{{ roomDetails }}</span>
+              <span
+                v-if="roomDetails"
+                class="hidden shrink-0 items-center rounded bg-muted/70 px-1.5 py-0.5 text-[11px] leading-none text-muted-foreground tabular-nums sm:inline-flex"
+              >
+                {{ roomDetails }}
+              </span>
             </span>
           </SelectValue>
         </SelectTrigger>
@@ -122,7 +129,13 @@ async function onLogout() {
 
       <Tooltip>
         <TooltipTrigger as-child>
-          <Button variant="outline" size="icon-sm" class="size-7 shrink-0" aria-label="切换主题" @click="onTheme">
+          <Button
+            variant="outline"
+            size="icon-sm"
+            class="size-7.5 shrink-0 rounded-lg border-border/80 bg-background text-muted-foreground shadow-none hover:bg-muted/60 hover:text-foreground"
+            aria-label="切换主题"
+            @click="onTheme"
+          >
             <component :is="themeIcon" class="size-3.5" aria-hidden="true" />
           </Button>
         </TooltipTrigger>
@@ -131,7 +144,14 @@ async function onLogout() {
 
       <Tooltip v-if="auth.enabled">
         <TooltipTrigger as-child>
-          <Button variant="outline" size="sm" class="h-7 shrink-0 gap-1.5 px-2 sm:px-2.5 text-xs" aria-label="退出登录" :disabled="loggingOut" @click="onLogout">
+          <Button
+            variant="outline"
+            size="sm"
+            class="h-7.5 shrink-0 gap-1.5 rounded-lg border-border/80 bg-background ps-2 pe-2.5 text-xs text-muted-foreground shadow-none hover:bg-muted/60 hover:text-foreground"
+            aria-label="退出登录"
+            :disabled="loggingOut"
+            @click="onLogout"
+          >
             <PhSignOut class="size-3.5" aria-hidden="true" />
             <span class="hidden sm:inline">退出登录</span>
           </Button>

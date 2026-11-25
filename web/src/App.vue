@@ -185,18 +185,20 @@ onUnmounted(() => {
     </form>
   </div>
 
-  <SidebarProvider v-else class="flex h-dvh min-h-0 w-screen flex-col overflow-hidden bg-sidebar" style="--sidebar-width: 220px" @update:open="animateSidebarChange">
+  <SidebarProvider v-else class="flex h-dvh min-h-0 w-screen flex-row overflow-hidden bg-sidebar" style="--sidebar-width: 224px" @update:open="animateSidebarChange">
     <a href="#page-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-md focus:bg-background focus:p-3 focus:text-foreground focus:shadow-md">跳到内容</a>
-    <TopBar />
-
-    <div class="relative flex flex-1 min-h-0 w-full overflow-hidden bg-sidebar">
-      <AppSidebar />
-      <div ref="workspace" data-slot="main-workspace" class="flex flex-1 min-h-0 min-w-0 flex-col overflow-hidden">
+    <AppSidebar />
+    <div ref="workspace" data-slot="main-workspace" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden md:p-2 md:pl-0">
+      <div
+        data-slot="app-shell-surface"
+        class="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background md:rounded-xl md:border md:border-border/85 md:shadow-[0_1px_2px_rgba(15,23,42,0.04),0_6px_20px_-8px_rgba(15,23,42,0.08)] dark:md:border-border dark:md:shadow-[0_2px_12px_rgba(0,0,0,0.45)]"
+      >
+        <TopBar />
         <main
           id="page-content"
           tabindex="-1"
           :class="[
-            'flex min-h-0 min-w-0 flex-1 flex-col bg-background md:rounded-tl-xl md:border-t md:border-l border-border/60 shadow-xs',
+            'flex min-h-0 min-w-0 flex-1 flex-col',
             cardScroll ? 'overflow-hidden' : 'overflow-y-auto'
           ]"
           :style="cardScroll ? undefined : { scrollbarGutter: 'stable' }"
