@@ -69,6 +69,7 @@ const total = computed(() => result.value?.total || 0);
 const pageCount = computed(() => Math.max(1, Math.ceil(total.value / size.value)));
 const start = computed(() => (page.value - 1) * size.value);
 const initialSkeletonRows = computed(() => Math.min(size.value, 12));
+const SKELETON_MSG_WIDTHS = ['w-28', 'w-56', 'w-72', 'w-64', 'w-40', 'w-60', 'w-52', 'w-36', 'w-64', 'w-28'];
 const pendingSkeletonCount = computed(() => {
   if (!streaming.value) return 0;
   return Math.min(Math.max(expectedCount.value - entries.value.length, 0), 12);
@@ -350,7 +351,7 @@ async function blockPlayer(entry) {
           <Table class="min-w-[820px] table-fixed">
             <TableHeader class="bg-muted/50">
               <TableRow>
-                <TableHead scope="col" class="w-10 px-0"><div class="flex items-center justify-center"><Skeleton class="size-4" /></div></TableHead>
+                <TableHead scope="col" class="w-10 px-0"><div class="flex items-center justify-center"><Skeleton class="size-4 rounded-[4px]" /></div></TableHead>
                 <TableHead scope="col" class="w-28">记录时间</TableHead>
                 <TableHead scope="col" class="w-56">玩家</TableHead>
                 <TableHead scope="col" class="w-44">网络标识</TableHead>
@@ -361,13 +362,26 @@ async function blockPlayer(entry) {
             </TableHeader>
             <TableBody>
               <TableRow v-for="i in initialSkeletonRows" :key="i">
-                <TableCell class="px-0"><div class="flex items-center justify-center"><Skeleton class="size-4" /></div></TableCell>
-                <TableCell class="py-2"><div class="flex flex-col gap-1"><Skeleton class="h-3.5 w-20" /><Skeleton class="h-3.5 w-16" /></div></TableCell>
-                <TableCell><div class="flex items-center gap-2"><Skeleton class="size-9 shrink-0 rounded-md" /><div class="grid flex-1 gap-1"><Skeleton class="h-4 w-20" /><Skeleton class="h-3.5 w-28" /></div></div></TableCell>
-                <TableCell><div class="grid gap-1"><Skeleton class="h-3.5 w-32" /><Skeleton class="h-3.5 w-24" /></div></TableCell>
-                <TableCell><Skeleton class="h-5 w-12 rounded-full" /></TableCell>
-                <TableCell><Skeleton class="h-4 w-3/4" /></TableCell>
-                <TableCell class="pr-4 text-right"><div class="flex justify-end"><Skeleton class="size-7 rounded-md" /></div></TableCell>
+                <TableCell class="px-0"><div class="flex items-center justify-center"><Skeleton class="size-4 rounded-[4px]" /></div></TableCell>
+                <TableCell class="py-2"><div class="inline-flex h-8 flex-col justify-center gap-1"><Skeleton class="h-3 w-[70px] rounded" /><Skeleton class="h-3 w-14 rounded" /></div></TableCell>
+                <TableCell class="py-2">
+                  <div class="flex min-h-[42px] items-center gap-2">
+                    <Skeleton class="size-8 shrink-0 rounded-md" />
+                    <div class="grid flex-1 gap-0.5">
+                      <div class="flex h-5 items-center"><Skeleton class="h-3.5 w-16 rounded" /></div>
+                      <div class="flex h-5 items-center"><Skeleton class="h-3 w-24 rounded" /></div>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell class="py-2">
+                  <div class="grid gap-0.5">
+                    <div class="flex h-5 items-center"><Skeleton class="h-3 w-[124px] rounded" /></div>
+                    <div class="flex h-4 items-center"><Skeleton class="h-3 w-16 rounded" /></div>
+                  </div>
+                </TableCell>
+                <TableCell><Skeleton class="h-5 w-[42px] rounded-full" /></TableCell>
+                <TableCell><Skeleton class="h-3.5 max-w-full rounded" :class="SKELETON_MSG_WIDTHS[(i - 1) % SKELETON_MSG_WIDTHS.length]" /></TableCell>
+                <TableCell class="pr-4 text-right"><div class="flex justify-end"><Skeleton class="size-7 rounded-lg" /></div></TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -410,7 +424,7 @@ async function blockPlayer(entry) {
                   <span v-else>运行时长 {{ entry.time }}</span>
                 </TableCell>
                 <TableCell class="py-2">
-                  <div class="flex min-w-0 items-center gap-2">
+                  <div class="flex min-h-[42px] min-w-0 items-center gap-2">
                     <Tooltip v-if="entry.prefab">
                       <TooltipTrigger as-child>
                         <img
@@ -460,13 +474,26 @@ async function blockPlayer(entry) {
                 </TableCell>
               </TableRow>
               <TableRow v-for="n in pendingSkeletonCount" :key="`stream-skeleton-${n}`" role="status" aria-label="继续加载日志">
-                <TableCell class="px-0"><div class="flex items-center justify-center"><Skeleton class="size-4" /></div></TableCell>
-                <TableCell class="py-2"><div class="flex flex-col gap-1"><Skeleton class="h-3.5 w-20" /><Skeleton class="h-3.5 w-16" /></div></TableCell>
-                <TableCell><div class="flex items-center gap-2"><Skeleton class="size-8 shrink-0 rounded-md" /><div class="grid flex-1 gap-1"><Skeleton class="h-4 w-20" /><Skeleton class="h-3.5 w-28" /></div></div></TableCell>
-                <TableCell><div class="grid gap-1"><Skeleton class="h-3.5 w-32" /><Skeleton class="h-3.5 w-24" /></div></TableCell>
-                <TableCell><Skeleton class="h-5 w-12 rounded-full" /></TableCell>
-                <TableCell><Skeleton class="h-4 w-3/4" /></TableCell>
-                <TableCell class="pr-4 text-right"><div class="flex justify-end"><Skeleton class="size-7 rounded-md" /></div></TableCell>
+                <TableCell class="px-0"><div class="flex items-center justify-center"><Skeleton class="size-4 rounded-[4px]" /></div></TableCell>
+                <TableCell class="py-2"><div class="inline-flex h-8 flex-col justify-center gap-1"><Skeleton class="h-3 w-[70px] rounded" /><Skeleton class="h-3 w-14 rounded" /></div></TableCell>
+                <TableCell class="py-2">
+                  <div class="flex min-h-[42px] items-center gap-2">
+                    <Skeleton class="size-8 shrink-0 rounded-md" />
+                    <div class="grid flex-1 gap-0.5">
+                      <div class="flex h-5 items-center"><Skeleton class="h-3.5 w-16 rounded" /></div>
+                      <div class="flex h-5 items-center"><Skeleton class="h-3 w-24 rounded" /></div>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell class="py-2">
+                  <div class="grid gap-0.5">
+                    <div class="flex h-5 items-center"><Skeleton class="h-3 w-[124px] rounded" /></div>
+                    <div class="flex h-4 items-center"><Skeleton class="h-3 w-16 rounded" /></div>
+                  </div>
+                </TableCell>
+                <TableCell><Skeleton class="h-5 w-[42px] rounded-full" /></TableCell>
+                <TableCell><Skeleton class="h-3.5 max-w-full rounded" :class="SKELETON_MSG_WIDTHS[(entries.length + n - 1) % SKELETON_MSG_WIDTHS.length]" /></TableCell>
+                <TableCell class="pr-4 text-right"><div class="flex justify-end"><Skeleton class="size-7 rounded-lg" /></div></TableCell>
               </TableRow>
             </TableBody>
           </Table>
@@ -478,8 +505,8 @@ async function blockPlayer(entry) {
         aria-label="日志分页"
         class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t bg-card px-[var(--panel-padding)] py-3 text-xs"
       >
-        <p v-if="loading && !result" class="flex items-center">
-          <Skeleton class="h-4 w-32" />
+        <p v-if="loading && !result" class="flex h-4 items-center">
+          <Skeleton class="h-3.5 w-28 rounded" />
         </p>
         <p v-else-if="total > 0" class="text-muted-foreground tabular-nums">
           第 {{ start + 1 }}–{{ Math.min(start + size, total) }} 条，共 {{ total }} 条
