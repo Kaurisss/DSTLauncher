@@ -16,6 +16,20 @@ import { fmtTime, shardLabel } from '@/lib/format.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 
 const rooms = useRoomsStore();
+const SKELETON_LANDMARKS = [
+  { name: '64%', coord: '58px' },
+  { name: '78%', coord: '64px' },
+  { name: '52%', coord: '54px' },
+  { name: '72%', coord: '62px' },
+  { name: '60%', coord: '60px' },
+  { name: '82%', coord: '56px' },
+  { name: '56%', coord: '64px' },
+  { name: '70%', coord: '58px' },
+];
+const SKELETON_LEGEND_WIDTHS = [
+  '36px', '48px', '42px', '56px', '38px', '52px', '44px', '48px', '36px', '60px',
+  '42px', '48px', '54px', '40px', '46px', '52px', '38px', '50px', '44px', '48px',
+];
 const open = ref(false);
 const roomId = ref('');
 const shard = ref('');
@@ -86,13 +100,22 @@ function selectLandmark(id) { selectedId.value = id; showLandmarks.value = true;
         <label class="flex items-center gap-2 text-sm"><Checkbox v-model="showLandmarks" />地标</label>
         <IconAction icon="refresh" variant="ghost" label="刷新地图" :disabled="loading" @click="refresh" />
         <time v-if="data" class="ml-auto text-xs text-muted-foreground">保存于 {{ fmtTime(data.savedAt) }}</time>
+        <Skeleton v-else-if="loading" class="ml-auto h-4 w-[148px] rounded" aria-hidden="true" />
       </div>
       <p v-if="error" role="alert" class="break-words text-sm text-destructive">{{ error }}</p>
       <div v-else-if="loading" role="status" aria-label="正在读取世界保存点" class="grid h-[min(58dvh,36rem)] min-h-[27rem] shrink-0 grid-rows-[minmax(15rem,1fr)_12rem] overflow-hidden rounded-md border md:min-h-[24rem] md:grid-cols-[minmax(0,1fr)_15rem] md:grid-rows-1">
         <Skeleton class="size-full rounded-none" />
-        <div class="flex min-h-0 flex-col gap-2 border-t p-3 md:border-t-0 md:border-l">
-          <Skeleton class="h-9 w-full shrink-0 rounded-md" />
-          <Skeleton v-for="i in 5" :key="i" class="h-10 w-full rounded-md" />
+        <div class="flex min-h-0 flex-col gap-2 border-t p-3 md:border-t-0 md:border-l" aria-hidden="true">
+          <Skeleton class="h-8 w-full shrink-0 rounded-lg" />
+          <div class="grid min-h-0 flex-1 content-start gap-1 overflow-hidden">
+            <div v-for="(row, i) in SKELETON_LANDMARKS" :key="i" class="flex items-center gap-3 rounded-lg border border-transparent px-2 py-2">
+              <Skeleton class="size-6 shrink-0 rounded-md" />
+              <div class="grid min-w-0 flex-1 gap-0.5">
+                <div class="flex h-5 items-center"><Skeleton class="h-3.5 rounded" :style="{ width: row.name }" /></div>
+                <div class="flex h-4 items-center"><Skeleton class="h-3 rounded" :style="{ width: row.coord }" /></div>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
       <div v-else-if="data" class="grid h-[min(58dvh,36rem)] min-h-[27rem] shrink-0 grid-rows-[minmax(15rem,1fr)_12rem] overflow-hidden rounded-md border md:min-h-[24rem] md:grid-cols-[minmax(0,1fr)_15rem] md:grid-rows-1">
@@ -111,7 +134,13 @@ function selectLandmark(id) { selectedId.value = id; showLandmarks.value = true;
           </ul>
         </aside>
       </div>
-      <ul v-if="data" class="flex max-h-16 shrink-0 flex-wrap gap-x-4 gap-y-2 overflow-y-auto text-xs text-muted-foreground" aria-label="地形图例">
+      <div v-if="loading" class="flex max-h-16 shrink-0 flex-wrap gap-x-4 gap-y-2 overflow-hidden" aria-hidden="true">
+        <div v-for="(w, i) in SKELETON_LEGEND_WIDTHS" :key="i" class="flex h-4 items-center gap-1.5">
+          <Skeleton class="size-2.5 shrink-0 rounded-sm" />
+          <Skeleton class="h-3 rounded" :style="{ width: w }" />
+        </div>
+      </div>
+      <ul v-else-if="data" class="flex max-h-16 shrink-0 flex-wrap gap-x-4 gap-y-2 overflow-y-auto text-xs text-muted-foreground" aria-label="地形图例">
         <li v-for="terrain in data.terrainLegend" :key="terrain.id" class="flex items-center gap-1.5"><span class="size-2.5 shrink-0 rounded-sm" :style="{ background: terrain.color }" aria-hidden="true" />{{ terrain.label }}</li>
       </ul>
     </DialogContent>
