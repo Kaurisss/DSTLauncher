@@ -1,7 +1,8 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue';
+import { useTimeoutPoll } from '@vueuse/core';
 import UiCard from '@/components/ui/UiCard.vue';
-import UiField from '@/components/ui/UiField.vue';
+import { Field, FieldLabel } from '@/components/ui/field';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
@@ -16,7 +17,6 @@ const draft = ref(null);
 const error = ref('');
 const saving = ref(false);
 const jobs = { backup: '自动备份', restart: '每日重启', update: '更新检查' };
-let timer;
 let disposed = false;
 
 async function refresh() {
@@ -28,12 +28,16 @@ async function refresh() {
     error.value = '';
   } catch (err) {
     if (!disposed) error.value = err.message;
-  } finally {
-    if (!disposed) timer = setTimeout(refresh, 5000);
   }
 }
-onMounted(refresh);
-onUnmounted(() => { disposed = true; clearTimeout(timer); });
+
+const { resume } = useTimeoutPoll(refresh, 5000, { immediate: false });
+
+onMounted(async () => {
+  await refresh();
+  if (!disposed) resume();
+});
+onUnmounted(() => { disposed = true; });
 
 async function save() {
   if (saving.value) return;
@@ -67,28 +71,33 @@ function date(value) {
     <p v-if="error" role="alert" class="mb-4 text-sm text-destructive">{{ error }}</p>
     <form v-if="draft" id="automation-plan-form" class="grid gap-4" @submit.prevent="save">
       <fieldset class="grid gap-4 sm:grid-cols-2" :disabled="saving || !!snapshot?.running">
-        <UiField label="所有房间备份间隔（小时，0 关闭）" for-id="auto-backup-hours" block>
+        <Field>
+          <FieldLabel for="auto-backup-hours">所有房间备份间隔（小时，0 关闭）</FieldLabel>
           <Input id="auto-backup-hours" v-model="draft.backupHours" type="number" min="0" max="720" step="1" required />
-        </UiField>
-        <UiField label="每个房间保留自动备份份数" for-id="auto-backup-keep" block>
+        </Field>
+        <Field>
+          <FieldLabel for="auto-backup-keep">每个房间保留自动备份份数</FieldLabel>
           <Input id="auto-backup-keep" v-model="draft.keep" type="number" min="1" max="100" step="1" required />
-        </UiField>
-        <UiField :label="`每日重启（${snapshot?.timezone || '宿主机时间'}）`" for-id="auto-restart-enabled" block>
+        </Field>
+        <Field>
+          <FieldLabel for="auto-restart-enabled">每日重启（{{ snapshot?.timezone || '宿主机时间' }}）</FieldLabel>
           <div class="flex items-center gap-3">
             <Switch id="auto-restart-enabled" :model-value="!!draft.restartAt" @update:model-value="draft.restartAt = $event ? '04:00' : ''" />
             <Input v-if="draft.restartAt" v-model="draft.restartAt" aria-label="每日重启时间" type="time" required />
           </div>
-        </UiField>
-        <UiField label="更新检查间隔（分钟，0 关闭）" for-id="auto-update-minutes" block>
+        </Field>
+        <Field>
+          <FieldLabel for="auto-update-minutes">更新检查间隔（分钟，0 关闭）</FieldLabel>
           <Input id="auto-update-minutes" v-model="draft.updateMinutes" type="number" min="0" max="1440" step="1" required />
-        </UiField>
-        <UiField label="发现服务端或已启用模组更新时" for-id="auto-update-mode" block>
+        </Field>
+        <Field>
+          <FieldLabel for="auto-update-mode">发现服务端或已启用模组更新时</FieldLabel>
           <NativeSelect id="auto-update-mode" v-model="draft.updateMode">
             <NativeSelectOption value="notify">仅检测</NativeSelectOption>
             <NativeSelectOption value="auto">自动停服更新并恢复</NativeSelectOption>
             <NativeSelectOption value="idle">所有房间无玩家时更新</NativeSelectOption>
           </NativeSelect>
-        </UiField>
+        </Field>
       </fieldset>
     </form>
     <div v-else-if="!error" role="status" aria-label="读取计划中" class="grid gap-4">

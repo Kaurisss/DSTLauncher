@@ -12,8 +12,8 @@ import { PopoverClose, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigge
 
 import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
-import UiEmpty from '@/components/ui/UiEmpty.vue';
-import UiField from '@/components/ui/UiField.vue';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
+import { Field, FieldLabel } from '@/components/ui/field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -710,10 +710,12 @@ onMounted(() => selectShard(rooms.shards[0]));
             </div>
           </div>
         </div>
-        <UiEmpty v-else-if="!rooms.current">
-          <span>还没有可配置的房间，请先在「房间管理」新建一个房间。</span>
-          <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
-        </UiEmpty>
+        <Empty v-else-if="!rooms.current">
+          <EmptyDescription>还没有可配置的房间，请先在「房间管理」新建一个房间。</EmptyDescription>
+          <EmptyContent>
+            <Button size="sm" variant="outline" @click="ui.openRoomEditor()">前往新建房间</Button>
+          </EmptyContent>
+        </Empty>
         <div v-else-if="loadError" role="alert" class="world-error-state">
           <Icon name="alert" size="18" class="text-destructive" />
           <p class="text-sm font-medium text-destructive">读取失败：{{ loadError }}</p>
@@ -723,7 +725,8 @@ onMounted(() => selectShard(rooms.shards[0]));
         <div v-else-if="view" data-slot="page-scroll" class="flex h-full min-h-0 flex-col overflow-hidden">
           <div v-if="!levelDataInUse" role="region" aria-label="预设与启用" class="world-presets-bar shrink-0">
             <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
-              <UiField block label="世界生成预设" for-id="w-worldgen" class="min-w-[180px] flex-1 max-w-xs">
+              <Field class="min-w-[180px] flex-1 max-w-xs gap-1.5">
+                <FieldLabel for="w-worldgen">世界生成预设</FieldLabel>
                 <Select v-model="worldgenPreset" :disabled="worldgenFrozen || loading || saving">
                   <SelectTrigger id="w-worldgen" class="h-8 w-full bg-card text-xs"><SelectValue :placeholder="worldgenPreset || '选择预设'" /></SelectTrigger>
                   <SelectContent position="popper" align="start">
@@ -732,8 +735,9 @@ onMounted(() => selectShard(rooms.shards[0]));
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-              </UiField>
-              <UiField block label="世界规则预设" for-id="w-settings" class="min-w-[180px] flex-1 max-w-xs">
+              </Field>
+              <Field class="min-w-[180px] flex-1 max-w-xs gap-1.5">
+                <FieldLabel for="w-settings">世界规则预设</FieldLabel>
                 <Select v-model="settingsPreset" :disabled="frozen || loading || saving">
                   <SelectTrigger id="w-settings" class="h-8 w-full bg-card text-xs"><SelectValue :placeholder="settingsPreset || '选择预设'" /></SelectTrigger>
                   <SelectContent position="popper" align="start">
@@ -742,7 +746,7 @@ onMounted(() => selectShard(rooms.shards[0]));
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-              </UiField>
+              </Field>
               <label class="world-enabled flex h-8 items-center gap-2 text-xs font-medium">
                 <Switch v-model="enabled" aria-label="启用本文件" :disabled="frozen || loading || saving" />
                 <span>启用本文件</span>
@@ -785,14 +789,14 @@ onMounted(() => selectShard(rooms.shards[0]));
               </button>
             </nav>
             <div class="world-group-content" data-slot="world-options-scroll" tabindex="0" role="region" aria-label="世界配置选项">
-              <UiEmpty v-if="!selectedGroup">
-                <span>{{ onlyChanged && keyword.trim() ? '当前搜索条件下没有已改动的选项' : onlyChanged ? '当前分类下还没有已改动的选项' : '没有找到匹配的配置项' }}</span>
-                <div v-if="hasActiveFilter" class="mt-2 flex flex-wrap items-center justify-center gap-2">
+              <Empty v-if="!selectedGroup">
+                <EmptyDescription>{{ onlyChanged && keyword.trim() ? '当前搜索条件下没有已改动的选项' : onlyChanged ? '当前分类下还没有已改动的选项' : '没有找到匹配的配置项' }}</EmptyDescription>
+                <EmptyContent v-if="hasActiveFilter" class="flex-row flex-wrap justify-center gap-2">
                   <Button v-if="keyword.trim()" size="sm" variant="outline" @click="keyword = ''">清空搜索</Button>
                   <Button v-if="onlyChanged" size="sm" variant="outline" @click="onlyChanged = false">显示全部选项</Button>
                   <Button v-if="keyword.trim() && onlyChanged" size="sm" variant="ghost" @click="clearFilters">重置筛选</Button>
-                </div>
-              </UiEmpty>
+                </EmptyContent>
+              </Empty>
               <OptionGroupPanel
                 v-else
                 id="world-active-group"

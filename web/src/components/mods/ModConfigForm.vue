@@ -136,7 +136,7 @@ async function save() {
 
       <p v-else-if="loadError" class="text-sm text-destructive" role="alert">读取配置项失败：{{ loadError }}</p>
 
-      <p v-else-if="!hasOptions" class="field-tip">该模组没有可配置项。</p>
+      <p v-else-if="!hasOptions" class="text-xs text-muted-foreground">该模组没有可配置项。</p>
 
       <template v-else>
         <div v-for="o in schema" :key="o.name" class="opt">

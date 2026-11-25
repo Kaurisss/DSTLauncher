@@ -3,7 +3,7 @@
 
 import { computed, onUnmounted, ref, watch } from 'vue';
 
-import UiPill from '@/components/ui/UiPill.vue';
+import { Badge } from '@/components/ui/badge';
 import Icon from '@/components/ui/Icon.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -212,10 +212,10 @@ async function setExpanded(open) {
               </TooltipTrigger>
               <TooltipContent>本地 modinfo.lua 的版本号</TooltipContent>
             </Tooltip>
-            <UiPill v-if="downloading" tone="info">下载中</UiPill>
-            <UiPill v-else-if="!mod.installed" tone="warn">未下载</UiPill>
+            <Badge v-if="downloading" variant="info">下载中</Badge>
+            <Badge v-else-if="!mod.installed" variant="warn">未下载</Badge>
             <Tooltip v-if="updateInfo">
-              <TooltipTrigger as-child><UiPill tone="warn" tabindex="0">有新版本</UiPill></TooltipTrigger>
+              <TooltipTrigger as-child><Badge variant="warn" tabindex="0">有新版本</Badge></TooltipTrigger>
               <TooltipContent>本地 {{ fmtUnix(updateInfo.localTime) }}，工坊 {{ fmtUnix(updateInfo.remoteTime) }}</TooltipContent>
             </Tooltip>
           </div>

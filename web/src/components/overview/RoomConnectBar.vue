@@ -2,15 +2,16 @@
 // 概览左上大卡：房间概览信息 + 支持按分片切换的直连代码（默认自动探测外网 IP，可按分片自定义映射端口）。
 
 import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { useClipboard } from '@vueuse/core';
 import {
   PhCheck, PhCopy, PhEye, PhEyeSlash, PhLockSimple,
   PhPencilSimple, PhSlidersHorizontal, PhTerminalWindow, PhWifiHigh,
 } from '@phosphor-icons/vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
-import UiEmpty from '@/components/ui/UiEmpty.vue';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import IconAction from '@/components/ui/IconAction.vue';
-import UiField from '@/components/ui/UiField.vue';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -35,13 +36,12 @@ const ipInfo = ref({ ip: '', source: '', error: '' });
 const ipLoading = ref(false);
 const selectedShard = ref('');
 const showPassword = ref(false);
-const copied = ref(false);
+const { copy, copied, isSupported: clipboardSupported } = useClipboard({ copiedDuring: 1800, legacy: true });
 const customOpen = ref(false);
 const customIp = ref('');
 const customPorts = reactive({});
 const saving = ref(false);
 const saveError = ref('');
-let copyTimer = null;
 
 const room = computed(() => rooms.current);
 const enabledShards = computed(() => (room.value?.shards || []).filter(s => !s.disabled));
@@ -160,19 +160,14 @@ async function probePublicIp(refresh = false) {
 
 async function copyConnect() {
   if (!connectCommand.value) return;
-  if (!window.navigator.clipboard?.writeText) {
+  if (!clipboardSupported.value) {
     toast('当前连接不支持剪贴板访问，请选中直连代码手动复制', 'warn');
     return;
   }
   const targetName = activeShard.value ? shardDisplayName(activeShard.value) : '';
-  const { ok } = await guard(() => window.navigator.clipboard.writeText(connectCommand.value), {
+  await guard(() => copy(connectCommand.value), {
     success: `${targetName ? `「${targetName}」` : ''}直连代码已复制，游戏内按 ~ 粘贴回车即可加入`,
   });
-  if (ok) {
-    copied.value = true;
-    clearTimeout(copyTimer);
-    copyTimer = setTimeout(() => { copied.value = false; }, 1800);
-  }
 }
 
 watch(customOpen, open => {
@@ -289,10 +284,12 @@ onMounted(() => {
       </template>
     </template>
 
-    <UiEmpty v-if="!room" class="flex-1 justify-center">
-      <span>请先在「房间管理」页新建一个房间</span>
-      <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
-    </UiEmpty>
+    <Empty v-if="!room" class="flex-1 justify-center">
+      <EmptyDescription>请先在「房间管理」页新建一个房间</EmptyDescription>
+      <EmptyContent>
+        <Button size="sm" variant="outline" @click="ui.openRoomEditor()">前往新建房间</Button>
+      </EmptyContent>
+    </Empty>
 
     <div v-else class="flex min-h-0 flex-1 flex-col justify-between gap-3">
       <!-- 房间核心状态三联格 -->
@@ -385,7 +382,8 @@ onMounted(() => {
                 </DialogDescription>
               </DialogHeader>
               <form class="grid gap-4" @submit.prevent="saveCustom">
-                <UiField label="公网 IP 或域名" for-id="connect-custom-ip" block :tip="ipInfo.ip ? `当前自动探测外网 IP：${ipInfo.ip}` : '可填写公网 IPv4、域名或组网地址'">
+                <Field>
+                  <FieldLabel for="connect-custom-ip">公网 IP 或域名</FieldLabel>
                   <Input
                     id="connect-custom-ip"
                     v-model="customIp"
@@ -393,7 +391,10 @@ onMounted(() => {
                     :placeholder="ipInfo.ip || '如 play.example.com 或 1.2.3.4'"
                     :disabled="saving"
                   />
-                </UiField>
+                  <FieldDescription class="text-xs">
+                    {{ ipInfo.ip ? `当前自动探测外网 IP：${ipInfo.ip}` : '可填写公网 IPv4、域名或组网地址' }}
+                  </FieldDescription>
+                </Field>
 
                 <div class="grid gap-2">
                   <div class="flex items-baseline justify-between gap-2">

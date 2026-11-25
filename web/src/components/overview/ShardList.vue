@@ -2,8 +2,9 @@
 // 分片状态列表与启停按钮。
 
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useTimeoutPoll } from '@vueuse/core';
 
-import UiEmpty from '@/components/ui/UiEmpty.vue';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import WorldState from '@/components/overview/WorldState.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -23,20 +24,31 @@ const proc = useProcessControl();
 const snapshots = ref([]);
 const snapshotError = ref('');
 const loadingSnapshots = ref(false);
-let timer;
 let generation = 0;
 
+const { pause: pauseSnapshots, resume: resumeSnapshots } = useTimeoutPoll(
+  () => {
+    const id = rooms.current?.id;
+    if (id) return refreshSnapshots(id, generation);
+  },
+  15000,
+  { immediate: false },
+);
+
 onMounted(() => {
-  watch(() => rooms.current?.id, id => {
-    generation++;
-    clearTimeout(timer);
+  watch(() => rooms.current?.id, async id => {
+    const currentGeneration = ++generation;
+    pauseSnapshots();
     snapshots.value = [];
     snapshotError.value = '';
     loadingSnapshots.value = !!id;
-    if (id) refreshSnapshots(id, generation);
+    if (id) {
+      await refreshSnapshots(id, currentGeneration);
+      if (currentGeneration === generation) resumeSnapshots();
+    }
   }, { immediate: true });
 });
-onUnmounted(() => { generation++; clearTimeout(timer); });
+onUnmounted(() => { generation++; });
 
 // 后端只返回「有进程记录」的分片（已启动过、被停止过都算），
 // 从未启动过的分片没有记录。
@@ -126,17 +138,18 @@ async function refreshSnapshots(id, requestGeneration) {
   } finally {
     if (requestGeneration === generation) {
       loadingSnapshots.value = false;
-      timer = setTimeout(() => refreshSnapshots(id, requestGeneration), 15000);
     }
   }
 }
 </script>
 
 <template>
-  <UiEmpty v-if="!rooms.current">
-    <span>请先在「房间管理」页新建一个房间</span>
-    <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
-  </UiEmpty>
+  <Empty v-if="!rooms.current">
+    <EmptyDescription>请先在「房间管理」页新建一个房间</EmptyDescription>
+    <EmptyContent>
+      <Button size="sm" variant="outline" @click="ui.openRoomEditor()">前往新建房间</Button>
+    </EmptyContent>
+  </Empty>
 
   <section
     v-else
@@ -164,7 +177,7 @@ async function refreshSnapshots(id, requestGeneration) {
             </TooltipContent>
           </Tooltip>
           <Tooltip v-if="staleVersion(s)">
-            <TooltipTrigger as-child><span class="pill pill-warn" tabindex="0">需重启</span></TooltipTrigger>
+            <TooltipTrigger as-child><Badge variant="warn" tabindex="0">需重启</Badge></TooltipTrigger>
             <TooltipContent>{{ staleTip(s) }}</TooltipContent>
           </Tooltip>
         </div>

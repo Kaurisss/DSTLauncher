@@ -2,13 +2,14 @@
 // 备份页：整房间备份、回滚、删除。
 
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useTimeoutPoll } from '@vueuse/core';
 
 import UiCard from '@/components/ui/UiCard.vue';
 import UiToolbar from '@/components/ui/UiToolbar.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import UiEmpty from '@/components/ui/UiEmpty.vue';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
 import IconAction from '@/components/ui/IconAction.vue';
 import BackupTable from '@/components/backups/BackupTable.vue';
@@ -29,7 +30,7 @@ const loadError = ref('');
 const inspection = ref(null);
 const remote = ref(null);
 const remoteError = ref('');
-let remoteTimer, disposed = false;
+let disposed = false;
 const backupDir = computed(() => (items.value[0]?.path || '').replace(/[\\/][^\\/]+$/, ''));
 
 async function load() {
@@ -52,13 +53,15 @@ async function load() {
 
 onMounted(load);
 async function refreshRemote() {
-  clearTimeout(remoteTimer);
   try { const data = await backupRemoteApi.get(); if (!disposed) { remote.value = data; remoteError.value = ''; } }
   catch (err) { if (!disposed && !err.unauthorized) remoteError.value = '读取异地备份状态失败：' + err.message; }
-  finally { if (!disposed) remoteTimer = setTimeout(refreshRemote, 3000); }
 }
-onMounted(refreshRemote);
-onUnmounted(() => { disposed = true; clearTimeout(remoteTimer); });
+const { pause: pauseRemote, resume: resumeRemote } = useTimeoutPoll(refreshRemote, 3000, { immediate: false });
+onMounted(async () => {
+  await refreshRemote();
+  if (!disposed) resumeRemote();
+});
+onUnmounted(() => { disposed = true; });
 // 用 current 而不是 currentId 做触发（原因见 ModsView）：currentId 刷新后
 // 值不变 watch 不到，current 要等房间列表加载完才从 null 变成房间对象
 watch(() => rooms.current, () => { items.value = []; load(); });
@@ -84,7 +87,9 @@ async function sync(name) {
   const room = rooms.current;
   if (!room) return;
   await guard(() => backupRemoteApi.sync(room.id, name), { success: '已加入异地同步队列' });
+  pauseRemote();
   await refreshRemote();
+  if (!disposed) resumeRemote();
 }
 
 async function remove(name) {
@@ -135,12 +140,14 @@ function exportSave(name) {
           </div>
         </div>
       </div>
-      <UiEmpty v-else-if="!rooms.current">
-        <span>请先在「房间管理」页新建一个房间</span>
-        <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
-      </UiEmpty>
-      <UiEmpty v-else-if="loadError" :text="'读取备份失败：' + loadError" />
-      <UiEmpty v-else-if="!items.length" text="暂无备份" />
+      <Empty v-else-if="!rooms.current">
+        <EmptyDescription>请先在「房间管理」页新建一个房间</EmptyDescription>
+        <EmptyContent>
+          <Button size="sm" variant="outline" @click="ui.openRoomEditor()">前往新建房间</Button>
+        </EmptyContent>
+      </Empty>
+      <Empty v-else-if="loadError"><EmptyDescription>读取备份失败：{{ loadError }}</EmptyDescription></Empty>
+      <Empty v-else-if="!items.length"><EmptyDescription>暂无备份</EmptyDescription></Empty>
       <BackupTable v-else :items="items" :sync-enabled="!!remote?.enabled" :sync-results="(remote?.results || []).filter(item => item.room === rooms.currentId)" @restore="restore" @remove="remove" @export="exportSave" @sync="sync" />
     </div>
     <BackupInspectionDialog v-if="inspection" :room="inspection.room" :name="inspection.name" @close="inspection = null" @restored="load" />

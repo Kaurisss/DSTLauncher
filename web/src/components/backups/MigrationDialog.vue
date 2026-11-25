@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onUnmounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, onUnmounted, ref, watch } from 'vue';
+import { useFileDialog, useSessionStorage, useTimeoutPoll } from '@vueuse/core';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -17,29 +18,46 @@ const uploading = ref(false);
 const error = ref('');
 const job = ref(null);
 const applyPlan = ref(false);
-const fileInput = useTemplateRef('fileInput');
-let jobId = window.sessionStorage.getItem('dst-migration-job') || '';
-let timer;
+const jobId = useSessionStorage('dst-migration-job', '', { listenToStorageChanges: false, writeDefaults: false });
 let disposed = false;
 const working = computed(() => busy.value || job.value?.state === 'working');
 const allStopped = computed(() => rooms.list.every(room => !room.running));
 const importing = computed(() => job.value?.kind === 'import');
 const stage = computed(() => uploading.value ? '正在上传迁移包…' : job.value?.kind === 'upload' ? '正在校验迁移包…' : importing.value ? '正在创建新房间…' : '正在生成迁移包…');
 
-watch(open, value => { clearTimeout(timer); if (value && jobId) poll(); });
-onUnmounted(() => { disposed = true; clearTimeout(timer); });
+const { pause: pausePoll, resume: resumePoll } = useTimeoutPoll(poll, 750, { immediate: false });
+const { open: openUploadDialog, onChange: onUploadSelected } = useFileDialog({
+  accept: '.zip,application/zip',
+  multiple: false,
+  reset: true,
+});
+
+async function pollNow() {
+  pausePoll();
+  await poll();
+  if (!disposed && open.value && job.value?.state === 'working') resumePoll();
+}
+
+watch(open, value => {
+  pausePoll();
+  if (value && jobId.value) pollNow();
+});
+onUnmounted(() => { disposed = true; });
 
 async function poll() {
-  clearTimeout(timer);
-  const id = jobId;
+  const id = jobId.value;
+  if (!id) { pausePoll(); return; }
   try {
     const data = await migrationApi.status(id);
-    if (disposed || id !== jobId) return;
+    if (disposed || id !== jobId.value) return;
     job.value = data;
     error.value = '';
     if (data.kind === 'import' && data.state === 'ready') await rooms.load();
-    if (data.state === 'working' && open.value) timer = setTimeout(poll, 750);
-  } catch (err) { if (!disposed && id === jobId) error.value = err.message; }
+    if (data.state !== 'working' || !open.value) pausePoll();
+  } catch (err) {
+    pausePoll();
+    if (!disposed && id === jobId.value) error.value = err.message;
+  }
 }
 
 async function begin(action) {
@@ -47,33 +65,31 @@ async function begin(action) {
   error.value = '';
   try {
     const result = await action();
-    jobId = result.id;
-    window.sessionStorage.setItem('dst-migration-job', jobId);
-    await poll();
+    jobId.value = result.id;
+    await pollNow();
   } catch (err) { error.value = err.message; }
   finally { busy.value = false; uploading.value = false; }
 }
 
-async function upload(event) {
-  const file = event.target.files[0];
-  event.target.value = '';
+onUploadSelected(async files => {
+  const file = files?.[0];
   if (!file) return;
   if (file.size > 8 * 1024 ** 3) { error.value = '迁移包不能超过 8 GiB'; return; }
   uploading.value = true;
   await begin(() => migrationApi.upload(file));
-}
+});
 
 async function apply() {
   if (!await confirmAction(`导入为 ${job.value.preview.rooms.length} 个新房间？${applyPlan.value ? '\n\n同时替换当前自动维护计划。' : ''}\n\n导入后请检查房间设置并下载所需模组。`)) return;
-  await begin(() => migrationApi.apply(jobId, applyPlan.value));
+  await begin(() => migrationApi.apply(jobId.value, applyPlan.value));
 }
 
 async function reset() {
   busy.value = true;
+  pausePoll();
   try {
-    if (jobId) await migrationApi.remove(jobId);
-    jobId = '';
-    window.sessionStorage.removeItem('dst-migration-job');
+    if (jobId.value) await migrationApi.remove(jobId.value);
+    jobId.value = null;
     job.value = null;
     applyPlan.value = false;
     error.value = '';
@@ -117,14 +133,13 @@ async function reset() {
       <div class="flex flex-wrap gap-2">
         <template v-if="!job && !jobId">
           <Button :disabled="working || !allStopped || !rooms.list.length" @click="begin(migrationApi.export)">导出全部房间</Button>
-          <Button variant="outline" :disabled="working" @click="fileInput.click()">上传迁移包</Button>
+          <Button variant="outline" :disabled="working" @click="openUploadDialog()">上传迁移包</Button>
         </template>
         <Button v-if="job?.kind === 'upload' && job.state === 'ready'" :disabled="working || !allStopped" @click="apply">导入为新房间</Button>
         <Button v-if="job?.kind === 'export' && job.state === 'ready'" as-child><a :href="migrationApi.downloadUrl(job.id)" download>下载迁移包</a></Button>
-        <Button v-if="error && jobId" variant="outline" :disabled="busy" @click="poll">重新查询</Button>
+        <Button v-if="error && jobId" variant="outline" :disabled="busy" @click="pollNow">重新查询</Button>
         <Button v-if="jobId && job?.state !== 'working'" variant="outline" :disabled="busy" @click="reset">清除临时包</Button>
       </div>
-      <input ref="fileInput" type="file" class="hidden" accept=".zip,application/zip" aria-label="上传完整迁移包" @change="upload">
     </DialogContent>
   </Dialog>
 </template>

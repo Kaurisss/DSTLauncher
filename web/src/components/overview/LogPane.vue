@@ -1,6 +1,7 @@
 <script setup>
 // KeepAlive 保留各分片的命令草稿、命令历史、滚动位置和是否跟随最新日志。
 import { computed, onActivated, ref, watch } from 'vue';
+import { usePreferredReducedMotion } from '@vueuse/core';
 import { TabsContent } from 'reka-ui';
 
 import { Input } from '@/components/ui/input';
@@ -121,9 +122,11 @@ function restoreScroll() {
   });
 }
 
+const reducedMotion = usePreferredReducedMotion();
+
 function follow() {
   autoscroll.value = true;
-  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) settling = true;
+  if (reducedMotion.value !== 'reduce') settling = true;
   restoreScroll();
 }
 

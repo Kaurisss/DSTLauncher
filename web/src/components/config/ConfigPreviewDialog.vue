@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Skeleton } from '@/components/ui/skeleton';
-import UiEmpty from '@/components/ui/UiEmpty.vue';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import IconAction from '@/components/ui/IconAction.vue';
 import ConfigFiles from '@/components/config/ConfigFiles.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -121,9 +121,9 @@ watch(open, value => {
             </div>
           </div>
         </div>
-        <UiEmpty v-else-if="!targetRoom" text="请先在「房间管理」页新建一个房间" />
-        <UiEmpty v-else-if="loadError" :text="'读取失败：' + loadError" />
-        <UiEmpty v-else-if="!files.length" text="尚未生成配置文件" />
+        <Empty v-else-if="!targetRoom"><EmptyDescription>请先在「房间管理」页新建一个房间</EmptyDescription></Empty>
+        <Empty v-else-if="loadError"><EmptyDescription>读取失败：{{ loadError }}</EmptyDescription></Empty>
+        <Empty v-else-if="!files.length"><EmptyDescription>尚未生成配置文件</EmptyDescription></Empty>
         <ConfigFiles v-else :files="files" />
       </div>
     </DialogContent>

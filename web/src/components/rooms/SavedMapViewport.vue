@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, useTemplateRef, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
+import { useElementSize } from '@vueuse/core';
 import { mapApi } from '@/lib/api.js';
 import { landmarkCoordinates, landmarkStyle } from '@/lib/mapLandmarks.js';
 
@@ -12,11 +13,14 @@ const props = defineProps({
 const emit = defineEmits(['update:zoom', 'select']);
 const svg = useTemplateRef('svg');
 const viewport = useTemplateRef('viewport');
-const viewportSize = ref({ width: 600, height: 450 });
+const { width: viewportWidth, height: viewportHeight } = useElementSize(viewport, { width: 600, height: 450 });
+const viewportSize = computed(() => ({
+  width: viewportWidth.value || 600,
+  height: viewportHeight.value || 450,
+}));
 const center = ref({ x: props.map.width / 2, y: props.map.height / 2 });
 const dragging = ref(false);
 let drag;
-let observer;
 const scale = computed(() => Math.min(viewportSize.value.width / (props.map.width / props.zoom), viewportSize.value.height / (props.map.height / props.zoom)));
 const view = computed(() => ({ x: center.value.x - props.map.width / props.zoom / 2, y: center.value.y - props.map.height / props.zoom / 2, width: props.map.width / props.zoom, height: props.map.height / props.zoom }));
 const selected = computed(() => props.map.landmarks.find(point => point.id === props.selectedId));
@@ -45,14 +49,6 @@ const labels = computed(() => {
   }
   return visible;
 });
-
-onMounted(() => {
-  observer = new window.ResizeObserver(() => {
-    viewportSize.value = { width: viewport.value.clientWidth, height: viewport.value.clientHeight };
-  });
-  observer.observe(viewport.value);
-});
-onUnmounted(() => observer?.disconnect());
 
 function clampCenter(zoom = props.zoom) {
   const halfX = props.map.width / zoom / 2, halfY = props.map.height / zoom / 2;

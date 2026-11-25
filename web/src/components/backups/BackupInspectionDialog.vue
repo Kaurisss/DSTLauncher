@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useTimeoutPoll } from '@vueuse/core';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -21,33 +22,39 @@ const map = ref(null), mapError = ref(''), mapBusy = ref(false), shard = ref('')
 const restoring = computed(() => job.value?.state === 'restoring');
 const roomRunning = computed(() => rooms.list.find(room => room.id === props.room.id)?.running);
 const worldShards = computed(() => (job.value?.report?.shards || []).filter(item => item.snapshots > 0));
-let id = '', timer, disposed = false, mapRevision = 0;
+let id = '', disposed = false, mapRevision = 0;
 const seasons = { autumn: '秋季', winter: '冬季', spring: '春季', summer: '夏季' };
 
+const { pause: pausePoll, resume: resumePoll } = useTimeoutPoll(poll, 750, { immediate: false });
+
 onMounted(start);
-onUnmounted(() => { disposed = true; clearTimeout(timer); mapRevision++; });
+onUnmounted(() => { disposed = true; mapRevision++; });
 watch([() => job.value?.state, shard], ([state]) => { if (state === 'ready' && shard.value) loadMap(); });
 
 async function start() {
+  pausePoll();
   starting.value = true; error.value = ''; job.value = null; map.value = null; shard.value = '';
   try {
     const data = await backupApi.inspect(props.room.id, props.name);
     if (disposed) return;
     id = data.id;
     await poll();
+    if (!disposed && (job.value?.state === 'checking' || job.value?.state === 'restoring')) resumePoll();
   } catch (err) { if (!disposed) error.value = err.message; }
   finally { if (!disposed) starting.value = false; }
 }
 async function poll() {
-  clearTimeout(timer);
   try {
     const data = await backupApi.check(id);
     if (disposed) return;
     job.value = data;
     if (data.state === 'ready' && !shard.value) shard.value = data.report.shards.find(item => item.snapshots > 0)?.name || '';
-    if (data.state === 'restored') { emit('restored'); return; }
-    if (data.state === 'checking' || data.state === 'restoring') timer = setTimeout(poll, 750);
-  } catch (err) { if (!disposed) error.value = err.message; }
+    if (data.state === 'restored') { pausePoll(); emit('restored'); return; }
+    if (data.state !== 'checking' && data.state !== 'restoring') pausePoll();
+  } catch (err) {
+    pausePoll();
+    if (!disposed) error.value = err.message;
+  }
 }
 async function loadMap() {
   const revision = ++mapRevision;
@@ -63,11 +70,16 @@ async function loadMap() {
 async function restore() {
   if (!await confirmAction(`回滚到 ${props.name}？\n\n当前存档将被替换，恢复前版本会保留。房间设置、令牌和端口使用当前配置。`)) return;
   const result = await guard(() => backupApi.restoreChecked(props.room.id, id, job.value.report.sha256));
-  if (result.ok) { job.value = { ...job.value, state: 'restoring' }; await poll(); }
+  if (result.ok) {
+    pausePoll();
+    job.value = { ...job.value, state: 'restoring' };
+    await poll();
+    if (!disposed && job.value?.state === 'restoring') resumePoll();
+  }
 }
 async function close(value) {
   if (value || restoring.value || starting.value) return;
-  clearTimeout(timer);
+  pausePoll();
   if (id) backupApi.clearCheck(id).catch(err => toast(err.message, 'err'));
   emit('close');
 }

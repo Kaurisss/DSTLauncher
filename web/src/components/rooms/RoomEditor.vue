@@ -11,7 +11,7 @@ import {
 } from '@phosphor-icons/vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
-import UiField from '@/components/ui/UiField.vue';
+import { Field, FieldLabel } from '@/components/ui/field';
 import UiToolbar from '@/components/ui/UiToolbar.vue';
 import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
@@ -372,13 +372,16 @@ async function save() {
               <h4 class="mb-3.5 text-xs font-semibold text-muted-foreground">基本信息</h4>
               <div class="grid gap-4">
                 <div class="grid gap-4 md:grid-cols-12">
-                  <UiField label="房间名" for-id="f_name" block class="min-w-0 md:col-span-5">
+                  <Field class="min-w-0 md:col-span-5">
+                    <FieldLabel for="f_name">房间名</FieldLabel>
                     <Input id="f_name" v-model="form.name" type="text" placeholder="显示在服务器列表里的名字" />
-                  </UiField>
-                  <UiField label="房间密码" for-id="f_password" block class="min-w-0 md:col-span-3">
+                  </Field>
+                  <Field class="min-w-0 md:col-span-3">
+                    <FieldLabel for="f_password">房间密码</FieldLabel>
                     <Input id="f_password" v-model="form.password" type="text" placeholder="留空表示无密码" />
-                  </UiField>
-                  <UiField label="游戏模式" for-id="f_gameMode" block class="min-w-0 md:col-span-4">
+                  </Field>
+                  <Field class="min-w-0 md:col-span-4">
+                    <FieldLabel for="f_gameMode">游戏模式</FieldLabel>
                     <Select v-model="form.gameMode">
                       <SelectTrigger id="f_gameMode" class="w-full">
                         <SelectValue :placeholder="GAME_MODE_LABEL[form.gameMode] || form.gameMode" />
@@ -389,18 +392,21 @@ async function save() {
                         </SelectGroup>
                       </SelectContent>
                     </Select>
-                  </UiField>
+                  </Field>
                 </div>
 
-                <UiField label="描述" for-id="f_description" block class="min-w-0">
+                <Field class="min-w-0">
+                  <FieldLabel for="f_description">描述</FieldLabel>
                   <Input id="f_description" v-model="form.description" type="text" placeholder="房间简介、公告或进服须知" />
-                </UiField>
+                </Field>
 
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                  <UiField label="最大人数" for-id="f_maxPlayers" block class="min-w-0">
+                  <Field class="min-w-0">
+                    <FieldLabel for="f_maxPlayers">最大人数</FieldLabel>
                     <Input id="f_maxPlayers" v-model.number="form.maxPlayers" type="number" min="1" max="64" class="tabular-nums" />
-                  </UiField>
-                  <UiField label="语言" for-id="f_language" block class="min-w-0">
+                  </Field>
+                  <Field class="min-w-0">
+                    <FieldLabel for="f_language">语言</FieldLabel>
                     <Select v-model="form.language">
                       <SelectTrigger id="f_language" class="w-full">
                         <SelectValue :placeholder="LANGUAGE_LABEL[form.language] || form.language" />
@@ -411,10 +417,11 @@ async function save() {
                         </SelectGroup>
                       </SelectContent>
                     </Select>
-                  </UiField>
-                  <UiField label="回档快照上限" for-id="f_maxSnapshots" block class="min-w-0">
+                  </Field>
+                  <Field class="min-w-0">
+                    <FieldLabel for="f_maxSnapshots">回档快照上限</FieldLabel>
                     <Input id="f_maxSnapshots" v-model.number="form.maxSnapshots" type="number" min="1" max="100" class="tabular-nums" />
-                  </UiField>
+                  </Field>
                 </div>
               </div>
             </section>
@@ -487,12 +494,13 @@ async function save() {
                 </Badge>
               </div>
 
-              <UiField
-                label="cluster_token.txt"
-                for-id="f_token"
-                block
-                :hint="tokenOptional ? '已开启局域网或离线模式，不填令牌也能开服' : '在线开服必需，保存后自动写入房间目录的 cluster_token.txt'"
-              >
+              <Field>
+                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <FieldLabel for="f_token">cluster_token.txt</FieldLabel>
+                  <span class="text-[11px] text-muted-foreground">
+                    {{ tokenOptional ? '已开启局域网或离线模式，不填令牌也能开服' : '在线开服必需，保存后自动写入房间目录的 cluster_token.txt' }}
+                  </span>
+                </div>
                 <div class="flex min-w-0 items-center gap-1 rounded-lg border border-input bg-background pr-1 focus-within:ring-1 focus-within:ring-ring">
                   <Input
                     id="f_token"
@@ -530,7 +538,7 @@ async function save() {
                     label="前往 Klei 获取令牌（新标签页）"
                   />
                 </div>
-              </UiField>
+              </Field>
             </section>
           </template>
 
@@ -547,7 +555,8 @@ async function save() {
           <section v-else-if="currentSection === 'advanced'" class="rounded-xl border border-border/80 bg-card p-4" aria-label="高级设置">
             <h4 class="mb-3.5 text-xs font-semibold text-muted-foreground">分片通信与性能</h4>
             <div class="grid gap-4 sm:grid-cols-3">
-              <UiField label="tick 频率" for-id="f_tickRate" block class="min-w-0">
+              <Field class="min-w-0">
+                <FieldLabel for="f_tickRate">tick 频率</FieldLabel>
                 <Select :model-value="String(form.tickRate)" @update:model-value="v => form.tickRate = Number(v)">
                   <SelectTrigger id="f_tickRate" class="w-full">
                     <SelectValue :placeholder="TICK_RATE_LABEL[form.tickRate] || String(form.tickRate)" />
@@ -558,11 +567,13 @@ async function save() {
                     </SelectGroup>
                   </SelectContent>
                 </Select>
-              </UiField>
-              <UiField label="主分片 IP" for-id="f_masterIp" block class="min-w-0">
+              </Field>
+              <Field class="min-w-0">
+                <FieldLabel for="f_masterIp">主分片 IP</FieldLabel>
                 <Input id="f_masterIp" v-model="form.masterIp" type="text" class="font-mono" />
-              </UiField>
-              <UiField label="分片协调端口" for-id="f_masterPort" block class="min-w-0">
+              </Field>
+              <Field class="min-w-0">
+                <FieldLabel for="f_masterPort">分片协调端口</FieldLabel>
                 <Input
                   id="f_masterPort"
                   v-model.number="form.masterPort"
@@ -572,16 +583,14 @@ async function save() {
                   class="font-mono tabular-nums"
                   placeholder="自动分配"
                 />
-              </UiField>
-              <UiField
-                label="通信密钥"
-                for-id="f_clusterKey"
-                block
-                class="min-w-0 sm:col-span-3"
-                hint="所有启用分片必须一致，留空由系统自动生成；改动后需重启全部分片"
-              >
+              </Field>
+              <Field class="min-w-0 sm:col-span-3">
+                <div class="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                  <FieldLabel for="f_clusterKey">通信密钥</FieldLabel>
+                  <span class="text-[11px] text-muted-foreground">所有启用分片必须一致，留空由系统自动生成；改动后需重启全部分片</span>
+                </div>
                 <Input id="f_clusterKey" v-model="form.clusterKey" type="text" class="font-mono" placeholder="留空自动生成" />
-              </UiField>
+              </Field>
             </div>
           </section>
 

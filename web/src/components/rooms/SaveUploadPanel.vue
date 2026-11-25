@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref, watch } from 'vue';
+import { computed, ref, useTemplateRef, watch } from 'vue';
+import { useDropZone, useFileDialog } from '@vueuse/core';
 
 import {
   Dialog,
@@ -11,7 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Field, FieldGroup, FieldLabel, FieldTitle } from '@/components/ui/field';
-import UiPill from '@/components/ui/UiPill.vue';
+import { Badge } from '@/components/ui/badge';
 import UiProgress from '@/components/ui/UiProgress.vue';
 import Icon from '@/components/ui/Icon.vue';
 import IconAction from '@/components/ui/IconAction.vue';
@@ -34,8 +35,7 @@ const MODE_NEW = 'new';
 const mode = ref(props.presetRoomId ? MODE_OVERWRITE : MODE_NEW);
 const roomId = ref(props.presetRoomId || props.currentRoomId || props.rooms[0]?.id || null);
 const file = ref(null);
-const fileInput = ref(null);
-const dragging = ref(false);
+const dropzone = useTemplateRef('dropzone');
 const busy = ref(false);
 const percent = ref(0);
 const error = ref('');
@@ -59,8 +59,14 @@ watch(() => props.rooms.length, count => {
   }
 }, { immediate: true });
 
+const { open: openDialog, onChange: onFileSelected } = useFileDialog({
+  accept: '.zip,application/zip',
+  multiple: false,
+  reset: true,
+});
+
 function openFilePicker() {
-  if (!busy.value) fileInput.value?.click();
+  if (!busy.value) openDialog();
 }
 
 function chooseFile(picked) {
@@ -75,15 +81,12 @@ function chooseFile(picked) {
   file.value = picked;
 }
 
-function onPick(event) {
-  chooseFile(event.target.files?.[0]);
-  event.target.value = '';
-}
+onFileSelected(files => chooseFile(files?.[0]));
 
-function onDrop(event) {
-  dragging.value = false;
-  chooseFile(event.dataTransfer?.files?.[0]);
-}
+const { isOverDropZone: dragging } = useDropZone(dropzone, {
+  multiple: false,
+  onDrop: files => chooseFile(files?.[0]),
+});
 
 function onOpenChange(open) {
   if (!open && !busy.value) emit('close');
@@ -144,6 +147,7 @@ async function submit() {
           <Field>
             <FieldTitle>存档压缩包</FieldTitle>
             <div
+              ref="dropzone"
               role="button"
               :tabindex="busy ? -1 : 0"
               :aria-disabled="busy || undefined"
@@ -152,9 +156,6 @@ async function submit() {
               @click="openFilePicker"
               @keydown.enter.prevent="openFilePicker"
               @keydown.space.prevent="openFilePicker"
-              @dragover.prevent="dragging = true"
-              @dragleave.prevent="dragging = false"
-              @drop.prevent="onDrop"
             >
               <Icon :name="file ? 'archive' : 'upload'" size="22" />
               <div class="dropzone-text">
@@ -163,7 +164,6 @@ async function submit() {
               </div>
               <IconAction v-if="file" type="button" variant="outline" show-label icon="folder" label="重新选择" :disabled="busy" @click.stop="openFilePicker" />
             </div>
-            <input ref="fileInput" class="dropzone-input" type="file" accept=".zip,application/zip" :disabled="busy" aria-label="存档压缩包" @change="onPick">
           </Field>
 
           <Field>
@@ -211,7 +211,7 @@ async function submit() {
         <section v-else aria-label="导入结果" class="grid gap-3">
           <h3 class="text-sm font-medium">导入结果</h3>
           <div class="import-summary">
-            <div class="import-row"><span>房间</span><b>{{ result.roomName }}</b><UiPill :tone="result.newRoom ? 'ok' : 'info'">{{ result.newRoom ? '新建' : '覆盖' }}</UiPill></div>
+            <div class="import-row"><span>房间</span><b>{{ result.roomName }}</b><Badge :variant="result.newRoom ? 'ok' : 'info'">{{ result.newRoom ? '新建' : '覆盖' }}</Badge></div>
             <div class="import-row"><span>分片</span><b>{{ (result.shards || []).join(' + ') || '—' }}</b></div>
             <div class="import-row"><span>世界数据</span><b>{{ result.hasSave ? '已导入' : '存档包里没有世界数据' }}</b></div>
             <div class="import-row">

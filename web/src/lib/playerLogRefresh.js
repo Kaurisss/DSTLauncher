@@ -1,21 +1,17 @@
-import { ref, watch } from 'vue';
+import { useStorage } from '@vueuse/core';
 
 const KEY = 'dst-log-refresh';
 
-function read() {
-  try {
-    return localStorage.getItem(KEY) !== '0';
-  } catch {
-    return true;
-  }
-}
+const storage = typeof localStorage !== 'undefined' ? localStorage : undefined;
+const storageWindow = typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' ? window : undefined;
 
-export const playerLogRefresh = ref(read());
-
-watch(playerLogRefresh, value => {
-  try {
-    localStorage.setItem(KEY, value ? '1' : '0');
-  } catch {
-    // 隐私模式写不进本地存储时，本次打开仍然生效。
-  }
+export const playerLogRefresh = useStorage(KEY, true, storage, {
+  window: storageWindow,
+  listenToStorageChanges: false,
+  writeDefaults: false,
+  serializer: {
+    read: v => v !== '0',
+    write: v => (v ? '1' : '0'),
+  },
+  onError: () => {},
 });

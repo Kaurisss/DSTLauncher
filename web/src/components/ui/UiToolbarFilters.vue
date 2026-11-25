@@ -1,7 +1,7 @@
 <script setup>
 import { computed, onMounted, ref, useTemplateRef, watch } from 'vue';
 import { useElementSize } from '@vueuse/core';
-import { PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger } from 'reka-ui';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import IconAction from '@/components/ui/IconAction.vue';
 
 defineProps({
@@ -23,16 +23,14 @@ watch(compact, value => {
 
 <template>
   <div ref="anchor" class="shrink-0">
-    <PopoverRoot v-if="compact" v-model:open="open">
+    <Popover v-if="compact" v-model:open="open">
       <PopoverTrigger as-child>
         <IconAction icon="sliders" :label="label" :variant="active ? 'secondary' : 'outline'" />
       </PopoverTrigger>
-      <PopoverPortal>
-        <PopoverContent :aria-label="label" align="start" :side-offset="8" :collision-padding="16" class="toolbar-filters-popover grid w-64 gap-3 rounded-xl border border-border bg-popover p-4 text-popover-foreground shadow-md outline-none">
-          <slot :compact="true" />
-        </PopoverContent>
-      </PopoverPortal>
-    </PopoverRoot>
+      <PopoverContent :aria-label="label" align="start" :side-offset="8" :collision-padding="16" class="toolbar-filters-popover grid w-64 gap-3 rounded-xl p-4">
+        <slot :compact="true" />
+      </PopoverContent>
+    </Popover>
     <div v-else class="flex items-center gap-2"><slot :compact="false" /></div>
   </div>
 </template>

@@ -8,7 +8,7 @@ import { computed, onMounted, ref, watch } from 'vue';
 import { PhInfo } from '@phosphor-icons/vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
-import UiEmpty from '@/components/ui/UiEmpty.vue';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -140,7 +140,7 @@ async function remove(id) {
         {{ file }}
       </p>
 
-      <UiEmpty v-if="!room" text="请先在「房间」页新建一个房间" />
+      <Empty v-if="!room"><EmptyDescription>请先在「房间」页新建一个房间</EmptyDescription></Empty>
       <p v-else-if="loadError" role="alert" class="text-sm text-destructive">读取失败：{{ loadError }}</p>
       <div v-else-if="loading" role="status" aria-label="读取管理员中" class="grid gap-2">
         <div v-for="i in 2" :key="i" class="flex items-center gap-2 rounded-lg border border-border/80 px-3 py-2">
@@ -199,7 +199,7 @@ async function remove(id) {
             />
           </li>
         </ul>
-        <UiEmpty v-else text="暂无管理员。房主（服务器持有者）默认就是管理员" />
+        <Empty v-else><EmptyDescription>暂无管理员。房主（服务器持有者）默认就是管理员</EmptyDescription></Empty>
       </template>
     </div>
   </UiCard>

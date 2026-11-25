@@ -1,5 +1,6 @@
 <script setup>
-import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useIntervalFn, useTimestamp } from '@vueuse/core';
 import {
   Dialog, DialogTrigger, DialogContent, DialogHeader, DialogFooter,
   DialogTitle, DialogDescription, DialogClose,
@@ -7,7 +8,7 @@ import {
 import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
-import UiField from '@/components/ui/UiField.vue';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard } from '@/lib/toast.js';
 
@@ -18,10 +19,7 @@ defineProps({
 const rooms = useRoomsStore();
 const open = ref(false);
 const count = ref(1);
-const now = ref(Date.now());
-let timer;
-onMounted(() => { timer = setInterval(() => { now.value = Date.now(); }, 1000); });
-onUnmounted(() => clearInterval(timer));
+const now = useTimestamp({ scheduler: fn => useIntervalFn(fn, 1000) });
 
 const remaining = computed(() => Math.max(0, Math.ceil(((rooms.rollbackDeadlines[rooms.currentId] || 0) - now.value) / 1000)));
 const maxCount = computed(() => Math.max(0, Math.min(99, (rooms.current?.maxSnapshots || 10) - 1)));
@@ -91,9 +89,11 @@ function preventWhileBusy(event) {
             </Button>
           </div>
         </div>
-        <UiField label="自定义回退次数" for-id="rollback-count" block tip="1 表示回到最新存档之前的一个存档点。存档点通常每天产生，手动保存也会产生存档点。">
+        <Field>
+          <FieldLabel for="rollback-count">自定义回退次数</FieldLabel>
           <Input id="rollback-count" v-model="count" type="number" min="1" :max="maxCount || 1" step="1" :disabled="rooms.rollingBack" />
-        </UiField>
+          <FieldDescription class="text-xs">1 表示回到最新存档之前的一个存档点。存档点通常每天产生，手动保存也会产生存档点。</FieldDescription>
+        </Field>
         <p class="text-sm text-destructive">当前未保存进度及目标之后的存档点将被丢弃。建议先到备份页保留一份整房间备份。</p>
         <p v-if="unavailable" role="status" class="text-sm text-muted-foreground">{{ unavailable }}</p>
         <p v-else-if="!valid" role="alert" class="text-sm text-destructive">请输入 1–{{ maxCount }} 之间的整数；实际可回退数量由游戏中保留的存档决定。</p>

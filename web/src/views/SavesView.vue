@@ -6,6 +6,7 @@
 // 否则就太容易把正在玩的存档误删了。
 
 import { computed, h, onMounted, ref } from 'vue';
+import { useClipboard } from '@vueuse/core';
 import {
   createFilteredRowModel, createPaginatedRowModel, createSortedRowModel,
   filterFn_includesString, FlexRender, globalFilteringFeature,
@@ -107,12 +108,14 @@ async function load() {
 
 onMounted(load);
 
+const { copy, isSupported: clipboardSupported } = useClipboard({ legacy: true });
+
 async function copyRoot() {
-  if (!window.navigator.clipboard) {
+  if (!clipboardSupported.value) {
     toast('当前连接不支持剪贴板访问，请手动复制目录路径', 'err');
     return;
   }
-  await guard(() => window.navigator.clipboard.writeText(root.value), { success: '目录路径已复制' });
+  await guard(() => copy(root.value), { success: '目录路径已复制' });
 }
 
 function shardNames(item) {

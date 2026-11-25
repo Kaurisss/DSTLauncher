@@ -2,7 +2,8 @@
 import { computed, onUnmounted, ref, watch } from 'vue';
 import { PhInfo } from '@phosphor-icons/vue';
 import UiCard from '@/components/ui/UiCard.vue';
-import UiEmpty from '@/components/ui/UiEmpty.vue';
+import { Empty, EmptyDescription } from '@/components/ui/empty';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -125,24 +126,19 @@ async function change(id, remove = false) {
 
     <section :aria-label="selected.title" class="min-w-0 space-y-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <div role="group" aria-label="名单类型" class="inline-flex rounded-lg border border-border/80 bg-muted/45 p-0.5">
-          <button
-            v-for="item in kinds"
-            :key="item.key"
-            type="button"
-            :aria-pressed="kind === item.key"
-            :disabled="busy"
-            :class="[
-              'rounded-md px-2.5 py-1 text-xs font-medium transition-colors',
-              kind === item.key
-                ? 'bg-background text-foreground shadow-2xs dark:bg-accent'
-                : 'text-muted-foreground hover:text-foreground',
-            ]"
-            @click="kind = item.key"
-          >
-            {{ item.title }}
-          </button>
-        </div>
+        <Tabs v-model="kind">
+          <TabsList aria-label="名单类型" class="h-7 p-0.5">
+            <TabsTrigger
+              v-for="item in kinds"
+              :key="item.key"
+              :value="item.key"
+              :disabled="busy"
+              class="px-2.5 text-xs"
+            >
+              {{ item.title }}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
         <span class="text-xs text-muted-foreground">{{ selected.hint }}</span>
       </div>
       <p v-if="file" class="truncate rounded-md bg-muted/45 px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground" :title="file">
@@ -208,7 +204,7 @@ async function change(id, remove = false) {
             />
           </li>
         </ul>
-        <UiEmpty v-else :text="ids.length ? '没有匹配的玩家' : `暂无${selected.title}玩家`" />
+        <Empty v-else><EmptyDescription>{{ ids.length ? '没有匹配的玩家' : `暂无${selected.title}玩家` }}</EmptyDescription></Empty>
       </template>
     </section>
   </UiCard>

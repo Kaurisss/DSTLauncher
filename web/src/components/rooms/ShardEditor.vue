@@ -10,11 +10,12 @@
 import { ref } from 'vue';
 
 import Icon from '@/components/ui/Icon.vue';
-import UiSwitch from '@/components/ui/UiSwitch.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
@@ -145,12 +146,14 @@ async function removeShard(index) {
           </Badge>
 
           <div class="ml-auto flex items-center gap-1.5">
-            <UiSwitch
-              :model-value="!s.disabled"
-              :disabled="s.isMaster"
-              label="启用"
-              @update:model-value="v => (s.disabled = !v)"
-            />
+            <Label class="cursor-pointer select-none font-normal">
+              <Switch
+                :model-value="!s.disabled"
+                :disabled="s.isMaster"
+                @update:model-value="v => (s.disabled = !v)"
+              />
+              <span>启用</span>
+            </Label>
             <Tooltip v-if="!s.isMaster">
               <TooltipTrigger as="span" :as-child="!removing" class="inline-flex" :tabindex="removing ? 0 : undefined">
                 <Button

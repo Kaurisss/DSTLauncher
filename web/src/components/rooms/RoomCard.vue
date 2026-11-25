@@ -3,7 +3,7 @@
 
 import { computed } from 'vue';
 
-import UiPill from '@/components/ui/UiPill.vue';
+import { Badge } from '@/components/ui/badge';
 import IconAction from '@/components/ui/IconAction.vue';
 import { GAME_MODE_LABEL, roomShardLabel } from '@/lib/format.js';
 
@@ -63,9 +63,9 @@ function ports(s) {
       </span>
       <span>{{ modeLabel }}</span>
       <span v-if="enabledCount <= 1">仅一个世界</span>
-      <UiPill v-if="room.needToken" tone="warn">
+      <Badge v-if="room.needToken" variant="warn">
         缺令牌
-      </UiPill>
+      </Badge>
     </div>
 
     <div class="room-ports">

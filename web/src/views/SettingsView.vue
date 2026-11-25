@@ -6,8 +6,8 @@ import AutomationPanel from '@/components/AutomationPanel.vue';
 import NotificationSettings from '@/components/NotificationSettings.vue';
 import BackupRemoteSettings from '@/components/BackupRemoteSettings.vue';
 import UiCard from '@/components/ui/UiCard.vue';
-import UiField from '@/components/ui/UiField.vue';
-import UiPill from '@/components/ui/UiPill.vue';
+import { Badge } from '@/components/ui/badge';
+import { Field, FieldLabel } from '@/components/ui/field';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
 import { useTheme } from '@/composables/useTheme.js';
@@ -128,7 +128,8 @@ async function saveApiKey() {
           </template>
 
           <form id="settings-api-key-form" class="grid max-w-md gap-4" @submit.prevent="saveApiKey">
-            <UiField label="Steam Web API Key" for-id="set-steam-key" block>
+            <Field>
+              <FieldLabel for="set-steam-key">Steam Web API Key</FieldLabel>
               <Input
                 id="set-steam-key"
                 v-model="apiKey"
@@ -136,7 +137,7 @@ async function saveApiKey() {
                 autocomplete="off"
                 placeholder="用于创意工坊关键词搜索；按 ID 查询与下载无需配置"
               />
-            </UiField>
+            </Field>
           </form>
         </UiCard>
       </template>
@@ -145,9 +146,9 @@ async function saveApiKey() {
         <UiCard>
           <template #title>访问密码</template>
           <template #actions>
-            <UiPill :tone="auth.enabled ? 'ok' : ''">
+            <Badge :variant="auth.enabled ? 'ok' : 'muted'">
               {{ auth.envManaged ? '启动参数锁定' : (auth.enabled ? '已启用' : '未启用') }}
-            </UiPill>
+            </Badge>
             <IconAction v-if="auth.enabled" variant="destructive" show-label icon="logout" label="退出登录" @click="logout" />
             <IconAction v-if="!auth.envManaged" type="submit" form="settings-password-form" show-label icon="save" :label="savingPwd ? '保存中…' : '保存密码'" :disabled="savingPwd || (!auth.enabled && !newPwd.trim()) || (auth.enabled && !currentPwd)" />
           </template>
@@ -157,15 +158,17 @@ async function saveApiKey() {
           </p>
 
           <form v-else id="settings-password-form" class="grid max-w-md gap-4" @submit.prevent="savePassword">
-            <UiField v-if="auth.enabled" label="当前密码" for-id="set-cur-pwd" block>
+            <Field v-if="auth.enabled">
+              <FieldLabel for="set-cur-pwd">当前密码</FieldLabel>
               <Input
                 id="set-cur-pwd"
                 v-model="currentPwd"
                 type="password"
                 autocomplete="current-password"
               />
-            </UiField>
-            <UiField :label="auth.enabled ? '新密码' : '访问密码'" for-id="set-new-pwd" block>
+            </Field>
+            <Field>
+              <FieldLabel for="set-new-pwd">{{ auth.enabled ? '新密码' : '访问密码' }}</FieldLabel>
               <Input
                 id="set-new-pwd"
                 v-model="newPwd"
@@ -173,7 +176,7 @@ async function saveApiKey() {
                 autocomplete="new-password"
                 :placeholder="auth.enabled ? '至少 4 个字符；留空保存则关闭密码' : '至少 4 个字符'"
               />
-            </UiField>
+            </Field>
           </form>
         </UiCard>
 

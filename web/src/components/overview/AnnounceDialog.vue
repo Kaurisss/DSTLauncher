@@ -6,7 +6,7 @@ import {
 } from '@/components/ui/dialog';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Textarea } from '@/components/ui/textarea';
-import UiField from '@/components/ui/UiField.vue';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { procApi } from '@/lib/api.js';
 import { toast } from '@/lib/toast.js';
@@ -83,7 +83,8 @@ async function submit() {
         </DialogDescription>
       </DialogHeader>
       <form class="grid gap-4" @submit.prevent="submit">
-        <UiField label="公告内容" for-id="announce-message" block tip="最多 500 字，按 Ctrl+Enter 发送。">
+        <Field>
+          <FieldLabel for="announce-message">公告内容</FieldLabel>
           <Textarea
             id="announce-message"
             v-model="message"
@@ -94,7 +95,8 @@ async function submit() {
             @keydown.ctrl.enter="submit"
             @keydown.meta.enter="submit"
           />
-        </UiField>
+          <FieldDescription class="text-xs">最多 500 字，按 Ctrl+Enter 发送。</FieldDescription>
+        </Field>
         <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
         <DialogFooter>
           <DialogClose as-child>

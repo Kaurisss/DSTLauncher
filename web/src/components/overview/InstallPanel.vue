@@ -1,7 +1,9 @@
 <script setup>
 // 安装与位置配置沿用现有 store/API；这里只替换展示与确认交互。
 import { computed, onMounted, ref, watch } from 'vue';
+import { PhCaretRight } from '@phosphor-icons/vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader,
@@ -178,40 +180,45 @@ onMounted(async () => {
         <dt class="text-muted-foreground">模组目录</dt>
         <dd class="break-all font-mono text-xs leading-5">{{ server.ugcDir }}</dd>
       </dl>
-      <details>
-        <summary class="cursor-pointer text-sm font-medium">更改服务器文件位置</summary>
-        <div class="mt-4 flex flex-col gap-4">
-          <p v-if="locked" class="text-sm text-muted-foreground">开服、安装/更新、模组下载或分片运行期间不能更改位置。</p>
-          <FieldGroup>
-            <Field :data-disabled="locked || undefined">
-              <FieldLabel for="srv_dir">安装目录</FieldLabel>
-              <Input id="srv_dir" v-model="draftDir" :disabled="locked" placeholder="留空 = 自动探测 Steam 库" />
-              <FieldDescription>填「Don't Starve Together Dedicated Server」或游戏本体「Don't Starve Together」目录，也可以粘贴里面的 bin / bin64 目录。</FieldDescription>
-              <IconAction show-label class="self-start" icon="check" label="应用" :disabled="locked" @click="apply(draftDir)" />
-            </Field>
-            <Field :data-disabled="locked || undefined">
-              <FieldLabel for="srv_arch">架构</FieldLabel>
-              <NativeSelect id="srv_arch" v-model="draftArch" :disabled="locked" @change="applyArch">
-                <NativeSelectOption v-for="arch in server.archOptions" :key="arch" :value="arch">{{ ARCH_LABEL[arch] || arch }}</NativeSelectOption>
-              </NativeSelect>
-              <FieldDescription>64 位可突破 32 位进程约 2GB 的内存上限，模组较多时更稳。</FieldDescription>
-            </Field>
-          </FieldGroup>
-          <template v-if="server.candidates?.length">
-            <p class="text-sm text-muted-foreground">自动探测到的安装：</p>
-            <div v-for="candidate in server.candidates" :key="candidate.root" class="flex flex-wrap items-center gap-2">
-              <span class="min-w-0 flex-1 break-all text-sm">{{ candidate.root }}</span>
-              <Badge variant="secondary">{{ candidate.source }}</Badge>
-              <IconAction variant="outline" show-label icon="check" :label="candidate.root === server.root ? '使用中' : '使用'" :disabled="locked || candidate.root === server.root" @click="useCandidate(candidate.root)" />
+      <Collapsible>
+        <CollapsibleTrigger class="group flex cursor-pointer items-center gap-1.5 text-sm font-medium text-foreground">
+          <PhCaretRight class="size-3.5 text-muted-foreground transition-transform group-data-[state=open]:rotate-90" aria-hidden="true" />
+          <span>更改服务器文件位置</span>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div class="mt-4 flex flex-col gap-4">
+            <p v-if="locked" class="text-sm text-muted-foreground">开服、安装/更新、模组下载或分片运行期间不能更改位置。</p>
+            <FieldGroup>
+              <Field :data-disabled="locked || undefined">
+                <FieldLabel for="srv_dir">安装目录</FieldLabel>
+                <Input id="srv_dir" v-model="draftDir" :disabled="locked" placeholder="留空 = 自动探测 Steam 库" />
+                <FieldDescription>填「Don't Starve Together Dedicated Server」或游戏本体「Don't Starve Together」目录，也可以粘贴里面的 bin / bin64 目录。</FieldDescription>
+                <IconAction show-label class="self-start" icon="check" label="应用" :disabled="locked" @click="apply(draftDir)" />
+              </Field>
+              <Field :data-disabled="locked || undefined">
+                <FieldLabel for="srv_arch">架构</FieldLabel>
+                <NativeSelect id="srv_arch" v-model="draftArch" :disabled="locked" @change="applyArch">
+                  <NativeSelectOption v-for="arch in server.archOptions" :key="arch" :value="arch">{{ ARCH_LABEL[arch] || arch }}</NativeSelectOption>
+                </NativeSelect>
+                <FieldDescription>64 位可突破 32 位进程约 2GB 的内存上限，模组较多时更稳。</FieldDescription>
+              </Field>
+            </FieldGroup>
+            <template v-if="server.candidates?.length">
+              <p class="text-sm text-muted-foreground">自动探测到的安装：</p>
+              <div v-for="candidate in server.candidates" :key="candidate.root" class="flex flex-wrap items-center gap-2">
+                <span class="min-w-0 flex-1 break-all text-sm">{{ candidate.root }}</span>
+                <Badge variant="secondary">{{ candidate.source }}</Badge>
+                <IconAction variant="outline" show-label icon="check" :label="candidate.root === server.root ? '使用中' : '使用'" :disabled="locked || candidate.root === server.root" @click="useCandidate(candidate.root)" />
+              </div>
+            </template>
+            <div class="flex flex-wrap items-center gap-2">
+              <IconAction variant="outline" show-label icon="undo" label="恢复自动探测" :disabled="locked || !server.pinned" @click="resetAuto" />
+              <span class="text-sm text-muted-foreground">{{ server.pinned ? '当前为手动指定' : '当前为自动探测' }}</span>
             </div>
-          </template>
-          <div class="flex flex-wrap items-center gap-2">
-            <IconAction variant="outline" show-label icon="undo" label="恢复自动探测" :disabled="locked || !server.pinned" @click="resetAuto" />
-            <span class="text-sm text-muted-foreground">{{ server.pinned ? '当前为手动指定' : '当前为自动探测' }}</span>
+            <p class="break-all text-sm text-muted-foreground">配置保存在 {{ server.configPath }}，重启面板后依然有效。</p>
           </div>
-          <p class="break-all text-sm text-muted-foreground">配置保存在 {{ server.configPath }}，重启面板后依然有效。</p>
-        </div>
-      </details>
+        </CollapsibleContent>
+      </Collapsible>
     </template>
   </div>
 </template>

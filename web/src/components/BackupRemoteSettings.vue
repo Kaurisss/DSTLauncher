@@ -1,5 +1,6 @@
 <script setup>
 import { onMounted, onUnmounted, ref } from 'vue';
+import { useTimeoutPoll } from '@vueuse/core';
 import UiCard from '@/components/ui/UiCard.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -23,10 +24,9 @@ const clearPassword = ref(false);
 const busy = ref(false);
 const error = ref('');
 const labels = { queued: '排队中', syncing: '同步中', synced: '已同步', failed: '同步失败' };
-let timer, disposed = false;
+let disposed = false;
 
 async function refresh() {
-  clearTimeout(timer);
   try {
     const data = await backupRemoteApi.get();
     if (disposed) return;
@@ -34,10 +34,15 @@ async function refresh() {
     if (!draft.value) draft.value = { enabled: !!data?.enabled, kind: data?.kind || 'directory', directory: data?.directory || '', url: data?.url || '', username: data?.username || '', keep: data?.keep ?? 3 };
     error.value = '';
   } catch (err) { if (!disposed) error.value = err.message; }
-  finally { if (!disposed) timer = setTimeout(refresh, 3000); }
 }
-onMounted(refresh);
-onUnmounted(() => { disposed = true; clearTimeout(timer); });
+
+const { pause, resume } = useTimeoutPoll(refresh, 3000, { immediate: false });
+
+onMounted(async () => {
+  await refresh();
+  if (!disposed) resume();
+});
+onUnmounted(() => { disposed = true; });
 
 async function save() {
   if (busy.value) return;
@@ -61,7 +66,9 @@ async function retry(item) {
   busy.value = true;
   try {
     await guard(() => backupRemoteApi.sync(item.room, item.name), { success: '已加入同步队列' });
+    pause();
     await refresh();
+    if (!disposed) resume();
   } finally { busy.value = false; }
 }
 </script>

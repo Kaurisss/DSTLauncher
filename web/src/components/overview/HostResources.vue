@@ -2,6 +2,7 @@
 // 概览右上大卡：宿主机内存、存档盘空间、容器内存配额与当前房间进程资源监控。
 
 import { computed, onMounted, onUnmounted, ref } from 'vue';
+import { useTimeoutPoll } from '@vueuse/core';
 
 import UiCard from '@/components/ui/UiCard.vue';
 import { Badge } from '@/components/ui/badge';
@@ -21,7 +22,6 @@ defineProps({
 const snapshot = ref(null);
 const error = ref('');
 let disposed = false;
-let timer;
 
 const memory = computed(() => snapshot.value?.memory);
 const disk = computed(() => snapshot.value?.disk);
@@ -52,15 +52,17 @@ async function refresh() {
     if (disposed) return;
     snapshot.value = null;
     error.value = '宿主机资源读取失败：' + err.message;
-  } finally {
-    if (!disposed) timer = setTimeout(refresh, 5000);
   }
 }
 
-onMounted(refresh);
+const { resume } = useTimeoutPoll(refresh, 5000, { immediate: false });
+
+onMounted(async () => {
+  await refresh();
+  if (!disposed) resume();
+});
 onUnmounted(() => {
   disposed = true;
-  clearTimeout(timer);
 });
 </script>
 

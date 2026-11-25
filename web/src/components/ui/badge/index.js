@@ -17,6 +17,11 @@ export const badgeVariants = cva(
         ghost:
           "hover:bg-muted hover:text-muted-foreground dark:hover:bg-muted/50",
         link: "text-primary underline-offset-4 hover:underline",
+        ok: "bg-[var(--ok-soft)] text-[var(--ok)]",
+        warn: "bg-[var(--warn-soft)] text-[var(--warn)]",
+        danger: "bg-[var(--danger-soft)] text-[var(--danger)]",
+        info: "bg-[var(--info-soft)] text-[var(--info)]",
+        muted: "bg-[var(--surface-3)] text-muted-foreground",
       },
     },
     defaultVariants: {

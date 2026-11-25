@@ -5,6 +5,7 @@
 // 状态轮询、房间列表刷新、日志 SSE 连接。
 
 import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+import { useIntervalFn, useMediaQuery } from '@vueuse/core';
 
 import iconUrl from '@/assets/icon.png';
 
@@ -45,7 +46,6 @@ const cardScroll = computed(() => ['console', 'rooms', 'mods', 'world', 'logs', 
 // 全局管理页保留草稿；房间业务页重建实例，隔离旧房间的异步响应和草稿。
 const viewKey = computed(() => ui.isGlobalTab ? ui.activeTab : `${ui.activeTab}:${rooms.currentId}`);
 
-
 const auth = useAuthStore();
 const ui = useUiStore();
 const rooms = useRoomsStore();
@@ -55,9 +55,23 @@ const loginPwd = ref('');
 const loggingIn = ref(false);
 const loginError = ref('');
 const loginWait = ref(0);
-let loginTimer;
+let loginDeadline = 0;
+const canAnimateSidebar = useMediaQuery('(min-width: 768px) and (prefers-reduced-motion: no-preference)');
 const workspace = ref(null);
 let sidebarAnimation;
+
+const { pause: pauseLoginCooldown, resume: resumeLoginCooldown } = useIntervalFn(() => {
+  loginWait.value = Math.max(0, Math.ceil((loginDeadline - Date.now()) / 1000));
+  if (!loginWait.value) pauseLoginCooldown();
+}, 250, { immediate: false });
+
+const { resume: resumeStatusPoll } = useIntervalFn(() => {
+  if (auth.authenticated) rooms.refreshStatus().catch(() => {});
+}, 3000, { immediate: false });
+
+const { resume: resumeRoomsPoll } = useIntervalFn(() => {
+  if (auth.authenticated) rooms.load().catch(() => {});
+}, 15000, { immediate: false });
 
 async function animateSidebarChange() {
   const panel = workspace.value;
@@ -65,7 +79,7 @@ async function animateSidebarChange() {
   const left = panel.getBoundingClientRect().left;
   sidebarAnimation?.cancel();
   await nextTick();
-  if (!panel.isConnected || !window.matchMedia('(min-width: 768px) and (prefers-reduced-motion: no-preference)').matches) return;
+  if (!panel.isConnected || !canAnimateSidebar.value) return;
   // 只重排一次正文；中断时从当前可见位置继续，不逐帧改变内容宽度。
   const offset = left - panel.getBoundingClientRect().left;
   sidebarAnimation = panel.animate(
@@ -74,8 +88,6 @@ async function animateSidebarChange() {
   );
 }
 
-let statusTimer = null;
-let roomsTimer = null;
 let lastRoomId = undefined;
 let disposed = false;
 
@@ -104,14 +116,11 @@ async function submitLogin() {
 }
 
 function startLoginCooldown(seconds) {
-  clearInterval(loginTimer);
+  pauseLoginCooldown();
   loginError.value = '';
-  const deadline = Date.now() + seconds * 1000;
+  loginDeadline = Date.now() + seconds * 1000;
   loginWait.value = Math.ceil(seconds);
-  loginTimer = setInterval(() => {
-    loginWait.value = Math.max(0, Math.ceil((deadline - Date.now()) / 1000));
-    if (!loginWait.value) clearInterval(loginTimer);
-  }, 250);
+  resumeLoginCooldown();
 }
 
 // 换房间要重连日志；启停洞穴会改变分片列表，也要跟着增删对应分片的连接
@@ -142,20 +151,13 @@ onMounted(async () => {
     guard(() => rooms.loadMeta());
   }
 
-  statusTimer = setInterval(() => {
-    if (auth.authenticated) rooms.refreshStatus().catch(() => {});
-  }, 3000);
-  roomsTimer = setInterval(() => {
-    if (auth.authenticated) rooms.load().catch(() => {});
-  }, 15000);
+  resumeStatusPoll();
+  resumeRoomsPoll();
 });
 
 onUnmounted(() => {
   disposed = true;
   sidebarAnimation?.cancel();
-  clearInterval(statusTimer);
-  clearInterval(roomsTimer);
-  clearInterval(loginTimer);
   logs.disconnect();
 });
 </script>

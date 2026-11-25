@@ -5,6 +5,7 @@
 
 import { defineStore } from 'pinia';
 import { ref, computed, watch } from 'vue';
+import { useStorage } from '@vueuse/core';
 
 import { roomApi, procApi } from '@/lib/api.js';
 import { useSystemStore } from '@/stores/system.js';
@@ -17,28 +18,29 @@ import { useSystemStore } from '@/stores/system.js';
  */
 const ROOM_KEY = 'dst-room';
 
-function readStoredRoomId() {
-  try {
-    const n = Number(localStorage.getItem(ROOM_KEY));
+const roomIdSerializer = {
+  read(raw) {
+    const n = Number(raw);
     return Number.isInteger(n) && n > 0 ? n : null;
-  } catch (_) {
-    return null;
-  }
-}
-
-function storeRoomId(id) {
-  try {
-    if (id) localStorage.setItem(ROOM_KEY, String(id));
-    else localStorage.removeItem(ROOM_KEY);
-  } catch (_) {
-    // 隐私模式等场景下写不了：只是刷新后记不住选择，不影响功能
-  }
-}
+  },
+  write(id) {
+    return id ? String(id) : '';
+  },
+};
 
 export const useRoomsStore = defineStore('rooms', () => {
   const list = ref([]);
   // 初值直接取上次的选择，首屏就能停在同一个房间
-  const currentId = ref(readStoredRoomId());
+  const storage = typeof localStorage !== 'undefined' ? localStorage : undefined;
+  const storageWindow = typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' ? window : undefined;
+  const currentId = useStorage(ROOM_KEY, null, storage, {
+    flush: 'sync',
+    window: storageWindow,
+    listenToStorageChanges: false,
+    writeDefaults: false,
+    serializer: roomIdSerializer,
+    onError: () => {},
+  });
   const meta = ref(null);
   /** 仅当前房间的分片状态，刷新频率比列表高 */
   const statuses = ref([]);
@@ -69,13 +71,10 @@ export const useRoomsStore = defineStore('rooms', () => {
 
   const hasToken = computed(() => !!current.value && !current.value.needToken);
 
-  // 选中变化就落盘。集中在这里写，避免 create / update / remove / load
-  // 各处的赋值漏掉持久化。
-  watch(currentId, id => {
+  watch(currentId, () => {
     lastStatusRequest = ++statusRequest;
     statuses.value = [];
     statusLoaded.value = false;
-    storeRoomId(id);
   }, { flush: 'sync' });
 
   /* ---------- 加载 ---------- */

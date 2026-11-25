@@ -1,93 +1,71 @@
 // 主题：浅色 / 深色 / 跟随系统。
 //
 // 首屏主题已在 index.html 的内联脚本里定好（防止闪屏），
-// 这里只负责后续切换与响应系统偏好。
+// 这里借助 VueUse 管理持久化、系统偏好监听与无过渡切换。
 
-import { ref, computed } from 'vue';
+import { computed, watch } from 'vue';
+import { useColorMode, useStorage } from '@vueuse/core';
 
 const KEY = 'dst-theme';
 const MODES = ['auto', 'light', 'dark'];
 
 export const MODE_LABEL = { auto: '跟随系统', light: '浅色', dark: '深色' };
 
-const mql = window.matchMedia('(prefers-color-scheme: dark)');
+const storage = typeof localStorage !== 'undefined' ? localStorage : undefined;
+const storageWindow = typeof window !== 'undefined' && typeof window.dispatchEvent === 'function' ? window : undefined;
+const mode = useStorage(KEY, 'auto', storage, {
+  flush: 'sync',
+  window: storageWindow,
+  listenToStorageChanges: !!storageWindow,
+  writeDefaults: false,
+  onError: () => {},
+  serializer: {
+    read: v => (MODES.includes(v) ? v : 'auto'),
+    write: v => v,
+  },
+});
 
-const mode = ref(readSaved());
-const systemDark = ref(mql.matches);
+let defaultApply = null;
+
+function syncTheme(next) {
+  if (typeof document === 'undefined' || !document.documentElement) return;
+  const el = document.documentElement;
+  if (el.dataset.theme === next && el.dataset.themeMode === mode.value) return;
+  el.dataset.themeMode = mode.value;
+  if (defaultApply && typeof el.setAttribute === 'function' && typeof window?.document?.querySelector === 'function') {
+    defaultApply(next);
+  } else {
+    el.dataset.theme = next;
+  }
+}
+
+const colorMode = useColorMode({
+  attribute: 'data-theme',
+  storageRef: mode,
+  disableTransition: true,
+  onChanged(next, defaultHandler) {
+    defaultApply = defaultHandler;
+    syncTheme(next);
+  },
+});
 
 /** 实际生效的黑白（auto 会跟随系统）。 */
-export const resolved = computed(() =>
-  mode.value === 'auto' ? (systemDark.value ? 'dark' : 'light') : mode.value);
+export const resolved = computed(() => colorMode.state.value);
 
-function readSaved() {
-  try {
-    const v = localStorage.getItem(KEY);
-    return MODES.includes(v) ? v : 'auto';
-  } catch (_) {
-    return 'auto';
-  }
-}
-
-function apply(suppressTransition = false) {
-  const doApply = () => {
-    if (typeof document !== 'undefined' && document.documentElement) {
-      document.documentElement.dataset.themeMode = mode.value;
-      document.documentElement.dataset.theme = resolved.value;
-    }
-  };
-
-  if (!suppressTransition || typeof document === 'undefined' || !document.head) {
-    doApply();
-    return;
-  }
-
-  const style = document.createElement('style');
-  style.append(document.createTextNode('*,*::before,*::after{transition:none !important}'));
-  document.head.append(style);
-  try {
-    doApply();
-  } finally {
-    if (document.body) {
-      void document.body.offsetHeight;
-    }
-    const raf = typeof requestAnimationFrame === 'function'
-      ? requestAnimationFrame
-      : (cb) => setTimeout(cb, 16);
-    raf(() => {
-      raf(() => style.remove());
-    });
-  }
-}
+watch([mode, resolved], ([, next]) => syncTheme(next), { flush: 'sync' });
 
 function set(next) {
-  if (!MODES.includes(next)) return mode.value;
+  if (!MODES.includes(next)) return;
   mode.value = next;
-  try {
-    localStorage.setItem(KEY, mode.value);
-  } catch (_) {}
-  apply(true);
-  return mode.value;
 }
 
-/** 按「浅色 → 深色 → 跟随系统」循环。 */
 function cycle() {
-  return set(MODES[(MODES.indexOf(mode.value) + 1) % MODES.length]);
+  set(MODES[(MODES.indexOf(mode.value) + 1) % MODES.length]);
 }
 
-let inited = false;
-
+/** 供入口挂载前确保 DOM 属性与当前主题同步（可重复调用）。 */
 export function initTheme() {
-  if (inited) return;
-  inited = true;
-  apply(false);
-
-  const onChange = () => {
-    systemDark.value = mql.matches;
-    apply(true);
-  };
-  // Safari 14 以下只有 addListener
-  if (mql.addEventListener) mql.addEventListener('change', onChange);
-  else if (mql.addListener) mql.addListener(onChange);
+  syncTheme(resolved.value);
 }
 
 export function useTheme() {

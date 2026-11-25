@@ -1,9 +1,11 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue';
+import { useClipboard, useDebounceFn, useTimeoutFn } from '@vueuse/core';
 import { PhCaretLeft, PhCaretRight, PhCopy } from '@phosphor-icons/vue';
 import UiCard from '@/components/ui/UiCard.vue';
-import UiEmpty from '@/components/ui/UiEmpty.vue';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import UiToolbar from '@/components/ui/UiToolbar.vue';
 import UiToolbarFilters from '@/components/ui/UiToolbarFilters.vue';
 import { Badge } from '@/components/ui/badge';
@@ -48,9 +50,11 @@ const selected = ref(new Set());
 const deleting = ref(false);
 let context = 0;
 let generation = 0;
-let timer;
 let disposed = false;
 let activeController = null;
+const { copy, isSupported: clipboardSupported } = useClipboard({ legacy: true });
+const debouncedLoad = useDebounceFn(ticket => load(ticket), 250);
+const autoRefresh = useTimeoutFn(() => load(generation), 5000, { immediate: false });
 
 const shards = computed(() => rooms.current?.shards || []);
 const labels = { all: '全部类型', chat: '聊天', whisper: '私聊', join: '进入', leave: '离开', death: '死亡', resurrect: '复活', announcement: '公告' };
@@ -108,10 +112,10 @@ watch(() => [rooms.currentId, shard.value, kind.value, search.value, pageSize.va
 }, { flush: 'sync' });
 watch(playerLogRefresh, enabled => {
   if (enabled) refresh();
-  else if (!loading.value) clearTimeout(timer);
+  else if (!loading.value) autoRefresh.stop();
 });
 watch(() => [rooms.currentId, shard.value, kind.value, search.value, page.value, pageSize.value], () => {
-  clearTimeout(timer);
+  autoRefresh.stop();
   abortActive();
   const ticket = ++generation;
   context++;
@@ -121,13 +125,13 @@ watch(() => [rooms.currentId, shard.value, kind.value, search.value, page.value,
   streaming.value = false;
   expectedCount.value = 0;
   loading.value = !!rooms.currentId && !!shard.value;
-  timer = setTimeout(() => load(ticket), 250);
+  debouncedLoad(ticket);
 }, { immediate: true });
 
 onUnmounted(() => {
   disposed = true;
   generation++;
-  clearTimeout(timer);
+  autoRefresh.stop();
   abortActive();
 });
 
@@ -212,13 +216,13 @@ async function load(ticket) {
       loading.value = false;
       streaming.value = false;
       expectedCount.value = 0;
-      if (!disposed && !redirected && playerLogRefresh.value) timer = setTimeout(() => load(ticket), 5000);
+      if (!disposed && !redirected && playerLogRefresh.value) autoRefresh.start();
     }
   }
 }
 
 function refresh() {
-  clearTimeout(timer);
+  autoRefresh.stop();
   abortActive();
   const ticket = ++generation;
   error.value = '';
@@ -260,11 +264,11 @@ async function removeEntries(ids) {
 }
 
 async function copyId(id, label = 'Klei ID') {
-  if (!window.navigator.clipboard) {
+  if (!clipboardSupported.value) {
     toast('当前连接不支持剪贴板访问，请选中 ID 手动复制', 'err');
     return;
   }
-  await guard(() => window.navigator.clipboard.writeText(id), { success: `${label} 已复制` });
+  await guard(() => copy(id), { success: `${label} 已复制` });
 }
 
 async function blockPlayer(entry) {
@@ -292,20 +296,18 @@ async function blockPlayer(entry) {
 <template>
   <UiCard flush fill role="region" :aria-label="activeSection === 'logs' ? '聊天与进出记录' : '管理员与准入名单'" class="min-w-0" :aria-busy="activeSection === 'logs' && loading">
     <div class="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b bg-muted/20 px-[var(--panel-padding)] py-2">
-      <div role="tablist" aria-label="玩家管理标签" class="inline-flex items-center gap-1 rounded-lg bg-muted/70 p-0.5">
-        <button
-          v-for="item in sections"
-          :key="item.key"
-          type="button"
-          role="tab"
-          :aria-selected="activeSection === item.key"
-          class="rounded-md px-3 py-1 text-xs font-medium transition-colors"
-          :class="activeSection === item.key ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
-          @click="activeSection = item.key"
-        >
-          {{ item.label }}
-        </button>
-      </div>
+      <Tabs v-model="activeSection">
+        <TabsList aria-label="玩家管理标签" class="h-7 p-0.5">
+          <TabsTrigger
+            v-for="item in sections"
+            :key="item.key"
+            :value="item.key"
+            class="px-3 text-xs"
+          >
+            {{ item.label }}
+          </TabsTrigger>
+        </TabsList>
+      </Tabs>
       <label v-if="activeSection === 'logs'" for="player-log-refresh" class="flex shrink-0 cursor-pointer select-none items-center gap-2 text-xs text-muted-foreground">
         <Switch id="player-log-refresh" v-model="playerLogRefresh" aria-label="自动刷新玩家日志" />
         <span>自动刷新</span>
@@ -386,12 +388,14 @@ async function blockPlayer(entry) {
             </TableBody>
           </Table>
         </div>
-        <UiEmpty v-else-if="!rooms.current">
-          <span>请先在「房间管理」页新建一个房间</span>
-          <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
-        </UiEmpty>
-        <UiEmpty v-else-if="!result?.exists" text="该分片还没有聊天日志，开服并产生聊天或进出记录后显示" />
-        <UiEmpty v-else-if="!entries.length && pendingSkeletonCount === 0" text="历史日志中没有匹配的记录" />
+        <Empty v-else-if="!rooms.current">
+          <EmptyDescription>请先在「房间管理」页新建一个房间</EmptyDescription>
+          <EmptyContent>
+            <Button size="sm" variant="outline" @click="ui.openRoomEditor()">前往新建房间</Button>
+          </EmptyContent>
+        </Empty>
+        <Empty v-else-if="!result?.exists"><EmptyDescription>该分片还没有聊天日志，开服并产生聊天或进出记录后显示</EmptyDescription></Empty>
+        <Empty v-else-if="!entries.length && pendingSkeletonCount === 0"><EmptyDescription>历史日志中没有匹配的记录</EmptyDescription></Empty>
         <div v-else class="log-table-frame flex min-w-0 flex-auto shrink-0 flex-col overflow-hidden rounded-lg border">
           <Table class="min-w-[820px] table-fixed" role="region" aria-label="日志表格，可横向滚动" tabindex="0">
             <caption class="sr-only">游戏聊天记录</caption>
@@ -538,10 +542,12 @@ async function blockPlayer(entry) {
       role="region"
       aria-label="管理员与准入名单"
     >
-      <UiEmpty v-if="!rooms.current">
-        <span>请先在「房间管理」页新建一个房间</span>
-        <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
-      </UiEmpty>
+      <Empty v-if="!rooms.current">
+        <EmptyDescription>请先在「房间管理」页新建一个房间</EmptyDescription>
+        <EmptyContent>
+          <Button size="sm" variant="outline" @click="ui.openRoomEditor()">前往新建房间</Button>
+        </EmptyContent>
+      </Empty>
       <div v-else class="grid items-start gap-4 lg:grid-cols-2">
         <RoomAdmins :key="rooms.current.id" :room="rooms.current" />
         <RoomPlayerLists :key="`lists-${rooms.current.id}`" :room="rooms.current" />

@@ -1,5 +1,7 @@
 <script setup>
 import { computed, ref, watch } from 'vue';
+import { PhCaretRight } from '@phosphor-icons/vue';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -69,7 +71,15 @@ async function refresh() {
           <div v-if="finding.mods.length" class="flex flex-wrap gap-2">
             <a v-for="mod in finding.mods" :key="mod.id" :href="`https://steamcommunity.com/sharedfiles/filedetails/?id=${mod.id.slice(9)}`" target="_blank" rel="noopener noreferrer" class="text-sm text-primary underline underline-offset-4">{{ mod.name || mod.id }}</a>
           </div>
-          <details class="min-w-0 text-sm"><summary class="cursor-pointer text-muted-foreground">原始日志依据</summary><pre class="mt-2 whitespace-pre-wrap break-all font-mono text-xs">{{ finding.evidence.join('\n') }}</pre></details>
+          <Collapsible class="min-w-0 text-sm">
+            <CollapsibleTrigger class="group flex cursor-pointer items-center gap-1 text-muted-foreground hover:text-foreground">
+              <PhCaretRight class="size-3.5 transition-transform group-data-[state=open]:rotate-90" aria-hidden="true" />
+              <span>原始日志依据</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <pre class="mt-2 whitespace-pre-wrap break-all font-mono text-xs">{{ finding.evidence.join('\n') }}</pre>
+            </CollapsibleContent>
+          </Collapsible>
         </article>
       </section>
     </DialogContent>

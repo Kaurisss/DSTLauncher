@@ -1,5 +1,6 @@
 <script setup>
-import { computed, ref, useTemplateRef, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
+import { useFileDialog } from '@vueuse/core';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog';
 import { Field, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
@@ -19,7 +20,11 @@ const name = ref('');
 const items = ref([]);
 const busy = ref(false);
 const error = ref('');
-const file = useTemplateRef('file');
+const { open: openImportDialog, onChange: onImportFile } = useFileDialog({
+  accept: '.json,application/json',
+  multiple: false,
+  reset: true,
+});
 const sourceRoom = computed(() => rooms.list.find(room => room.id === Number(source.value)));
 
 watch(open, async value => {
@@ -66,9 +71,8 @@ function remove(profile) {
   });
 }
 
-function importFile(event) {
-  const selected = event.target.files[0];
-  event.target.value = '';
+onImportFile(files => {
+  const selected = files?.[0];
   if (!selected) return;
   run(async () => {
     const result = await guard(async () => {
@@ -77,7 +81,7 @@ function importFile(event) {
     }, { success: '配置方案已导入' });
     if (result.ok) await load();
   });
-}
+});
 </script>
 
 <template>
@@ -107,8 +111,7 @@ function importFile(event) {
         <div class="flex flex-wrap gap-2">
           <Button type="submit" :disabled="busy || !sourceRoom || sourceRoom.running || !name.trim()">保存为方案</Button>
           <Button type="button" variant="outline" :disabled="busy || !sourceRoom || sourceRoom.running" @click="create()">复制房间</Button>
-          <Button type="button" variant="outline" :disabled="busy" @click="file.click()">导入方案</Button>
-          <input ref="file" type="file" accept=".json,application/json" class="hidden" aria-label="导入配置方案文件" @change="importFile">
+          <Button type="button" variant="outline" :disabled="busy" @click="openImportDialog()">导入方案</Button>
         </div>
       </form>
       <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }} <Button variant="link" :disabled="busy" @click="load">重试</Button></p>

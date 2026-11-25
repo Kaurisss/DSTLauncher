@@ -266,7 +266,7 @@ test('三态主题与首屏脚本一致，跟随系统并仅注册一次监听',
     assert.equal(saved.get('dst-theme'), mode);
     for (const dark of [false, true]) {
       media.matches = dark;
-      for (const fn of mediaListeners) fn();
+      for (const fn of mediaListeners) fn({ matches: dark });
       const firstPaint = { documentElement: { dataset: {} } };
       runInNewContext(script, { window, localStorage, document: firstPaint });
       assert.equal(document.documentElement.dataset.theme, firstPaint.documentElement.dataset.theme);

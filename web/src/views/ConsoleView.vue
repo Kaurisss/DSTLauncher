@@ -2,11 +2,12 @@
 // 控制台页：满屏实时日志流、分片轻控、关键词与告警筛选、快捷指令与命令历史。
 
 import { computed, ref, watch } from 'vue';
+import { useClipboard } from '@vueuse/core';
 import { TabsList, TabsRoot, TabsTrigger } from 'reka-ui';
 import { PhCheck, PhCopy, PhMagnifyingGlass, PhX } from '@phosphor-icons/vue';
 
 import UiCard from '@/components/ui/UiCard.vue';
-import UiEmpty from '@/components/ui/UiEmpty.vue';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import LogPane from '@/components/overview/LogPane.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Badge } from '@/components/ui/badge';
@@ -30,9 +31,8 @@ const { channels, clear } = useLogs();
 const active = ref('');
 const filterText = ref('');
 const level = ref('all');
-const copied = ref(false);
+const { copy, copied, isSupported: clipboardSupported } = useClipboard({ copiedDuring: 1600, legacy: true });
 const paneRef = ref(null);
-let copyTimer = null;
 
 const label = shard => shardLabel(shard, rooms.current?.locations?.[shard]);
 
@@ -72,27 +72,24 @@ async function copyLogs() {
     toast('当前没有可复制的日志', 'warn');
     return;
   }
-  if (!window.navigator.clipboard?.writeText) {
+  if (!clipboardSupported.value) {
     toast('当前连接不支持剪贴板访问，请在日志区手动选中复制', 'warn');
     return;
   }
-  const { ok } = await guard(() => window.navigator.clipboard.writeText(text), {
+  await guard(() => copy(text), {
     success: `已复制 ${lineCounts.value.visible} 行日志`,
   });
-  if (ok) {
-    copied.value = true;
-    clearTimeout(copyTimer);
-    copyTimer = setTimeout(() => { copied.value = false; }, 1600);
-  }
 }
 </script>
 
 <template>
   <UiCard flush fill role="region" aria-label="实时控制台" class="min-w-0">
-    <UiEmpty v-if="!rooms.current || !rooms.shards.length" class="flex-1 justify-center">
-      <span>还没有可用的房间或启用分片，请先在「房间管理」中配置。</span>
-      <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往房间管理</Button>
-    </UiEmpty>
+    <Empty v-if="!rooms.current || !rooms.shards.length" class="flex-1 justify-center">
+      <EmptyDescription>还没有可用的房间或启用分片，请先在「房间管理」中配置。</EmptyDescription>
+      <EmptyContent>
+        <Button size="sm" variant="outline" @click="ui.openRoomEditor()">前往房间管理</Button>
+      </EmptyContent>
+    </Empty>
 
     <TabsRoot v-else v-model="active" class="flex min-h-0 min-w-0 flex-1 flex-col">
       <!-- 顶部主控制栏：分片标签 + 轻控启停 + 日志操作 -->

@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onUnmounted, ref, watch } from 'vue';
+import { useTimeoutPoll } from '@vueuse/core';
 import { PhUsers } from '@phosphor-icons/vue';
 import {
   DialogRoot, DialogPortal, DialogOverlay, DialogContent,
@@ -32,7 +33,6 @@ const teleport = ref(null);
 const targetId = ref('');
 let requestId = 0;
 let disposed = false;
-let timer;
 
 const labelOf = name => shardLabel(name, rooms.current?.locations?.[name]);
 
@@ -68,11 +68,11 @@ function canTeleport(player) {
 }
 
 async function load() {
-  clearTimeout(timer);
   const req = ++requestId;
   const roomId = rooms.currentId;
   if (!canQuery.value) {
     loading.value = false;
+    pausePoll();
     return;
   }
   loading.value = true;
@@ -90,25 +90,31 @@ async function load() {
   } finally {
     if (!disposed && req === requestId) {
       loading.value = false;
-      timer = setTimeout(load, 15000);
     }
   }
 }
 
+const { pause: pausePoll, resume: resumePoll } = useTimeoutPoll(load, 15000, { immediate: false });
+
+async function reload() {
+  pausePoll();
+  await load();
+  if (!disposed && canQuery.value) resumePoll();
+}
+
 watch([() => rooms.current?.id, queryableShards], () => {
-  clearTimeout(timer);
+  pausePoll();
   players.value = [];
   errors.value = {};
   loadError.value = '';
   actionError.value = '';
   teleport.value = null;
   targetId.value = '';
-  load();
+  reload();
 }, { immediate: true });
 onUnmounted(() => {
   disposed = true;
   requestId++;
-  clearTimeout(timer);
 });
 
 async function act(player, action, target = '') {
@@ -141,7 +147,7 @@ async function act(player, action, target = '') {
     if (disposed || roomId !== rooms.currentId) return;
     teleport.value = null;
     toast(action === 'admin' ? '管理员已保存，下次重启房间后生效' : `${label}指令已执行`);
-    await load();
+    await reload();
   } catch (err) {
     if (!disposed && roomId === rooms.currentId) actionError.value = err.message;
   } finally {
@@ -175,7 +181,7 @@ function preventWhileBusy(event) {
         </span>
       </template>
       <template #actions>
-        <IconAction variant="outline" icon="refresh" :label="loading ? '查询中…' : '刷新玩家'" :disabled="!canQuery || loading || busy" @click="load" />
+        <IconAction variant="outline" icon="refresh" :label="loading ? '查询中…' : '刷新玩家'" :disabled="!canQuery || loading || busy" @click="reload" />
       </template>
 
       <div v-if="emptyState" class="flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-center">

@@ -11,7 +11,8 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import UiField from '@/components/ui/UiField.vue';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { playerApi } from '@/lib/api.js';
 import { shardLabel } from '@/lib/format.js';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -115,30 +116,15 @@ function onExecute() {
       </DialogHeader>
 
       <div class="grid gap-4">
-        <div role="tablist" aria-label="指令分类" class="inline-flex w-fit items-center gap-1 rounded-lg bg-muted/70 p-0.5">
-          <button
-            type="button"
-            role="tab"
-            :aria-selected="scope === 'world'"
-            class="rounded-md px-3 py-1 text-xs font-medium transition-colors"
-            :class="scope === 'world' ? 'bg-background text-foreground shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
-            @click="scope = 'world'"
-          >
-            世界指令
-          </button>
-          <button
-            type="button"
-            role="tab"
-            :aria-selected="scope === 'player'"
-            class="rounded-md px-3 py-1 text-xs font-medium transition-colors"
-            :class="scope === 'player' ? 'bg-background text-foreground shadow-2xs' : 'text-muted-foreground hover:text-foreground'"
-            @click="scope = 'player'"
-          >
-            玩家指令
-          </button>
-        </div>
+        <Tabs v-model="scope">
+          <TabsList aria-label="指令分类" class="h-7 p-0.5">
+            <TabsTrigger value="world" class="px-3 text-xs">世界指令</TabsTrigger>
+            <TabsTrigger value="player" class="px-3 text-xs">玩家指令</TabsTrigger>
+          </TabsList>
+        </Tabs>
 
-        <UiField v-if="scope === 'player'" label="目标玩家（Klei ID）" for-id="quick-cmd-player" block :tip="loadingPlayers ? '正在读取本分片在线玩家…' : onlinePlayers.length ? '可直接从下方在线列表选择或手动输入 KU_ 开头 ID' : '当前分片暂无在线玩家，可手动输入 KU_ 开头 ID'">
+        <Field v-if="scope === 'player'">
+          <FieldLabel for="quick-cmd-player">目标玩家（Klei ID）</FieldLabel>
           <div class="grid gap-2">
             <Select v-if="onlinePlayers.length" :model-value="playerId" @update:model-value="playerId = $event">
               <SelectTrigger aria-label="选择在线玩家" class="w-full"><SelectValue placeholder="从在线玩家中选择" /></SelectTrigger>
@@ -152,9 +138,13 @@ function onExecute() {
             </Select>
             <Input id="quick-cmd-player" v-model="playerId" autocomplete="off" placeholder="例如 KU_abc12345" class="font-mono text-xs" />
           </div>
-        </UiField>
+          <FieldDescription class="text-xs">
+            {{ loadingPlayers ? '正在读取本分片在线玩家…' : onlinePlayers.length ? '可直接从下方在线列表选择或手动输入 KU_ 开头 ID' : '当前分片暂无在线玩家，可手动输入 KU_ 开头 ID' }}
+          </FieldDescription>
+        </Field>
 
-        <UiField label="指令模板" for-id="quick-cmd-preset" block :tip="activePreset?.desc">
+        <Field>
+          <FieldLabel for="quick-cmd-preset">指令模板</FieldLabel>
           <Select v-model="selectedCmd">
             <SelectTrigger id="quick-cmd-preset" class="w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
@@ -165,11 +155,13 @@ function onExecute() {
               </SelectGroup>
             </SelectContent>
           </Select>
-        </UiField>
+          <FieldDescription v-if="activePreset?.desc" class="text-xs">{{ activePreset.desc }}</FieldDescription>
+        </Field>
 
-        <UiField v-if="scope === 'world' && activePreset?.needsText" label="公告内容" for-id="quick-cmd-announce" block>
+        <Field v-if="scope === 'world' && activePreset?.needsText">
+          <FieldLabel for="quick-cmd-announce">公告内容</FieldLabel>
           <Input id="quick-cmd-announce" v-model="announceText" autocomplete="off" maxlength="200" placeholder="输入要全服广播的内容…" />
-        </UiField>
+        </Field>
 
         <div class="grid gap-1.5">
           <span class="text-xs font-medium text-muted-foreground">将生成的指令</span>

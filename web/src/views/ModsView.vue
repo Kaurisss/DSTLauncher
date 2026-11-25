@@ -7,6 +7,7 @@
 // 只加载不下载，所以启动前必须先把模组更新到位。
 
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { useTimeoutFn, useTimeoutPoll } from '@vueuse/core';
 import {
   DialogRoot, DialogPortal, DialogOverlay, DialogContent,
   DialogTitle, DialogDescription, DialogClose,
@@ -15,8 +16,8 @@ import {
 import { PhMagnifyingGlass } from '@phosphor-icons/vue';
 import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
-import UiEmpty from '@/components/ui/UiEmpty.vue';
-import UiPill from '@/components/ui/UiPill.vue';
+import { Badge } from '@/components/ui/badge';
+import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import UiToolbarFilters from '@/components/ui/UiToolbarFilters.vue';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -114,11 +115,10 @@ function isWorkshopPending(mod) {
 let loadRequest = 0;
 let loadController = null;
 let workshopBatch = [];
-let workshopBatchTimer = null;
+const workshopBatchTimer = useTimeoutFn(flushWorkshopBatch, 60, { immediate: false });
 
 function flushWorkshopBatch() {
-  clearTimeout(workshopBatchTimer);
-  workshopBatchTimer = null;
+  workshopBatchTimer.stop();
   if (!workshopBatch.length) return;
   const batch = workshopBatch;
   workshopBatch = [];
@@ -137,8 +137,8 @@ function queueWorkshopCheck(mod) {
   workshopBatch.push(mod);
   if (workshopBatch.length >= 12) {
     flushWorkshopBatch();
-  } else if (!workshopBatchTimer) {
-    workshopBatchTimer = setTimeout(flushWorkshopBatch, 60);
+  } else if (!workshopBatchTimer.isPending.value) {
+    workshopBatchTimer.start();
   }
 }
 
@@ -184,8 +184,7 @@ async function load() {
   const request = ++loadRequest;
   loadController?.abort();
   loadController = null;
-  clearTimeout(workshopBatchTimer);
-  workshopBatchTimer = null;
+  workshopBatchTimer.stop();
   workshopBatch = [];
   queuedWorkshopIds.clear();
 
@@ -324,7 +323,6 @@ const busyIds = computed(() => [...queuedIds.value, ...pendingIds.value]);
 const queueing = ref(false);
 const stopping = ref(false);
 const pollError = ref('');
-let pollTimer = null;
 let polling = false;
 let disposed = false;
 
@@ -336,12 +334,7 @@ function restoreWorkshopFocus() {
   nextTick(() => addModButton.value?.focus());
 }
 
-function stopPoll() {
-  if (pollTimer) {
-    clearTimeout(pollTimer);
-    pollTimer = null;
-  }
-}
+const { pause: stopPoll, resume: resumePoll } = useTimeoutPoll(pollUpdate, 2000, { immediate: false });
 
 async function pollUpdate() {
   if (polling || disposed) return;
@@ -390,10 +383,7 @@ async function pollUpdate() {
 function startPoll() {
   if (disposed) return;
   stopPoll();
-  pollTimer = setTimeout(async () => {
-    await pollUpdate();
-    if (!disposed && updating.value) startPoll();
-  }, 2000);
+  resumePoll();
 }
 
 // 检查与下载分开：确认后才修改跨房间共享的模组文件。
@@ -497,7 +487,7 @@ onMounted(async () => {
 onUnmounted(() => {
   disposed = true;
   loadController?.abort();
-  clearTimeout(workshopBatchTimer);
+  workshopBatchTimer.stop();
   stopPoll();
 });
 // 用 current 而不是 currentId 做触发：刷新页面时 currentId 从 localStorage
@@ -571,11 +561,13 @@ watch([() => rooms.current, shard], () => {
       </div>
 
       <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="模组列表" :aria-busy="loading">
-        <UiEmpty v-if="rooms.loaded && !rooms.current">
-          <span>请先在「房间管理」页新建一个房间</span>
-          <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
-        </UiEmpty>
-        <UiEmpty v-else-if="loadError" :text="'读取模组失败：' + loadError" />
+        <Empty v-if="rooms.loaded && !rooms.current">
+          <EmptyDescription>请先在「房间管理」页新建一个房间</EmptyDescription>
+          <EmptyContent>
+            <Button size="sm" variant="outline" @click="ui.openRoomEditor()">前往新建房间</Button>
+          </EmptyContent>
+        </Empty>
+        <Empty v-else-if="loadError"><EmptyDescription>读取模组失败：{{ loadError }}</EmptyDescription></Empty>
 
         <template v-else>
           <span v-if="isInitialLoading || streaming" class="sr-only" role="status">{{ isInitialLoading ? '正在加载模组…' : '正在继续加载模组…' }}</span>
@@ -597,8 +589,7 @@ watch([() => rooms.current, shard], () => {
           </div>
           <p
             v-if="checkResult && (checkResult.missing || []).length"
-            class="field-tip"
-            style="margin-bottom: 16px"
+            class="mb-4 text-xs text-muted-foreground"
           >
             工坊查不到以下模组（可能已下架或 ID 有误）：{{ (checkResult.missing || []).join('、') }}
           </p>
@@ -637,11 +628,13 @@ watch([() => rooms.current, shard], () => {
               @busy="slot.mod && setItemBusy(slot.mod.id, $event)"
             />
           </template>
-          <div v-else class="grid justify-items-center gap-3 rounded-lg border border-dashed p-10">
-            <UiEmpty :text="mods.length ? '没有匹配的模组' : '还没有模组'" />
-            <IconAction v-if="mods.length" variant="outline" show-label icon="clean" label="清除筛选" @click="search = ''; filter = 'all'" />
-            <IconAction v-else show-label icon="plus" label="添加模组" @click="workshopOpen = true" />
-          </div>
+          <Empty v-else class="border p-10">
+            <EmptyDescription>{{ mods.length ? '没有匹配的模组' : '还没有模组' }}</EmptyDescription>
+            <EmptyContent>
+              <IconAction v-if="mods.length" variant="outline" show-label icon="clean" label="清除筛选" @click="search = ''; filter = 'all'" />
+              <IconAction v-else show-label icon="plus" label="添加模组" @click="workshopOpen = true" />
+            </EmptyContent>
+          </Empty>
         </template>
       </div>
     </UiCard>
@@ -657,12 +650,12 @@ watch([() => rooms.current, shard], () => {
       <DialogContent class="mod-update-dialog" @close-auto-focus.prevent="restoreUpdateFocus">
         <div class="flex flex-wrap items-center gap-2">
           <DialogTitle class="text-lg font-semibold">模组更新</DialogTitle>
-          <UiPill :tone="pollError ? 'warn' : updating ? 'info' : (updateError ? 'danger' : 'ok')" role="status">
+          <Badge :variant="pollError ? 'warn' : updating ? 'info' : (updateError ? 'danger' : 'ok')" role="status">
             {{ pollError ? '进度暂不可用' : updating ? (progress || '进行中') : (updateError ? '失败' : '完成') }}
-          </UiPill>
+          </Badge>
         </div>
         <DialogDescription class="sr-only">模组下载任务的进度与日志</DialogDescription>
-        <p v-if="queuedCount" class="field-tip">队列中还有 {{ queuedCount }} 个待下载</p>
+        <p v-if="queuedCount" class="text-xs text-muted-foreground">队列中还有 {{ queuedCount }} 个待下载</p>
         <p v-if="updateError || pollError" class="text-sm text-destructive" role="alert">{{ pollError ? '无法读取更新进度：' + pollError : updateError }}</p>
         <CodeBlock size="sm">
           <CodeBlockActions><CodeBlockCopyButton :value="output.join('\n')" :disabled="!output.length" /></CodeBlockActions>
