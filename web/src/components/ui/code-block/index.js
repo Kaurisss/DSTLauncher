@@ -1,30 +1,30 @@
-import { cva } from "class-variance-authority";
+import { cva } from 'class-variance-authority';
 
-export { default as CodeBlock } from "./CodeBlock.vue";
-export { default as CodeBlockActions } from "./CodeBlockActions.vue";
-export { default as CodeBlockContent } from "./CodeBlockContent.vue";
-export { default as CodeBlockCopyButton } from "./CodeBlockCopyButton.vue";
-export { default as CodeBlockFooter } from "./CodeBlockFooter.vue";
-export { default as CodeBlockHeader } from "./CodeBlockHeader.vue";
-export { default as CodeBlockLine } from "./CodeBlockLine.vue";
-export { default as CodeBlockTitle } from "./CodeBlockTitle.vue";
-export { default as CodeBlockToken } from "./CodeBlockToken.vue";
-export { highlightCode, loadHighlighter } from "./highlighter";
-export { useHighlightedCode } from "./useHighlightedCode";
+export { default as CodeBlock } from './CodeBlock.vue';
+export { default as CodeBlockActions } from './CodeBlockActions.vue';
+export { default as CodeBlockContent } from './CodeBlockContent.vue';
+export { default as CodeBlockCopyButton } from './CodeBlockCopyButton.vue';
+export { default as CodeBlockFooter } from './CodeBlockFooter.vue';
+export { default as CodeBlockHeader } from './CodeBlockHeader.vue';
+export { default as CodeBlockLine } from './CodeBlockLine.vue';
+export { default as CodeBlockTitle } from './CodeBlockTitle.vue';
+export { default as CodeBlockToken } from './CodeBlockToken.vue';
+export { highlightCode, loadHighlighter } from './highlighter';
+export { useHighlightedCode } from './useHighlightedCode';
 
 export const codeBlockVariants = cva(
-  "rounded-xl border border-transparent text-sm ring-1 ring-foreground/10 data-[size=sm]:text-xs has-[>[data-slot=code-block-content]:focus-visible]:ring-3 has-[>[data-slot=code-block-content]:focus-visible]:ring-ring/50 group/code-block relative flex w-full min-w-0 flex-col overflow-hidden",
+  'rounded-xl border border-border bg-card text-sm data-[size=sm]:text-xs has-[>[data-slot=code-block-content]:focus-visible]:ring-3 has-[>[data-slot=code-block-content]:focus-visible]:ring-ring/50 group/code-block relative flex w-full min-w-0 flex-col overflow-hidden',
   {
     variants: {
       variant: {
         default:
-          "text-foreground dark:bg-input/30",
+          'text-foreground dark:bg-input/30',
         destructive:
-          "border border-destructive/30 text-destructive dark:border-destructive/40",
+          'border border-destructive/30 text-destructive dark:border-destructive/40',
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: 'default',
     },
   },
 );
@@ -34,14 +34,14 @@ export const codeBlockLineVariants = cva(
   {
     variants: {
       variant: {
-        default: "",
+        default: '',
         added: "bg-muted after:content-['+']",
         removed: "bg-destructive/10 after:text-destructive after:content-['−']",
-        highlighted: "bg-muted",
+        highlighted: 'bg-muted',
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: 'default',
     },
   },
 );

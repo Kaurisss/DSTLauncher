@@ -5,12 +5,13 @@
 // 操作对象由编辑页传入，不随顶部的当前房间选择变化。
 
 import { computed, onMounted, ref, watch } from 'vue';
+import { PhInfo } from '@phosphor-icons/vue';
 
-import Icon from '@/components/ui/Icon.vue';
 import UiCard from '@/components/ui/UiCard.vue';
 import UiEmpty from '@/components/ui/UiEmpty.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { adminApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
 import { lookupPlayer, playerOptionLabel, unseenPlayers } from '@/lib/format.js';
@@ -32,14 +33,17 @@ const loadError = ref('');
 const input = ref('');
 const busy = ref(false);
 const candidates = computed(() => unseenPlayers(seen.value, admins.value));
+
 function who(id) {
   const face = lookupPlayer(seen.value, id);
   return face?.name ? `${face.name}（${id}）` : id;
 }
+
 function onPick(id) {
   picked.value = id;
   input.value = id;
 }
+
 let reqId = 0;
 
 async function load() {
@@ -126,51 +130,77 @@ async function remove(id) {
 <template>
   <UiCard>
     <template #title>房间管理员</template>
-    <template #hint>写入 adminlist.txt；名单在服务器启动时读取，修改后需重启房间生效</template>
+    <template #hint>写入 adminlist.txt，修改后需重启房间生效</template>
+    <template #actions>
+      <IconAction variant="outline" icon="refresh" label="刷新管理员" :disabled="loading || busy" @click="load" />
+    </template>
 
-    <p v-if="file" class="path-line" style="margin-bottom: 12px">{{ file }}</p>
-
-    <UiEmpty v-if="!room" text="请先在「房间」页新建一个房间" />
-    <p v-else-if="loadError" class="field-tip">读取失败：{{ loadError }}</p>
-
-    <template v-else>
-      <div class="inline-row" style="max-width: 560px">
-        <Input
-          v-model="input"
-          class="mono"
-          placeholder="输入 Klei ID（KU_ 开头）"
-          autocomplete="off"
-          spellcheck="false"
-          @keydown.enter="add"
-        />
-        <IconAction show-label icon="plus" label="添加" :disabled="busy || !input.trim()" @click="add" />
-      </div>
-      <Select v-if="candidates.length" :model-value="picked" :disabled="busy" @update:model-value="onPick">
-        <SelectTrigger class="mt-2 max-w-xl" aria-label="从进过房间的玩家选择">
-          <SelectValue placeholder="从进过房间的玩家选择" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectGroup>
-            <SelectItem v-for="player in candidates" :key="player.id" :value="player.id">{{ playerOptionLabel(player) }}</SelectItem>
-          </SelectGroup>
-        </SelectContent>
-      </Select>
-      <p class="field-tip" style="margin-top: 6px">
-        游戏内按 ` 反引号打开控制台，输入 TheNet:GetUserID() 可查看自己的 Klei ID。
+    <div class="min-w-0 space-y-3">
+      <p v-if="file" class="truncate rounded-md bg-muted/45 px-2.5 py-1.5 font-mono text-[11px] text-muted-foreground" :title="file">
+        {{ file }}
       </p>
 
-      <div v-if="needRestart" class="notice" style="margin-top: 12px">
-        <Icon name="info" size="16" />
-        <span>房间正在运行：名单的增删将在<strong>下次重启房间</strong>后生效。</span>
-      </div>
-
-      <div v-if="admins.length" class="mt-3 grid gap-2">
-        <div v-for="id in admins" :key="id" class="flex min-w-0 items-center gap-2 rounded-md border px-3 py-2">
-          <PlayerIdentity class="min-w-0 flex-1" :id="id" :seen="seen" />
-          <IconAction variant="destructive" icon="trash" :label="`移除管理员 ${who(id)}`" :disabled="busy" @click="remove(id)" />
+      <UiEmpty v-if="!room" text="请先在「房间」页新建一个房间" />
+      <p v-else-if="loadError" role="alert" class="text-sm text-destructive">读取失败：{{ loadError }}</p>
+      <div v-else-if="loading" role="status" aria-label="读取管理员中" class="grid gap-2">
+        <div v-for="i in 2" :key="i" class="flex items-center gap-2 rounded-lg border border-border/80 px-3 py-2">
+          <Skeleton class="size-8 shrink-0 rounded-md" />
+          <div class="grid flex-1 gap-1.5">
+            <Skeleton class="h-4 w-32" />
+            <Skeleton class="h-3 w-40" />
+          </div>
+          <Skeleton class="size-7 shrink-0 rounded-md" />
         </div>
       </div>
-      <UiEmpty v-else text="暂无管理员。房主（服务器持有者）默认就是管理员" />
-    </template>
+
+      <template v-else>
+        <form class="flex flex-wrap gap-2" @submit.prevent="add">
+          <Input
+            v-model="input"
+            aria-label="管理员 Klei ID"
+            class="min-w-0 flex-1 basis-48 font-mono"
+            placeholder="输入 Klei ID（KU_ 开头）"
+            autocomplete="off"
+            spellcheck="false"
+            :disabled="busy"
+          />
+          <IconAction type="submit" show-label icon="plus" label="添加" :disabled="busy || !input.trim()" />
+          <Select v-if="candidates.length" :model-value="picked" :disabled="busy" @update:model-value="onPick">
+            <SelectTrigger class="w-full min-w-0 basis-full" aria-label="从进过房间的玩家选择">
+              <SelectValue placeholder="从进过房间的玩家选择" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectGroup>
+                <SelectItem v-for="player in candidates" :key="player.id" :value="player.id">{{ playerOptionLabel(player) }}</SelectItem>
+              </SelectGroup>
+            </SelectContent>
+          </Select>
+        </form>
+
+        <p class="text-xs text-muted-foreground">
+          游戏内按 <code>`</code> 打开控制台，输入 <code>TheNet:GetUserID()</code> 可查看自己的 Klei ID。
+        </p>
+
+        <div v-if="needRestart" role="status" class="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/8 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
+          <PhInfo class="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          <span>房间正在运行：名单增删将在下次重启房间后生效。</span>
+        </div>
+
+        <ul v-if="admins.length" class="grid gap-2" aria-label="管理员列表">
+          <li v-for="id in admins" :key="id" class="flex min-w-0 items-center gap-2 rounded-lg border border-border/80 px-3 py-2">
+            <PlayerIdentity class="min-w-0 flex-1" :id="id" :seen="seen" />
+            <IconAction
+              variant="ghost"
+              class="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+              icon="trash"
+              :label="`移除管理员 ${who(id)}`"
+              :disabled="busy"
+              @click="remove(id)"
+            />
+          </li>
+        </ul>
+        <UiEmpty v-else text="暂无管理员。房主（服务器持有者）默认就是管理员" />
+      </template>
+    </div>
   </UiCard>
 </template>

@@ -103,7 +103,7 @@ watch(open, value => {
         <IconAction variant="outline" icon="refresh" label="刷新" :disabled="loading || !targetRoom" @click="load" />
       </div>
 
-      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain pr-1" tabindex="0" role="region" aria-label="配置文件列表">
+      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-0.5 pr-1.5" tabindex="0" role="region" aria-label="配置文件列表">
         <div v-if="loading && !files.length" role="status" aria-label="加载中" class="grid min-w-0 gap-4">
           <div v-for="i in 2" :key="i" class="overflow-hidden rounded-xl border">
             <div class="flex items-center justify-between gap-2 border-b bg-muted/40 px-4 py-2.5">

@@ -11,6 +11,7 @@ import { ref } from 'vue';
 
 import Icon from '@/components/ui/Icon.vue';
 import UiSwitch from '@/components/ui/UiSwitch.vue';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
@@ -24,6 +25,8 @@ import { confirmAction } from '@/lib/confirm.js';
 const props = defineProps({
   /** 新建房间时还没落盘，所有分片都可以改名 */
   roomIsNew: { type: Boolean, default: false },
+  /** 嵌入带统一分区标题的编辑器时隐藏自身头部 */
+  hideHeader: { type: Boolean, default: false },
 });
 
 const shards = defineModel('shards', { type: Array, required: true });
@@ -66,6 +69,8 @@ function addShard() {
   ];
 }
 
+defineExpose({ addShard });
+
 const removing = ref(false);
 
 async function removeShard(index) {
@@ -87,8 +92,8 @@ async function removeShard(index) {
 </script>
 
 <template>
-  <section class="grid gap-3">
-    <div class="flex flex-wrap items-center justify-between gap-2">
+  <section class="grid gap-3" aria-label="世界（分片）">
+    <div v-if="!hideHeader" class="flex flex-wrap items-center justify-between gap-2">
       <h3 class="text-xs font-semibold text-muted-foreground">世界（分片）</h3>
       <IconAction variant="outline" show-label icon="plus" label="添加世界" @click="addShard" />
     </div>
@@ -97,35 +102,49 @@ async function removeShard(index) {
       <div
         v-for="(s, i) in shards"
         :key="i"
-        class="shard-card rounded-lg border border-border p-3 transition-opacity"
+        class="rounded-xl border border-border/80 bg-card p-4 transition-opacity"
         :class="{ 'opacity-60': s.disabled }"
       >
-        <div class="flex flex-wrap items-center gap-2">
-          <Tooltip>
-            <TooltipTrigger as="span" :as-child="canRename(s)" class="inline-flex min-w-24 flex-1" :tabindex="!canRename(s) ? 0 : undefined">
-              <Input v-model.trim="s.name" class="font-medium disabled:pointer-events-none" :disabled="!canRename(s)" aria-label="世界名" placeholder="世界名" />
-            </TooltipTrigger>
-            <TooltipContent>{{ canRename(s) ? '英文名，不含空格；保存后不可修改' : '存档目录名，保存后不可修改' }}</TooltipContent>
-          </Tooltip>
-          <Select v-model="s.worldType" :disabled="!canRename(s)">
+        <div class="flex min-h-7 flex-wrap items-center gap-2">
+          <template v-if="canRename(s)">
             <Tooltip>
-              <TooltipTrigger as="span" :as-child="canRename(s)" class="inline-flex w-24 shrink-0" :tabindex="!canRename(s) ? 0 : undefined">
-                <SelectTrigger class="w-full disabled:pointer-events-none" aria-label="世界类型">
-                  <SelectValue :placeholder="typeLabel(s.worldType)" />
-                </SelectTrigger>
+              <TooltipTrigger as-child>
+                <Input v-model.trim="s.name" class="h-8 min-w-24 flex-1 font-mono text-sm font-medium" aria-label="世界名" placeholder="世界名" />
               </TooltipTrigger>
-              <SelectContent position="popper">
-                <SelectGroup>
-                  <SelectItem v-for="t in WORLD_TYPES" :key="t.value" :value="t.value">
-                    {{ t.label }}
-                  </SelectItem>
-                </SelectGroup>
-              </SelectContent>
-              <TooltipContent>{{ canRename(s) ? '决定世界生成预设与可用设置项' : '存档类型' }}</TooltipContent>
+              <TooltipContent>英文名，不含空格；保存后不可修改</TooltipContent>
             </Tooltip>
-          </Select>
-          <span v-if="s.isMaster" class="pill pill-info">主世界</span>
-          <div class="ml-auto flex items-center gap-2">
+            <Select v-model="s.worldType">
+              <Tooltip>
+                <TooltipTrigger as-child>
+                  <SelectTrigger class="h-8 w-24 shrink-0 text-xs" aria-label="世界类型">
+                    <SelectValue :placeholder="typeLabel(s.worldType)" />
+                  </SelectTrigger>
+                </TooltipTrigger>
+                <SelectContent position="popper">
+                  <SelectGroup>
+                    <SelectItem v-for="t in WORLD_TYPES" :key="t.value" :value="t.value">
+                      {{ t.label }}
+                    </SelectItem>
+                  </SelectGroup>
+                </SelectContent>
+                <TooltipContent>决定世界生成预设与可用设置项</TooltipContent>
+              </Tooltip>
+            </Select>
+          </template>
+          <template v-else>
+            <span class="truncate font-mono text-sm font-semibold text-foreground">{{ s.name }}</span>
+            <Badge variant="secondary" class="text-[11px] font-normal">{{ typeLabel(s.worldType) }}</Badge>
+          </template>
+
+          <Badge
+            v-if="s.isMaster"
+            variant="outline"
+            class="border-primary/35 bg-primary/8 text-[11px] font-medium text-primary dark:text-emerald-400"
+          >
+            主世界
+          </Badge>
+
+          <div class="ml-auto flex items-center gap-1.5">
             <UiSwitch
               :model-value="!s.disabled"
               :disabled="s.isMaster"
@@ -134,7 +153,15 @@ async function removeShard(index) {
             />
             <Tooltip v-if="!s.isMaster">
               <TooltipTrigger as="span" :as-child="!removing" class="inline-flex" :tabindex="removing ? 0 : undefined">
-                <Button type="button" variant="destructive" size="icon-sm" aria-label="从面板移除（存档目录保留）" :disabled="removing" @click="removeShard(i)">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  class="size-7 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                  aria-label="从面板移除（存档目录保留）"
+                  :disabled="removing"
+                  @click="removeShard(i)"
+                >
                   <Icon name="trash" size="14" />
                 </Button>
               </TooltipTrigger>
@@ -143,12 +170,12 @@ async function removeShard(index) {
           </div>
         </div>
 
-        <div class="mt-3 grid grid-cols-3 gap-2">
+        <div class="mt-3.5 grid grid-cols-1 gap-2.5 sm:grid-cols-3">
           <label v-for="p in PORTS" :key="p.key" class="flex min-w-0 flex-col gap-1">
             <span class="text-[11px] text-muted-foreground">{{ p.label }}</span>
             <Input
               v-model.number="s[p.key]"
-              class="h-8 text-sm"
+              class="h-8 font-mono text-xs tabular-nums"
               type="number"
               min="1024"
               max="65535"
@@ -157,11 +184,14 @@ async function removeShard(index) {
           </label>
         </div>
 
-        <p class="mt-2 text-xs text-muted-foreground">
-          世界 ID <code>{{ s.gameId || '自动' }}</code>
-          <template v-if="s.isMaster">（进服落点，不可停用）</template>
-          <template v-else-if="s.disabled">（已停用，不会启动）</template>
-        </p>
+        <div class="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5 text-xs text-muted-foreground">
+          <span>
+            世界 ID <code>{{ s.gameId || '自动' }}</code>
+            <template v-if="s.isMaster">（进服落点，不可停用）</template>
+            <template v-else-if="s.disabled">（已停用，不会启动）</template>
+          </span>
+          <span v-if="!canRename(s)" class="text-[11px] text-muted-foreground/75">目录名与类型不可修改</span>
+        </div>
       </div>
     </div>
   </section>

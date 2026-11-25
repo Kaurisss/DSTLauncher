@@ -19,7 +19,7 @@ import { confirmAction } from '@/lib/confirm.js';
 
 const rooms = useRoomsStore();
 const ui = useUiStore();
-const editor = ref({ open: false, roomId: null, key: 0 });
+const editor = ref({ open: false, roomId: null, section: 'general', key: 0 });
 const preparing = ref(false);
 const uploader = ref({ open: false, roomId: null, key: 0 });
 const deleting = ref(false);
@@ -29,14 +29,14 @@ onMounted(async () => {
   await guard(() => rooms.load());
   if (!rooms.meta) await guard(() => rooms.loadMeta());
   const pending = ui.consumePendingEditRoom();
-  if (pending !== null) await openEditor(pending || null);
+  if (pending !== null) await openEditor(pending.roomId || null, pending.section || 'general');
 });
 
 function reload() {
   guard(() => rooms.load());
 }
 
-async function openEditor(roomId = null) {
+async function openEditor(roomId = null, section = 'general') {
   if (preparing.value) return;
   preparing.value = true;
   try {
@@ -44,10 +44,11 @@ async function openEditor(roomId = null) {
       const { ok } = await guard(() => rooms.loadMeta());
       if (!ok) return;
     }
-    editor.value = { open: true, roomId: roomId ? Number(roomId) : null, key: editor.value.key + 1 };
+    editor.value = { open: true, roomId: roomId ? Number(roomId) : null, section, key: editor.value.key + 1 };
     await nextTick();
     document.querySelector('#page-content [data-slot="page-scroll"]')?.scrollTo({ top: 0 });
-    document.getElementById('f_name')?.focus({ preventScroll: true });
+    const focusId = section === 'network' ? 'f_token' : 'f_name';
+    document.getElementById(focusId)?.focus({ preventScroll: true });
   } finally {
     preparing.value = false;
   }
@@ -107,15 +108,14 @@ async function onRemove(id) {
         :key="editor.key"
         :room="editingRoom"
         :meta="rooms.meta"
+        :initial-section="editor.section"
         @close="closeEditor"
         @saved="closeEditor"
       >
-        <div v-if="editingRoom" class="mt-2 grid gap-1 border-t pt-5">
-          <h3 class="text-xs font-semibold text-muted-foreground">管理员与准入名单（即时生效）</h3>
-          <p class="text-xs text-muted-foreground">以下增删操作立即写入房间文件，与上方表单「保存」按钮相互独立；也可以直接在「玩家管理」中维护当前房间的名单。</p>
-        </div>
-        <RoomAdmins v-if="editingRoom" :key="editingRoom.id" :room="editingRoom" />
-        <RoomPlayerLists v-if="editingRoom" :key="`lists-${editingRoom.id}`" :room="editingRoom" />
+        <template v-if="editingRoom" #access>
+          <RoomAdmins :key="editingRoom.id" :room="editingRoom" />
+          <RoomPlayerLists :key="`lists-${editingRoom.id}`" :room="editingRoom" />
+        </template>
       </RoomEditor>
       <UiCard v-else>
         <template #title>房间已不存在</template>

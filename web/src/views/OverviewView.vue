@@ -167,7 +167,7 @@ async function runQuick(action) {
       <AlertTitle>当前房间缺少 Klei 服务器令牌</AlertTitle>
       <AlertDescription class="flex flex-wrap items-center justify-between gap-2">
         <span>在线模式开服需要配置 <code>cluster_token.txt</code> 令牌，局域网或离线模式可在房间设置中关闭在线校验。</span>
-        <Button size="sm" variant="outline" @click="ui.openRoomEditor(rooms.current.id)">前往配置令牌</Button>
+        <Button size="sm" variant="outline" @click="ui.openRoomEditor(rooms.current.id, 'network')">前往配置令牌</Button>
       </AlertDescription>
     </Alert>
 
