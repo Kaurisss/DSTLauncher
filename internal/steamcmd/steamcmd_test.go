@@ -273,6 +273,44 @@ func TestCancelInstallTerminatesRunningSteamCmdProcess(t *testing.T) {
 	}
 }
 
+func TestDetectInstalledIncludesGameClientAndPrefersDedicatedServer(t *testing.T) {
+	libA := filepath.Join(t.TempDir(), "SteamA")
+	libB := filepath.Join(t.TempDir(), "SteamB")
+
+	clientRoot := filepath.Join(libA, "steamapps", "common", clientDirName)
+	_, clientExe := serverPaths(clientRoot, Arch64)
+	mustWriteFile(t, clientExe)
+
+	// Incomplete dedicated server directory (no executable) should be skipped.
+	if err := os.MkdirAll(filepath.Join(libA, "steamapps", "common", gameDirName), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	got := detectInstalledInLibraries([]string{libA})
+	if len(got) != 1 {
+		t.Fatalf("client-only detect len = %d, want 1 (%+v)", len(got), got)
+	}
+	if !samePath(got[0].Root, clientRoot) || !strings.Contains(got[0].Source, "游戏本体") {
+		t.Fatalf("unexpected client detection: %+v", got[0])
+	}
+
+	// Dedicated server in a later library still outranks the game client.
+	dedicatedRoot := filepath.Join(libB, "steamapps", "common", gameDirName)
+	_, dedicatedExe := serverPaths(dedicatedRoot, Arch64)
+	mustWriteFile(t, dedicatedExe)
+
+	got = detectInstalledInLibraries([]string{libA, libB})
+	if len(got) != 2 {
+		t.Fatalf("combined detect len = %d, want 2 (%+v)", len(got), got)
+	}
+	if !samePath(got[0].Root, dedicatedRoot) || !strings.Contains(got[0].Source, "专用服务器") {
+		t.Fatalf("first candidate should be dedicated server, got %+v", got[0])
+	}
+	if !samePath(got[1].Root, clientRoot) || !strings.Contains(got[1].Source, "游戏本体") {
+		t.Fatalf("second candidate should be game client, got %+v", got[1])
+	}
+}
+
 func mustWriteFile(t *testing.T, path string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {

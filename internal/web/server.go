@@ -1885,7 +1885,7 @@ func (s *Server) handleInstall(w http.ResponseWriter, r *http.Request) {
 		defer s.taskMu.Unlock()
 		if s.steam.IsExternal() {
 			respond(w, 200, nil, fmt.Errorf(
-				"当前已复用安装好的专用服务器（%s），无需在此安装；如需更新请在 Steam 中更新该工具",
+				"当前已复用本机已安装的服务器（%s），无需在此安装；如需更新请在 Steam 中更新对应的游戏或专用服务器工具",
 				s.steam.Root()))
 			return
 		}
@@ -1933,7 +1933,7 @@ func (s *Server) handleUpdate(w http.ResponseWriter, r *http.Request) {
 	defer s.taskMu.Unlock()
 	if s.steam.IsExternal() {
 		respond(w, 200, nil, fmt.Errorf(
-			"服务器复用自 %s，请在 Steam 中更新「Don't Starve Together Dedicated Server」工具",
+			"服务器复用自 %s，请在 Steam 中更新对应的「Don't Starve Together」游戏本体或专用服务器工具",
 			s.steam.Root()))
 		return
 	}

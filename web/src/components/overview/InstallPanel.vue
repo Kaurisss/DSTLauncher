@@ -128,7 +128,7 @@ onMounted(async () => {
       </dl>
       <p class="break-all text-sm text-muted-foreground">{{ system.root }}</p>
       <p v-if="system.external" class="text-sm text-muted-foreground">
-        更新请在 Steam 中更新「Don't Starve Together Dedicated Server」工具，面板会自动使用最新版本。
+        更新请在 Steam 中更新对应的「Don't Starve Together」游戏本体或专用服务器工具，面板会自动使用最新版本。
       </p>
       <IconAction v-else variant="outline" show-label class="self-start" icon="cloudCheck" label="检查更新" :disabled="busy" @click="update" />
       <Alert v-if="busy">
@@ -186,7 +186,7 @@ onMounted(async () => {
             <Field :data-disabled="locked || undefined">
               <FieldLabel for="srv_dir">安装目录</FieldLabel>
               <Input id="srv_dir" v-model="draftDir" :disabled="locked" placeholder="留空 = 自动探测 Steam 库" />
-              <FieldDescription>填「Don't Starve Together Dedicated Server」那一层，也可以粘贴里面的 bin 目录。</FieldDescription>
+              <FieldDescription>填「Don't Starve Together Dedicated Server」或游戏本体「Don't Starve Together」目录，也可以粘贴里面的 bin / bin64 目录。</FieldDescription>
               <IconAction show-label class="self-start" icon="check" label="应用" :disabled="locked" @click="apply(draftDir)" />
             </Field>
             <Field :data-disabled="locked || undefined">

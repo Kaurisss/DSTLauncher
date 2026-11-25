@@ -24,6 +24,7 @@ const (
 
 	gameAppID       = "343050"
 	gameDirName     = "Don't Starve Together Dedicated Server"
+	clientDirName   = "Don't Starve Together"
 	steamCMDDirName = "steamcmd"
 	maxOutputLines  = 400
 )

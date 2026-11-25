@@ -13,22 +13,38 @@ var (
 )
 
 // DetectInstalled finds valid dedicated-server installations in known Steam
-// libraries. Invalid or incomplete directories are intentionally omitted so the
-// caller can show every candidate without later failing on a missing executable.
+// libraries. Both the standalone Dedicated Server tool and the main game client
+// (which bundles the same dedicated-server executables) are scanned, with the
+// standalone tool ranked first. Invalid or incomplete directories are omitted
+// so callers can show every candidate without later failing on a missing binary.
 func DetectInstalled() []Detected {
+	return detectInstalledInLibraries(libraryRoots(steamRoots()))
+}
+
+func detectInstalledInLibraries(libraries []string) []Detected {
+	targets := []struct {
+		dirName string
+		label   string
+	}{
+		{dirName: gameDirName, label: "Steam 库（专用服务器）："},
+		{dirName: clientDirName, label: "Steam 库（游戏本体）："},
+	}
+
 	var found []Detected
 	seen := make(map[string]bool)
-	for _, library := range libraryRoots(steamRoots()) {
-		root := filepath.Join(library, "steamapps", "common", gameDirName)
-		layout, err := PickLayout(root, ArchAuto, "")
-		if err != nil || seen[normalizePath(layout.Root)] {
-			continue
+	for _, target := range targets {
+		for _, library := range libraries {
+			root := filepath.Join(library, "steamapps", "common", target.dirName)
+			layout, err := PickLayout(root, ArchAuto, "")
+			if err != nil || seen[normalizePath(layout.Root)] {
+				continue
+			}
+			seen[normalizePath(layout.Root)] = true
+			found = append(found, Detected{
+				Root:   layout.Root,
+				Source: target.label + library,
+			})
 		}
-		seen[normalizePath(layout.Root)] = true
-		found = append(found, Detected{
-			Root:   layout.Root,
-			Source: "Steam 库：" + library,
-		})
 	}
 	return found
 }
