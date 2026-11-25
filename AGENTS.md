@@ -22,7 +22,7 @@
 
 ## Testing Guidelines
 - Use Go's `testing` package (`go test ./internal/<pkg> -v`); on Windows, `go run ./cmd/verify` validates server process lifecycles.
-- Run targeted Playwright/Node checks in `web/scripts/check-*.mjs` for modified views or APIs before running `pnpm --dir web test`.
+- Run `pnpm --dir web test` for pure-Node frontend checks in `web/scripts/check-*.mjs`, and use Chrome DevTools MCP for live UI verification.
 - Run `tools/test_*.py` via `python -m unittest` when editing Python extractors, and `.\tools\check-desktop.ps1` for desktop builds.
 
 ## Commit & Pull Request Guidelines

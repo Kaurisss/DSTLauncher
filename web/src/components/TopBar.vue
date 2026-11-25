@@ -88,7 +88,7 @@ async function onLogout() {
     </div>
 
     <!-- 右侧：房间选择（仅当前房间作用域显示）+ 切换主题 + 退出登录（启用密码时显示） -->
-    <div class="flex min-w-0 shrink-0 items-center gap-2 pr-3 sm:pr-4">
+    <div class="flex min-w-0 shrink-0 items-center gap-2 pr-3">
       <Select v-if="!ui.isGlobalTab" :model-value="rooms.currentId ? String(rooms.currentId) : ''" :disabled="!rooms.list.length" @update:model-value="rooms.select">
         <SelectTrigger id="roomSelect" aria-label="房间" size="sm" class="w-auto min-w-[140px] max-w-[200px] sm:max-w-[340px] md:max-w-[420px] lg:max-w-[500px] bg-card h-7 px-2.5 text-xs">
           <SelectValue as-child>

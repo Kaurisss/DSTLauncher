@@ -613,7 +613,7 @@ onMounted(() => selectShard(rooms.shards[0]));
               </button>
               <button
                 class="seg-btn"
-                :class="{ 'is-active': category === 'worldgen' }"
+                :class="{ 'is-active': category === 'worldgen', 'has-icon': worldGenerated }"
                 :aria-pressed="category === 'worldgen'"
                 type="button"
                 @pointerenter="preloadIcons(worldgenGroups.slice(0, 1))"
@@ -629,7 +629,7 @@ onMounted(() => selectShard(rooms.shards[0]));
           </div>
           <div class="world-search-wrap">
             <PhMagnifyingGlass class="world-search-icon" aria-hidden="true" />
-            <Input v-model="keyword" aria-label="搜索世界配置" placeholder="搜索选项（中英文均可）" class="world-search pl-8 pr-7" />
+            <Input v-model="keyword" aria-label="搜索世界配置" placeholder="搜索选项（中英文均可）" class="world-search rounded-md pl-[30px] pr-7" />
             <button
               v-if="keyword"
               type="button"

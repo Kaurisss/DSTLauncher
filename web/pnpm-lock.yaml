@@ -228,9 +228,6 @@ importers:
       '@eslint/js':
         specifier: ^10.0.1
         version: 10.0.1(eslint@10.12.0(jiti@2.7.0))
-      '@playwright/cli':
-        specifier: ^0.1.22
-        version: 0.1.22
       '@tailwindcss/vite':
         specifier: ^4.3.3
         version: 4.3.3(vite@8.3.2(jiti@2.7.0)(stylus@0.57.0))
@@ -243,9 +240,6 @@ importers:
       eslint-plugin-vue:
         specifier: ^10.11.1
         version: 10.11.1(eslint@10.12.0(jiti@2.7.0))(vue-eslint-parser@10.4.1(eslint@10.12.0(jiti@2.7.0)))
-      playwright:
-        specifier: 1.64.0-alpha-1790635538000
-        version: 1.64.0-alpha-1790635538000
       tailwindcss:
         specifier: ^4.3.3
         version: 4.3.3
@@ -555,11 +549,6 @@ packages:
     engines: {node: '>=14'}
     peerDependencies:
       vue: '>=3.2.39'
-
-  '@playwright/cli@0.1.22':
-    resolution: {integrity: sha512-6WMkQNM4VEzqMkdr/l60X9Cr7i+tI/arK87IWz2K7pB6j8I2ZJ8KN+1JfhJDLnK+SXnab6Op8xGt4adcGLsyfA==}
-    engines: {node: '>=18'}
-    hasBin: true
 
   '@rolldown/binding-android-arm-eabi@1.2.12':
     resolution: {integrity: sha512-dB/a1214qKfHMXCpgqR4OZT+jS4kTyEXbQGJPqzobt5EwH5rX080pxE37alt3RzvR1bf1Yz/yGqRfrYAxuPw0A==}
@@ -2117,16 +2106,6 @@ packages:
   pkg-types@2.4.0:
     resolution: {integrity: sha512-07Fys7iVx0X6TcviMOgogM1Lk33ZyqOezMnU79S+kffWqwolG/5W9V8EgQSeYCIfFTYVgssRbnH630Oa2+soBA==}
 
-  playwright-core@1.64.0-alpha-1790635538000:
-    resolution: {integrity: sha512-pNwaXirhXMRLaRQs4NQ18EpTdtDoFwyPH9FOaaDC7YXG4hpwE2xmwCic/1srbuExVQC7zT9LJSJpDBAru+Vo9A==}
-    engines: {node: '>=20'}
-    hasBin: true
-
-  playwright@1.64.0-alpha-1790635538000:
-    resolution: {integrity: sha512-/5XDUMxpOd/9AojJtWDFIRV3EJZNQ0AwvK69wgt3CPzy8wTgiBG9pX45VfxtqtvIRGwfWzMhrvawNKreG69Snw==}
-    engines: {node: '>=20'}
-    hasBin: true
-
   postcss-less@6.0.0:
     resolution: {integrity: sha512-FPX16mQLyEjLzEuuJtxA8X3ejDLNGGEG503d2YGZR5Ask1SpDN8KmZUMpzCvyalWRywAn1n1VOA5dcqfCLo5rg==}
     engines: {node: '>=12'}
@@ -3013,11 +2992,6 @@ snapshots:
   '@phosphor-icons/vue@2.2.1(vue@3.5.43(typescript@5.9.3))':
     dependencies:
       vue: 3.5.43(typescript@5.9.3)
-
-  '@playwright/cli@0.1.22':
-    dependencies:
-      playwright: 1.64.0-alpha-1790635538000
-      playwright-core: 1.64.0-alpha-1790635538000
 
   '@rolldown/binding-android-arm-eabi@1.2.12':
     optional: true
@@ -4435,12 +4409,6 @@ snapshots:
       confbox: 0.3.1
       exsolve: 1.1.3
       pathe: 2.0.3
-
-  playwright-core@1.64.0-alpha-1790635538000: {}
-
-  playwright@1.64.0-alpha-1790635538000:
-    dependencies:
-      playwright-core: 1.64.0-alpha-1790635538000
 
   postcss-less@6.0.0(postcss@8.5.28):
     dependencies:

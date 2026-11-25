@@ -20,10 +20,10 @@ const props = defineProps({
 });
 
 const RESPONSIVE_BUTTON = {
-  sm: 'w-7 px-0 sm:w-auto sm:px-2.5',
-  md: 'w-7 px-0 md:w-auto md:px-2.5',
-  lg: 'w-7 px-0 lg:w-auto lg:px-2.5',
-  xl: 'w-7 px-0 xl:w-auto xl:px-2.5',
+  sm: 'w-7 px-0 sm:w-auto sm:ps-2 sm:pe-2.5',
+  md: 'w-7 px-0 md:w-auto md:ps-2 md:pe-2.5',
+  lg: 'w-7 px-0 lg:w-auto lg:ps-2 lg:pe-2.5',
+  xl: 'w-7 px-0 xl:w-auto xl:ps-2 xl:pe-2.5',
 };
 
 const RESPONSIVE_TEXT = {
@@ -88,7 +88,7 @@ defineExpose({ focus });
     :type="as === 'button' ? type : undefined"
     :variant="variant"
     :size="buttonSize"
-    :class="attrs.class"
+    :class="['ps-2 pe-2.5', attrs.class]"
     :aria-label="label"
     :disabled="disabled"
     v-bind="buttonAttrs"
