@@ -53,6 +53,8 @@ async function openPage(tab, width = 1280, long = false) {
       return ok(state.automation);
     }
     if (path === '/api/workshop/key') return ok({ steamApiKey: '' });
+    if (path === '/api/admins') return ok({ admins: ['KU_ADMIN1'], seen: {}, file: 'adminlist.txt', needRestart: false });
+    if (path === '/api/player-lists') return ok({ ids: ['KU_BLOCK1'], seen: {}, file: 'blocklist.txt', needRestart: false, reservedSlots: 0 });
     if (path === '/api/logs/stream') return route.fulfill({ contentType: 'text/event-stream', body: '' });
     return ok([]);
   });
@@ -60,7 +62,7 @@ async function openPage(tab, width = 1280, long = false) {
   return { page, state };
 }
 
-for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '玩家日志'], ['backups', '备份'], ['saves', '存档'], ['config', '配置预览']]) {
+for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '玩家日志'], ['backups', '备份'], ['saves', '存档']]) {
   test(`${label}统计筛选与操作合并，桌面单行、手机不溢出`, async () => {
     for (const width of (['mods', 'logs'].includes(tab) ? [640, 768, 820, 900, 1024, 1280, 1536, 375, 320] : [1280, 375])) {
       const { page, state } = await openPage(tab, width);
@@ -118,7 +120,7 @@ for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '�
   });
 }
 
-for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '玩家日志'], ['backups', '备份'], ['saves', '存档'], ['config', '配置预览']]) {
+for (const [tab, label] of [['rooms', '房间'], ['mods', '模组'], ['logs', '玩家日志'], ['backups', '备份'], ['saves', '存档']]) {
   test(`${label}仅卡片列表滚动，外框、工具栏和Topbar固定，末行与底部边距可达`, async () => {
     for (const width of [1280, 375]) {
       const { page, state } = await openPage(tab, width, true);
@@ -260,6 +262,24 @@ test('设置保存按钮位于各自Header，仍提交对应表单并保留原�
     await page.getByText('Steam API Key 已保存', { exact: true }).waitFor();
     const savedKey = state.requests.find(r => r.path === '/api/workshop/key' && r.method === 'PUT');
     assert.equal(JSON.parse(savedKey.body).steamApiKey, '0123456789abcdef0123456789abcdef');
+    assert.deepEqual(state.errors, []);
+  } finally { await page.close(); }
+});
+
+
+test('玩家管理支持在玩家日志与管理员准入名单间切换且不溢出', async () => {
+  const { page, state } = await openPage('logs', 1280);
+  try {
+    const tabs = page.getByRole('tablist', { name: '玩家管理标签', exact: true });
+    await tabs.getByRole('tab', { name: '玩家日志', exact: true }).waitFor();
+    await tabs.getByRole('tab', { name: '管理员与准入名单', exact: true }).click();
+    await page.getByRole('heading', { name: '房间管理员', exact: true }).waitFor();
+    await page.getByRole('heading', { name: '玩家准入名单', exact: true }).waitFor();
+    await page.getByText('KU_ADMIN1', { exact: true }).waitFor();
+    await page.getByText('KU_BLOCK1', { exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
+    await tabs.getByRole('tab', { name: '玩家日志', exact: true }).click();
+    await page.getByRole('region', { name: '玩家日志工具栏', exact: true }).waitFor();
     assert.deepEqual(state.errors, []);
   } finally { await page.close(); }
 });

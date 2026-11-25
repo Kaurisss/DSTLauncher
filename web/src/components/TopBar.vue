@@ -1,24 +1,28 @@
 <script setup>
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import iconUrl from '@/assets/icon.png';
-import { PhDesktop, PhMoon, PhSun } from '@phosphor-icons/vue';
+import { PhDesktop, PhMoon, PhSignOut, PhSun } from '@phosphor-icons/vue';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SidebarTrigger, useSidebar } from '@/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import { useAuthStore } from '@/stores/auth.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useUiStore } from '@/stores/ui.js';
 import { useTheme } from '@/composables/useTheme.js';
-import { toast } from '@/lib/toast.js';
+import { guard, toast } from '@/lib/toast.js';
 import { GAME_MODE_LABEL } from '@/lib/format.js';
 
+const auth = useAuthStore();
 const rooms = useRoomsStore();
 const ui = useUiStore();
 const theme = useTheme();
 const { state } = useSidebar();
+const loggingOut = ref(false);
 
-const pageTitle = computed(() => ui.tabs.find(t => t.key === ui.activeTab)?.label || '控制台');
+const pageTitle = computed(() => ui.activeTabMeta?.label || '控制台');
 const roomDetails = computed(() => {
   const room = rooms.current;
   if (!room) return '';
@@ -28,9 +32,26 @@ const roomDetails = computed(() => {
 const themeIcon = computed(() => ({ auto: PhDesktop, light: PhSun, dark: PhMoon })[theme.mode.value]);
 const themeTitle = computed(() => '切换主题：' + theme.label.value);
 
+function isRoomRunning(room) {
+  if (!room) return false;
+  if (room.id === rooms.currentId && rooms.statuses.length) return rooms.running;
+  if (typeof room.running === 'boolean') return room.running;
+  return (room.statuses || []).some(s => s.state === 'running' || s.state === 'starting');
+}
+
 function onTheme() {
   theme.cycle();
   toast(`主题：${theme.label.value}`);
+}
+
+async function onLogout() {
+  if (loggingOut.value) return;
+  loggingOut.value = true;
+  try {
+    await guard(() => auth.logout(), { success: '已退出登录' });
+  } finally {
+    loggingOut.value = false;
+  }
 }
 </script>
 
@@ -60,15 +81,24 @@ function onTheme() {
       </div>
 
       <!-- 当前页面标题：移动端紧随触发按钮，桌面端从侧边栏分界处起排 -->
-      <h1 class="truncate text-sm font-semibold sm:text-base text-sidebar-foreground pl-1 md:pl-3">{{ pageTitle }}</h1>
+      <div class="flex min-w-0 items-center gap-2 pl-1 md:pl-3">
+        <h1 class="truncate text-sm font-semibold sm:text-base text-sidebar-foreground">{{ pageTitle }}</h1>
+        <Badge v-if="ui.isGlobalTab" variant="outline" class="hidden shrink-0 text-[11px] font-normal text-muted-foreground sm:inline-flex">全局</Badge>
+      </div>
     </div>
 
-    <!-- 右侧：房间选择 + 切换主题 -->
+    <!-- 右侧：房间选择（仅当前房间作用域显示）+ 切换主题 + 退出登录（启用密码时显示） -->
     <div class="flex min-w-0 shrink-0 items-center gap-2 pr-3 sm:pr-4">
-      <Select :model-value="rooms.currentId ? String(rooms.currentId) : ''" :disabled="!rooms.list.length" @update:model-value="rooms.select">
+      <Select v-if="!ui.isGlobalTab" :model-value="rooms.currentId ? String(rooms.currentId) : ''" :disabled="!rooms.list.length" @update:model-value="rooms.select">
         <SelectTrigger id="roomSelect" aria-label="房间" size="sm" class="w-auto min-w-[140px] max-w-[200px] sm:max-w-[340px] md:max-w-[420px] lg:max-w-[500px] bg-card h-7 px-2.5 text-xs">
           <SelectValue as-child>
             <span class="flex min-w-0 flex-1 items-center gap-1.5">
+              <span
+                v-if="rooms.current"
+                aria-hidden="true"
+                :data-running="isRoomRunning(rooms.current) ? 'true' : 'false'"
+                :class="['size-2 shrink-0 rounded-full', isRoomRunning(rooms.current) ? 'bg-emerald-500' : 'bg-muted-foreground/35']"
+              />
               <span class="truncate text-xs font-medium">{{ rooms.current?.name || (rooms.list.length ? '选择房间' : '（暂无房间）') }}</span>
               <span v-if="roomDetails" class="hidden sm:inline-flex shrink-0 items-center rounded bg-muted/60 px-1.5 py-0.5 text-[11px] text-muted-foreground tabular-nums leading-none">{{ roomDetails }}</span>
             </span>
@@ -76,7 +106,16 @@ function onTheme() {
         </SelectTrigger>
         <SelectContent position="popper" align="end">
           <SelectGroup>
-            <SelectItem v-for="room in rooms.list" :key="room.id" :value="String(room.id)">{{ room.name }}</SelectItem>
+            <SelectItem v-for="room in rooms.list" :key="room.id" :value="String(room.id)">
+              <span class="flex min-w-0 items-center gap-2">
+                <span
+                  aria-hidden="true"
+                  :data-running="isRoomRunning(room) ? 'true' : 'false'"
+                  :class="['size-2 shrink-0 rounded-full', isRoomRunning(room) ? 'bg-emerald-500' : 'bg-muted-foreground/35']"
+                />
+                <span class="truncate">{{ room.name }}</span>
+              </span>
+            </SelectItem>
           </SelectGroup>
         </SelectContent>
       </Select>
@@ -88,6 +127,16 @@ function onTheme() {
           </Button>
         </TooltipTrigger>
         <TooltipContent>{{ themeTitle }}</TooltipContent>
+      </Tooltip>
+
+      <Tooltip v-if="auth.enabled">
+        <TooltipTrigger as-child>
+          <Button variant="outline" size="sm" class="h-7 shrink-0 gap-1.5 px-2 sm:px-2.5 text-xs" aria-label="退出登录" :disabled="loggingOut" @click="onLogout">
+            <PhSignOut class="size-3.5" aria-hidden="true" />
+            <span class="hidden sm:inline">退出登录</span>
+          </Button>
+        </TooltipTrigger>
+        <TooltipContent>退出登录</TooltipContent>
       </Tooltip>
     </div>
   </header>

@@ -15,6 +15,7 @@ import { Switch } from '@/components/ui/switch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import Icon from '@/components/ui/Icon.vue';
 import ShardEditor from '@/components/rooms/ShardEditor.vue';
+import ConfigPreviewDialog from '@/components/config/ConfigPreviewDialog.vue';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -203,6 +204,7 @@ async function save() {
       <h2 class="truncate text-sm font-semibold">{{ isNew ? '新建房间' : '编辑房间：' + form.name }}</h2>
       <Badge v-if="!isNew" variant="secondary" class="hidden shrink-0 font-mono text-[10px] lg:inline-flex">{{ room.key || 'Cluster_' + form.id }}</Badge>
       <template #actions>
+        <ConfigPreviewDialog v-if="!isNew" :room="room" show-label="sm" />
         <IconAction variant="outline" show-label icon="x" label="取消" :disabled="saving" @click="emit('close')" />
         <IconAction show-label icon="save" :label="saving ? '保存中…' : '保存'" :disabled="saving" @click="save" />
       </template>

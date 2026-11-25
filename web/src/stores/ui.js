@@ -1,10 +1,11 @@
-// 界面外壳状态：当前标签页。
+// 界面外壳状态：当前标签页与导航分组。
 //
-// 标签清单也放在这里，以后加「世界设置」「玩家管理」只要往数组里加一项，
-// 侧边栏导航与面板切换都会自动跟上。icon 对应 components/ui/Icon.vue 里的名字。
+// 侧边栏按作用域分为「当前房间」与「全局管理」两组：
+// - room 作用域页面随顶栏房间切换器切换上下文；
+// - global 作用域页面管理全站资源，顶栏不展示房间切换器以避免作用域误导。
 
 import { defineStore } from 'pinia';
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 
 /** activeTab 的本地记忆 key，与房间选择的记忆方式保持一致。 */
 const TAB_KEY = 'dst-tab';
@@ -28,21 +29,37 @@ function storeTab(key) {
 }
 
 export const useUiStore = defineStore('ui', () => {
-  /** 数组顺序即导航顺序。key 同时决定组件映射（见 App.vue）。 */
-  const tabs = [
-    { key: 'overview', label: '概览', icon: 'dashboard' },
-    { key: 'rooms', label: '房间', icon: 'server' },
-    { key: 'world', label: '世界配置', icon: 'globe' },
-    { key: 'mods', label: '模组', icon: 'package' },
-    { key: 'logs', label: '玩家日志', icon: 'message' },
-    { key: 'backups', label: '备份', icon: 'archive' },
-    { key: 'saves', label: '存档', icon: 'folder' },
-    { key: 'config', label: '配置预览', icon: 'fileCode' },
-    { key: 'settings', label: '设置', icon: 'settings' },
+  /** 导航分组：组序与项序即侧边栏展示顺序，key 决定视图映射（见 App.vue）。 */
+  const navGroups = [
+    {
+      key: 'room',
+      label: '当前房间',
+      items: [
+        { key: 'overview', label: '概览', icon: 'dashboard', scope: 'room' },
+        { key: 'world', label: '世界配置', icon: 'globe', scope: 'room' },
+        { key: 'mods', label: '模组', icon: 'package', scope: 'room' },
+        { key: 'logs', label: '玩家管理', icon: 'users', scope: 'room' },
+        { key: 'backups', label: '备份与回档', icon: 'archive', scope: 'room' },
+      ],
+    },
+    {
+      key: 'global',
+      label: '全局管理',
+      items: [
+        { key: 'rooms', label: '房间管理', icon: 'server', scope: 'global' },
+        { key: 'saves', label: '磁盘存档', icon: 'folder', scope: 'global' },
+        { key: 'settings', label: '系统设置', icon: 'settings', scope: 'global' },
+      ],
+    },
   ];
 
-  // 初值取上次的选择；存了不认识的旧 key（版本迭代删过页面）时回落到概览
+  /** 扁平化的全部导航项，供标题解析、路由校验与测试遍历。 */
+  const tabs = navGroups.flatMap(group => group.items);
+
+  // 初值取上次的选择；存了不认识的旧 key（如已下沉的 config）时回落到概览
   const activeTab = ref(readStoredTab(tabs.map(t => t.key)) || 'overview');
+  const activeTabMeta = computed(() => tabs.find(t => t.key === activeTab.value) || tabs[0]);
+  const isGlobalTab = computed(() => activeTabMeta.value?.scope === 'global');
 
   // 与 rooms.js 的房间记忆同理：切换就落盘，刷新后停在原页面
   watch(activeTab, storeTab);
@@ -51,5 +68,5 @@ export const useUiStore = defineStore('ui', () => {
     if (tabs.some(t => t.key === key)) activeTab.value = key;
   }
 
-  return { tabs, activeTab, select };
+  return { navGroups, tabs, activeTab, activeTabMeta, isGlobalTab, select };
 });

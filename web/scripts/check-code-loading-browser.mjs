@@ -21,7 +21,7 @@ const files = [
   { path: 'Cluster_1/Master/server.ini', onDisk: false, content: '[NETWORK]\nserver_port = 10999\n' },
   { path: 'Cluster_1/cluster_token.txt', onDisk: true, redacted: true, content: '[令牌已隐藏]' },
 ];
-const resources = { world: '/api/worldconfig', mods: '/api/mods', backups: '/api/backups', saves: '/api/saves', config: '/api/config' };
+const resources = { world: '/api/worldconfig', mods: '/api/mods', backups: '/api/backups', saves: '/api/saves' };
 
 async function openPage(tab, { paused = false, width = 1280 } = {}) {
   const page = await browser.newPage({ viewport: { width, height: 900 } });
@@ -52,14 +52,15 @@ async function openPage(tab, { paused = false, width = 1280 } = {}) {
     });
     if (path === '/api/mods/update') return ok({ running: false, output: [] });
     if (path === '/api/saves') return ok({ root: 'D:\\DST\\DST', items: [] });
-    if (path === '/api/config') return ok({ clusterDir: 'D:\\DST\\DST\\Cluster_1', files });
+    if (path === '/api/diagnostics') return ok({ time: new Date().toISOString(), room: 1, checks: [], shards: [], downloads: { findings: [] } });
+    if (path === '/api/config') { await state.pending; return ok({ clusterDir: 'D:\\DST\\DST\\Cluster_1', files }); }
     return ok([]);
   });
   await page.goto(origin);
   return { page, state, release };
 }
 
-test('世界、模组、备份、存档与配置初次加载都使用骨架屏', async () => {
+test('世界、模组、备份与存档初次加载都使用骨架屏', async () => {
   for (const tab of Object.keys(resources)) {
     const { page, state, release } = await openPage(tab, { paused: true });
     try {
@@ -74,12 +75,28 @@ test('世界、模组、备份、存档与配置初次加载都使用骨架屏',
   }
 });
 
-test('配置 Code Block 只读并保留落盘与令牌隐藏状态，复制得到原文本而非行号', async () => {
-  const { page, state } = await openPage('config', { width: 375 });
+async function openConfigPreview(page) {
+  await page.getByRole('button', { name: '故障诊断', exact: true }).click();
+  const diag = page.getByRole('dialog', { name: '故障诊断', exact: true });
+  await diag.getByRole('button', { name: '配置预览', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: /配置预览/ });
+  await dialog.waitFor();
+  return dialog;
+}
+
+test('配置预览弹窗初次加载使用骨架屏，Code Block 只读并保留落盘与令牌隐藏状态，复制得到原文本而非行号', async () => {
+  const { page, state, release } = await openPage('overview', { paused: true, width: 375 });
   try {
-    const preview = page.getByRole('region', { name: files[0].path, exact: true });
+    const dialog = await openConfigPreview(page);
+    const loading = dialog.getByRole('status', { name: '加载中', exact: true });
+    await loading.waitFor();
+    assert.ok(await loading.locator('[data-slot="skeleton"]').count() > 0);
+    release();
+    await loading.waitFor({ state: 'hidden' });
+
+    const preview = dialog.getByRole('region', { name: files[0].path, exact: true });
     await preview.waitFor();
-    assert.equal(await page.locator('[data-slot="code-block"]').count(), 3);
+    assert.equal(await dialog.locator('[data-slot="code-block"]').count(), 3);
     const blockStyle = await preview.locator('xpath=ancestor::*[@data-slot="code-block"]').evaluate(el => {
       const style = window.getComputedStyle(el);
       return { radius: style.borderRadius, border: style.borderWidth, ring: style.boxShadow };
@@ -89,8 +106,8 @@ test('配置 Code Block 只读并保留落盘与令牌隐藏状态，复制得�
     assert.equal(await preview.getAttribute('data-numbered'), 'true');
     assert.match(await preview.innerText(), /cluster_name = <img src=x onerror=alert\(1\)>/);
     assert.equal(await preview.locator('img, textarea, input, [contenteditable="true"]').count(), 0);
-    await page.getByText('令牌已隐藏', { exact: true }).waitFor();
-    await page.getByText('未生成', { exact: true }).waitFor();
+    await dialog.getByText('令牌已隐藏', { exact: true }).waitFor();
+    await dialog.getByText('未生成', { exact: true }).waitFor();
     assert.equal(await preview.locator('[data-slot="code-block-code"]').evaluate(el => window.getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
     const widths = await preview.locator('[data-slot="code-block-code"]').evaluate(el => {
       const style = window.getComputedStyle(el);
@@ -108,34 +125,27 @@ test('配置 Code Block 只读并保留落盘与令牌隐藏状态，复制得�
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
     assert.equal(state.requests.some(request => request.method !== 'GET'), false);
     assert.deepEqual(state.errors, []);
-    for (const { width, dark } of [{ width: 375, dark: false }, { width: 1440, dark: true }]) {
-      await page.setViewportSize({ width, height: 900 });
-      await page.evaluate(dark => localStorage.setItem('dst-theme', dark ? 'dark' : 'light'), dark);
-      await page.reload();
-      await preview.waitFor();
-      await page.locator('[data-slot="page-scroll"]').evaluate(el => { el.scrollTop = 0; });
-      await page.mouse.move(0, 0);
-      await page.screenshot({ path: fileURLToPath(new URL(`../../.scratch/screenshots/code-preview-${width}-${dark ? 'dark' : 'light'}.png`, import.meta.url)) });
-    }
-  } finally { await page.close(); }
+  } finally { release(); await page.close(); }
 });
 
-test('配置刷新保留现有 Code Block，加载过程中不切回占位', async () => {
-  const { page, state } = await openPage('config');
+test('配置预览弹窗刷新保留现有 Code Block，加载过程中不切回占位', async () => {
+  const { page, state } = await openPage('overview');
   let release = () => {};
   try {
-    const preview = page.getByRole('region', { name: files[0].path, exact: true });
+    const dialog = await openConfigPreview(page);
+    const preview = dialog.getByRole('region', { name: files[0].path, exact: true });
     await preview.waitFor();
     state.pending = new Promise(resolve => { release = resolve; });
     await Promise.all([
       page.waitForRequest(request => new URL(request.url()).pathname === '/api/config'),
-      page.getByRole('button', { name: '刷新', exact: true }).click(),
+      dialog.getByRole('button', { name: '刷新', exact: true }).click(),
     ]);
     assert.equal(await preview.isVisible(), true);
-    assert.equal(await page.getByRole('status', { name: '加载中', exact: true }).count(), 0);
-    assert.equal(await page.getByRole('button', { name: '刷新', exact: true }).isDisabled(), true);
+    assert.equal(await dialog.getByRole('status', { name: '加载中', exact: true }).count(), 0);
+    assert.equal(await dialog.getByRole('button', { name: '刷新', exact: true }).isDisabled(), true);
     release();
-    await page.waitForFunction(() => [...document.querySelectorAll('button')].some(button => button.getAttribute('aria-label') === '刷新' && !button.disabled));
+    await dialog.getByRole('button', { name: '刷新', exact: true }).waitFor();
+    await page.waitForFunction(() => [...document.querySelectorAll('[role="dialog"] button')].some(button => button.getAttribute('aria-label') === '刷新' && !button.disabled));
     assert.deepEqual(state.errors, []);
   } finally { release(); await page.close(); }
 });

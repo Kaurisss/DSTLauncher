@@ -34,16 +34,16 @@ const VIEWS = {
   logs: defineAsyncComponent(() => import('@/views/PlayerLogsView.vue')),
   backups: defineAsyncComponent(() => import('@/views/BackupsView.vue')),
   saves: defineAsyncComponent(() => import('@/views/SavesView.vue')),
-  config: defineAsyncComponent(() => import('@/views/ConfigView.vue')),
+
   settings: defineAsyncComponent(() => import('@/views/SettingsView.vue')),
 };
 
 /** 兜底：万一 activeTab 与 VIEWS 不一致，也不会渲染出空白页。 */
 const currentView = computed(() => VIEWS[ui.activeTab] || OverviewView);
-const cardScroll = computed(() => ['rooms', 'mods', 'world', 'logs', 'backups', 'saves', 'config'].includes(ui.activeTab));
+const cardScroll = computed(() => ['rooms', 'mods', 'world', 'logs', 'backups', 'saves'].includes(ui.activeTab));
 // 全局管理页保留草稿；房间业务页重建实例，隔离旧房间的异步响应和草稿。
-const viewKey = computed(() => ['rooms', 'saves', 'settings'].includes(ui.activeTab)
-  ? ui.activeTab : `${ui.activeTab}:${rooms.currentId}`);
+const viewKey = computed(() => ui.isGlobalTab ? ui.activeTab : `${ui.activeTab}:${rooms.currentId}`);
+
 
 const auth = useAuthStore();
 const ui = useUiStore();

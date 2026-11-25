@@ -11,6 +11,7 @@ import RoomAdmins from '@/components/rooms/RoomAdmins.vue';
 import RoomPlayerLists from '@/components/rooms/RoomPlayerLists.vue';
 import SaveUploadPanel from '@/components/rooms/SaveUploadPanel.vue';
 import RoomProfilesDialog from '@/components/rooms/RoomProfilesDialog.vue';
+import MigrationDialog from '@/components/backups/MigrationDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { guard, toast } from '@/lib/toast.js';
 import { confirmAction } from '@/lib/confirm.js';
@@ -105,6 +106,10 @@ async function onRemove(id) {
         @close="closeEditor"
         @saved="closeEditor"
       >
+        <div v-if="editingRoom" class="mt-2 grid gap-1 border-t pt-5">
+          <h3 class="text-xs font-semibold text-muted-foreground">管理员与准入名单（即时生效）</h3>
+          <p class="text-xs text-muted-foreground">以下增删操作立即写入房间文件，与上方表单「保存」按钮相互独立；也可以直接在「玩家管理」中维护当前房间的名单。</p>
+        </div>
         <RoomAdmins v-if="editingRoom" :key="editingRoom.id" :room="editingRoom" />
         <RoomPlayerLists v-if="editingRoom" :key="`lists-${editingRoom.id}`" :room="editingRoom" />
       </RoomEditor>
@@ -119,6 +124,7 @@ async function onRemove(id) {
         <Badge variant="secondary" class="whitespace-nowrap tabular-nums">共 {{ rooms.list.length }} 个房间</Badge>
         <template #actions>
           <RoomProfilesDialog @created="onProfileCreated" />
+          <MigrationDialog />
           <IconAction id="new-room-button" show-label="sm" icon="plus" label="新建房间" :disabled="preparing" @click="openEditor()" />
           <IconAction variant="outline" show-label="sm" icon="upload" label="上传存档" @click="openUpload()" />
           <IconAction variant="outline" icon="refresh" label="刷新" @click="reload" />

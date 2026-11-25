@@ -11,7 +11,6 @@ import UiEmpty from '@/components/ui/UiEmpty.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import IconAction from '@/components/ui/IconAction.vue';
 import BackupTable from '@/components/backups/BackupTable.vue';
-import MigrationDialog from '@/components/backups/MigrationDialog.vue';
 import BackupInspectionDialog from '@/components/backups/BackupInspectionDialog.vue';
 import RollbackDialog from '@/components/overview/RollbackDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -111,7 +110,6 @@ function exportSave(name) {
         <TooltipContent class="max-w-sm break-all">{{ backupDir }}</TooltipContent>
       </Tooltip>
       <template #actions>
-        <MigrationDialog />
         <RollbackDialog show-label="sm" />
         <IconAction show-label="sm" icon="archive" label="立即备份" :disabled="!rooms.current" @click="create" />
       </template>

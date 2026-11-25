@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import IconAction from '@/components/ui/IconAction.vue';
+import ConfigPreviewDialog from '@/components/config/ConfigPreviewDialog.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { diagnosticsApi } from '@/lib/api.js';
 import { shardLabel } from '@/lib/format.js';
@@ -44,9 +45,12 @@ async function refresh() {
         <DialogTitle>故障诊断</DialogTitle>
         <DialogDescription>检查当前配置、各分片最近 400 行日志及共享模组下载记录。日志问题可能来自此前的启动。</DialogDescription>
       </DialogHeader>
-      <div class="flex items-center justify-between gap-3 text-sm">
-        <span>{{ rooms.current?.name }}</span>
-        <IconAction icon="refresh" variant="outline" show-label :label="busy ? '诊断中…' : '重新诊断'" :disabled="busy" @click="refresh" />
+      <div class="flex flex-wrap items-center justify-between gap-2 text-sm">
+        <span class="min-w-0 truncate font-medium">{{ rooms.current?.name }}</span>
+        <div class="flex shrink-0 items-center gap-2">
+          <ConfigPreviewDialog show-label="sm" />
+          <IconAction icon="refresh" variant="outline" show-label :label="busy ? '诊断中…' : '重新诊断'" :disabled="busy" @click="refresh" />
+        </div>
       </div>
       <p v-if="error" role="alert" class="text-sm text-destructive">{{ error }}</p>
       <div v-else-if="busy && !report" role="status" aria-label="正在读取最近日志" class="grid gap-3">

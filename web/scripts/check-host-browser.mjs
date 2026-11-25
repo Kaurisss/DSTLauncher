@@ -52,6 +52,10 @@ test('登录限流后禁用提交并倒计时，刷新保留冷却，到期后�
         retryAfter = attempts === 2 ? 30 : 60;
         return route.fulfill({ status: 429, headers: { 'Retry-After': String(retryAfter) }, json: { code: 429, message: '密码错误次数过多' } });
       }
+      if (path === '/api/auth/logout') {
+        authenticated = false;
+        return ok({ ...status, authenticated: false });
+      }
       if (!authenticated) return route.fulfill({ status: 401, json: { code: 401, message: '请先登录面板' } });
       if (path === '/api/logs/stream') return route.fulfill({ contentType: 'text/event-stream', body: '' });
       return ok([]);
@@ -84,6 +88,10 @@ test('登录限流后禁用提交并倒计时，刷新保留冷却，到期后�
     await page.clock.fastForward(22000);
     await page.getByRole('button', { name: '登录', exact: true }).click();
     await page.getByRole('navigation', { name: '主导航', exact: true }).waitFor();
+    const logoutBtn = page.locator('header[data-slot="app-header"]').getByRole('button', { name: '退出登录', exact: true });
+    await logoutBtn.waitFor();
+    await logoutBtn.click();
+    await page.getByRole('textbox', { name: '面板访问密码' }).waitFor();
     assert.equal(attempts, 4);
     assert.deepEqual(errors, []);
   } finally { await page.close(); }
@@ -203,7 +211,7 @@ test('概览统一四项资源指标，服务器配置仅在设置页提供', as
     assert.equal(await page.getByText('更改服务器文件位置', { exact: true }).count(), 0);
     assert.equal(await page.getByRole('button', { name: '检查更新', exact: true }).count(), 0);
     const nav = page.locator('#app-navigation');
-    await nav.getByRole('button', { name: '设置', exact: true }).click();
+    await nav.getByRole('button', { name: '系统设置', exact: true }).click();
     await page.getByRole('button', { name: '文件与架构', exact: true }).click();
     await page.getByRole('heading', { name: '服务器文件与架构', exact: true }).waitFor();
     await page.getByText('更改服务器文件位置', { exact: true }).click();
@@ -216,9 +224,9 @@ test('概览统一四项资源指标，服务器配置仅在设置页提供', as
 });
 
 test('Unified App Shell：Header 横跨顶部，Sidebar 位于左侧无缝连接，主内容以圆角 Inset 嵌入并独立滚动', async () => {
-  const room = { id: 1, key: 'Cluster_1', name: 'Skr Wu的世界 单人 双穿', gameMode: 'survival', maxPlayers: 2, shards: [{ name: 'Master', isMaster: true }] };
-  const other = { ...room, id: 2, key: 'Cluster_2', name: '备用房间', gameMode: 'endless', maxPlayers: 6 };
-  const { page } = await openPanel({ room, roomList: [room, other], tab: 'config', width: 1440 });
+  const room = { id: 1, key: 'Cluster_1', name: 'Skr Wu的世界 单人 双穿', gameMode: 'survival', maxPlayers: 2, running: true, shards: [{ name: 'Master', isMaster: true }] };
+  const other = { ...room, id: 2, key: 'Cluster_2', name: '备用房间', gameMode: 'endless', maxPlayers: 6, running: false };
+  const { page } = await openPanel({ room, roomList: [room, other], tab: 'backups', width: 1440 });
   try {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const header = page.locator('header[data-slot="app-header"]');
@@ -242,8 +250,10 @@ test('Unified App Shell：Header 横跨顶部，Sidebar 位于左侧无缝连接
     assert.ok(mainBox.x >= sidebarBox.width);
     assert.ok(mainBox.y >= headerBox.height);
 
-    const title = header.getByRole('heading', { level: 1, name: '配置预览', exact: true });
-    assert.equal(await card.getByRole('heading', { name: '配置预览', exact: true }).count(), 0);
+    const title = header.getByRole('heading', { level: 1, name: '备份与回档', exact: true });
+    assert.equal(await card.getByRole('heading', { name: '备份与回档', exact: true }).count(), 0);
+    await sidebar.getByText('当前房间', { exact: true }).waitFor();
+    await sidebar.getByText('全局管理', { exact: true }).waitFor();
 
 
     const selector = header.getByRole('combobox', { name: '房间', exact: true });
@@ -253,11 +263,20 @@ test('Unified App Shell：Header 横跨顶部，Sidebar 位于左侧无缝连接
     assert.equal(await header.getByText('Cluster_1 生存 2人', { exact: true }).count(), 1);
 
     await selector.click();
+    assert.equal(await page.locator('[role="option"]').first().locator('[data-running="true"]').count(), 1);
+    assert.equal(await page.locator('[role="option"]').nth(1).locator('[data-running="false"]').count(), 1);
     await page.getByRole('option', { name: '备用房间', exact: true }).click();
     assert.match(await selector.innerText(), /备用房间/);
     assert.match(await selector.innerText(), /Cluster_2 无尽 6人/);
     assert.equal(await page.evaluate(() => localStorage.getItem('dst-room')), '2');
     assert.equal(await title.isVisible(), true, '换房不改变当前页面');
+
+    await sidebar.getByRole('button', { name: '房间管理', exact: true }).click();
+    await header.getByRole('heading', { level: 1, name: '房间管理', exact: true }).waitFor();
+    assert.equal(await header.getByRole('combobox', { name: '房间', exact: true }).count(), 0, '全局管理页隐藏房间选择器');
+    assert.equal(await header.getByText('全局', { exact: true }).count(), 1);
+    await sidebar.getByRole('button', { name: '备份与回档', exact: true }).click();
+    await title.waitFor();
 
     await page.screenshot({ path: fileURLToPath(new URL('../../.scratch/screenshots/layout-1440-light.png', import.meta.url)) });
     const lightText = await title.evaluate(el => window.getComputedStyle(el).color);
@@ -270,10 +289,10 @@ test('Unified App Shell：Header 横跨顶部，Sidebar 位于左侧无缝连接
 });
 test('手机主标题和长房间选择器不溢出，品牌在通顶抽屉内', async () => {
   const room = { id: 1, key: 'Cluster_1', name: 'Skr Wu的世界 单人 双穿 '.repeat(4), gameMode: 'survival', maxPlayers: 2, shards: [{ name: 'Master', isMaster: true }] };
-  const { page } = await openPanel({ room, width: 375, tab: 'config' });
+  const { page } = await openPanel({ room, width: 375, tab: 'backups' });
   try {
     const header = page.locator('header[data-slot="app-header"]');
-    assert.equal(await header.getByRole('heading', { level: 1, name: '配置预览', exact: true }).isVisible(), true);
+    assert.equal(await header.getByRole('heading', { level: 1, name: '备份与回档', exact: true }).isVisible(), true);
     assert.equal(await header.getByRole('button', { name: '切换主题', exact: true }).innerText(), '');
     assert.equal(await header.evaluate(el => el.scrollWidth <= el.clientWidth), true);
     assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth), true);
@@ -284,10 +303,10 @@ test('手机主标题和长房间选择器不溢出，品牌在通顶抽屉内',
     const drawer = page.locator('[data-mobile="true"]');
     await drawer.getByText('DST 开服控制台', { exact: true }).waitFor();
     assert.equal((await drawer.boundingBox()).y, 0);
-    await drawer.getByRole('button', { name: '房间', exact: true }).click();
+    await drawer.getByRole('button', { name: '房间管理', exact: true }).click();
     await drawer.waitFor({ state: 'hidden' });
-    await header.getByRole('heading', { level: 1, name: '房间', exact: true }).waitFor();
-    assert.equal(await header.getByRole('heading', { level: 1 }).innerText(), '房间');
+    await header.getByRole('heading', { level: 1, name: '房间管理', exact: true }).waitFor();
+    assert.equal(await header.getByRole('heading', { level: 1 }).innerText(), '房间管理');
     assert.equal(await page.locator('#new-room-button').isVisible(), true);
   } finally { await page.close(); }
 });
@@ -330,7 +349,7 @@ test('页面切换入场后内容可见，减少动态效果时停用动画', as
       });
     });
     const nav = page.locator('#app-navigation');
-    await nav.getByRole('button', { name: '房间', exact: true }).click();
+    await nav.getByRole('button', { name: '房间管理', exact: true }).click();
     await page.waitForFunction(() => window.pageEntries > 0);
     await nav.getByRole('button', { name: '概览', exact: true }).click();
     await page.getByRole('region', { name: '宿主机资源' }).waitFor();
@@ -342,7 +361,7 @@ test('页面切换入场后内容可见，减少动态效果时停用动画', as
     assert.equal(await content.evaluate(element => window.getComputedStyle(element).opacity), '1');
     assert.equal(await content.evaluate(element => window.getComputedStyle(element).transform), 'none');
     await page.emulateMedia({ reducedMotion: 'reduce' });
-    await nav.getByRole('button', { name: '房间', exact: true }).click();
+    await nav.getByRole('button', { name: '房间管理', exact: true }).click();
     await page.getByRole('region', { name: '宿主机资源' }).waitFor({ state: 'hidden' });
     assert.equal(await content.evaluate(element => window.getComputedStyle(element).animationName), 'none');
   } finally { await page.close(); }
@@ -404,7 +423,7 @@ test('移动端导航仍使用抽屉，选页后关闭且不平移正文', async
     await page.getByRole('button', { name: '切换导航', exact: true }).click();
     const drawer = page.locator('[data-mobile="true"]');
     await drawer.waitFor({ state: 'visible' });
-    await drawer.getByRole('button', { name: '房间', exact: true }).click();
+    await drawer.getByRole('button', { name: '房间管理', exact: true }).click();
     await drawer.waitFor({ state: 'hidden' });
     assert.equal(await page.locator('#page-content').evaluate(element => window.getComputedStyle(element).transform), 'none');
     assert.equal(await page.getByRole('button', { name: '切换导航', exact: true }).getAttribute('aria-expanded'), 'false');
@@ -452,7 +471,7 @@ test('轮询更新容量，请求失败清除旧值，恢复后清除错误，�
     await section.getByText(/4\.00 GB/).waitFor();
     await section.locator('.stat.is-warn', { hasText: '存档盘' }).waitFor();
     assert.doesNotMatch(await section.innerText(), /读取失败/);
-    await page.locator('#app-navigation').getByRole('button', { name: '房间', exact: true }).click();
+    await page.locator('#app-navigation').getByRole('button', { name: '房间管理', exact: true }).click();
     await section.waitFor({ state: 'hidden' });
     const count = state.requests;
     // Observe a full refresh interval to prove unmount actually stops polling.

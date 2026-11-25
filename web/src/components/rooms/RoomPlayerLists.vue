@@ -115,7 +115,7 @@ async function change(id, remove = false) {
 <template>
   <UiCard>
     <template #title>玩家准入名单</template>
-    <template #hint>名单属于当前编辑的房间「{{ room.name }}」，修改后需重启房间生效。</template>
+    <template #hint>名单属于房间「{{ room.name }}」，修改后需重启房间生效。</template>
     <template #actions>
       <IconAction variant="outline" icon="refresh" label="刷新名单" :disabled="loading || busy" @click="load" />
     </template>

@@ -14,6 +14,8 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
+import RoomAdmins from '@/components/rooms/RoomAdmins.vue';
+import RoomPlayerLists from '@/components/rooms/RoomPlayerLists.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { logApi, playerListApi } from '@/lib/api.js';
 import { confirmAction } from '@/lib/confirm.js';
@@ -22,6 +24,11 @@ import { playerLogRefresh } from '@/lib/playerLogRefresh.js';
 import { guard, toast } from '@/lib/toast.js';
 
 const rooms = useRoomsStore();
+const activeSection = ref('logs');
+const sections = [
+  { key: 'logs', label: '玩家日志' },
+  { key: 'lists', label: '管理员与准入名单' },
+];
 const shard = ref('');
 const kind = ref('all');
 const search = ref('');
@@ -280,200 +287,237 @@ async function blockPlayer(entry) {
 </script>
 
 <template>
-  <UiCard flush fill role="region" aria-label="聊天与进出记录" class="min-w-0" :aria-busy="loading">
-    <UiToolbar aria-label="玩家日志工具栏" layout-class="flex-nowrap">
-      <form class="flex min-w-0 flex-1 items-center gap-2" @submit.prevent="refresh">
-        <UiToolbarFilters v-slot="{ compact }" label="日志筛选" :active="kind !== 'all'">
-          <Select v-model="shard" :disabled="!shards.length">
-            <SelectTrigger id="chat_shard" aria-label="记录分片" :class="compact ? 'w-full' : 'w-24'" class="min-w-0 shrink-0 bg-background"><SelectValue placeholder="选择分片" /></SelectTrigger>
-            <SelectContent position="popper" align="start">
-              <SelectGroup>
-                <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ roomShardLabel(rooms.current, item) }}{{ item.disabled ? '（停用）' : '' }}</SelectItem>
-              </SelectGroup>
-            </SelectContent>
-          </Select>
-          <Select v-model="kind">
-            <SelectTrigger id="chat_kind" aria-label="记录类型" :class="compact ? 'w-full' : 'w-28'" class="min-w-0 shrink-0 bg-background"><SelectValue /></SelectTrigger>
-            <SelectContent position="popper" align="start">
-              <SelectGroup><SelectItem v-for="(label, key) in labels" :key="key" :value="key">{{ label }}</SelectItem></SelectGroup>
-            </SelectContent>
-          </Select>
-        </UiToolbarFilters>
-        <div class="relative min-w-0 flex-1 basis-64">
-          <Input id="chat_search" v-model="search" aria-label="搜索历史记录" class="bg-background pr-10" placeholder="昵称、ID、IP、角色或内容" maxlength="200" />
-          <IconAction type="button" variant="ghost" class="absolute end-0 top-1/2 -translate-y-1/2" icon="x" label="重置筛选" :disabled="kind === 'all' && !search" @click="resetFilters" />
-        </div>
-      </form>
-      <template #actions>
-        <IconAction :variant="selected.size ? 'destructive' : 'ghost'" show-label="lg" icon="trash" :label="`删除所选（${selected.size}）`" :disabled="!selected.size || deleting || !!blocking || loading" @click="removeEntries([...selected])" />
-        <IconAction variant="outline" icon="refresh" :icon-class="loading ? 'animate-spin motion-reduce:animate-none' : ''" label="刷新记录" :disabled="loading || !rooms.currentId || !shard" @click="refresh" />
-      </template>
-    </UiToolbar>
-
-    <div data-slot="page-scroll" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="玩家日志列表">
-      <p v-if="error" role="alert" class="break-words text-sm text-destructive">读取失败：{{ error }}</p>
-      <div v-else-if="loading && !result" role="status" aria-label="加载中" class="log-table-frame flex min-w-0 flex-auto shrink-0 flex-col overflow-hidden rounded-lg border">
-        <Table class="min-w-[1240px] table-fixed">
-          <TableHeader class="bg-muted/50">
-            <TableRow>
-              <TableHead scope="col" class="w-10 px-0"><div class="flex items-center justify-center"><Skeleton class="size-4" /></div></TableHead>
-              <TableHead scope="col" class="w-28">记录时间</TableHead>
-              <TableHead scope="col" class="w-32">玩家</TableHead>
-              <TableHead scope="col" class="w-40">Klei ID</TableHead>
-              <TableHead scope="col" class="w-16">角色</TableHead>
-              <TableHead scope="col" class="w-48">Steam ID</TableHead>
-              <TableHead scope="col" class="w-32">IP</TableHead>
-              <TableHead scope="col" class="w-20">事件</TableHead>
-              <TableHead scope="col">内容</TableHead>
-              <TableHead scope="col" class="w-20 pr-4 text-right">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow v-for="i in initialSkeletonRows" :key="i">
-              <TableCell class="px-0"><div class="flex items-center justify-center"><Skeleton class="size-4" /></div></TableCell>
-              <TableCell class="py-2"><div class="flex flex-col gap-1"><Skeleton class="h-3.5 w-20" /><Skeleton class="h-3.5 w-16" /></div></TableCell>
-              <TableCell><Skeleton class="h-4 w-20" /></TableCell>
-              <TableCell><Skeleton class="h-4 w-24" /></TableCell>
-              <TableCell><Skeleton class="size-9 rounded-md" /></TableCell>
-              <TableCell><Skeleton class="h-4 w-32" /></TableCell>
-              <TableCell><Skeleton class="h-4 w-24" /></TableCell>
-              <TableCell><Skeleton class="h-5 w-12 rounded-full" /></TableCell>
-              <TableCell><Skeleton class="h-4 w-3/4" /></TableCell>
-              <TableCell class="pr-4 text-right"><div class="flex justify-end"><Skeleton class="size-7 rounded-md" /></div></TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
+  <UiCard flush fill role="region" :aria-label="activeSection === 'logs' ? '聊天与进出记录' : '管理员与准入名单'" class="min-w-0" :aria-busy="activeSection === 'logs' && loading">
+    <div class="flex shrink-0 items-center justify-between gap-2 border-b bg-muted/20 px-[var(--panel-padding)] py-2">
+      <div role="tablist" aria-label="玩家管理标签" class="inline-flex items-center gap-1 rounded-lg bg-muted/70 p-0.5">
+        <button
+          v-for="item in sections"
+          :key="item.key"
+          type="button"
+          role="tab"
+          :aria-selected="activeSection === item.key"
+          class="rounded-md px-3 py-1 text-xs font-medium transition-colors"
+          :class="activeSection === item.key ? 'bg-background text-foreground shadow-xs' : 'text-muted-foreground hover:text-foreground'"
+          @click="activeSection = item.key"
+        >
+          {{ item.label }}
+        </button>
       </div>
-      <UiEmpty v-else-if="!rooms.current" text="请先选择房间" />
-      <UiEmpty v-else-if="!result?.exists" text="该分片还没有聊天日志，开服并产生聊天或进出记录后显示" />
-      <UiEmpty v-else-if="!entries.length && pendingSkeletonCount === 0" text="历史日志中没有匹配的记录" />
-      <div v-else class="log-table-frame flex min-w-0 flex-auto shrink-0 flex-col overflow-hidden rounded-lg border">
-        <Table class="min-w-[1240px] table-fixed" role="region" aria-label="日志表格，可横向滚动" tabindex="0">
-          <caption class="sr-only">游戏聊天记录</caption>
-          <TableHeader class="bg-muted/50">
-            <TableRow>
-              <TableHead scope="col" class="w-10 px-0">
-                <div class="flex items-center justify-center">
-                  <Checkbox aria-label="选择本页日志" :disabled="deleting || loading" :model-value="entries.length > 0 && selected.size === entries.length ? true : selected.size ? 'indeterminate' : false" @update:model-value="selected = $event ? new Set(entries.map(entry => entry.id)) : new Set()" />
-                </div>
-              </TableHead>
-              <TableHead scope="col" class="w-28">记录时间</TableHead>
-              <TableHead scope="col" class="w-32">玩家</TableHead>
-              <TableHead scope="col" class="w-40">Klei ID</TableHead>
-              <TableHead scope="col" class="w-16">角色</TableHead>
-              <TableHead scope="col" class="w-48">Steam ID</TableHead>
-              <TableHead scope="col" class="w-32">IP</TableHead>
-              <TableHead scope="col" class="w-20">事件</TableHead>
-              <TableHead scope="col">内容</TableHead>
-              <TableHead scope="col" class="w-20 pr-4 text-right">操作</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            <TableRow v-for="entry in entries" :key="entry.id">
-              <TableCell class="px-0">
-                <div class="flex items-center justify-center">
-                  <Checkbox :aria-label="`选择日志 ${entry.id}`" :disabled="deleting || loading" :model-value="selected.has(entry.id)" @update:model-value="selectEntry(entry.id, $event)" />
-                </div>
-              </TableCell>
-              <TableCell class="whitespace-normal py-2 font-mono text-xs text-muted-foreground tabular-nums">
-                <time v-if="entry.recordedAt" :datetime="entry.recordedAt" class="log-timestamp inline-flex flex-col whitespace-nowrap leading-4">
-                  <span v-for="(part, index) in recordedTimeParts(entry.recordedAt)" :key="index">{{ part }}</span>
-                </time>
-                <span v-else>运行时长 {{ entry.time }}</span>
-              </TableCell>
-              <TableCell class="whitespace-normal break-words [overflow-wrap:anywhere] font-medium">{{ entry.name || '—' }}</TableCell>
-              <TableCell>
-                <div v-if="entry.userid" class="flex min-w-0 items-center gap-1">
-                  <span class="min-w-0 break-all whitespace-normal font-mono text-xs">{{ entry.userid }}</span>
-                  <Tooltip>
-                    <TooltipTrigger as-child>
-                      <Button variant="ghost" size="icon-sm" class="shrink-0" :aria-label="`复制 Klei ID ${entry.userid}`" @click="copyId(entry.userid)">
-                        <PhCopy aria-hidden="true" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>复制 Klei ID</TooltipContent>
-                  </Tooltip>
-                </div>
-                <span v-else class="text-muted-foreground">—</span>
-              </TableCell>
-              <TableCell>
-                <Tooltip v-if="entry.prefab">
-                  <TooltipTrigger as-child>
-                    <img
-                      :src="`/character-avatars/${Object.hasOwn(CHARACTERS, entry.prefab) ? entry.prefab : 'unknown'}.png`"
-                      :alt="CHARACTERS[entry.prefab] || entry.prefab"
-                      width="36" height="36" tabindex="0" class="size-9 object-contain"
-                    />
-                  </TooltipTrigger>
-                  <TooltipContent>{{ CHARACTERS[entry.prefab] || entry.prefab }}</TooltipContent>
-                </Tooltip>
-                <span v-else class="text-muted-foreground">—</span>
-              </TableCell>
-              <TableCell>
-                <div v-if="entry.steamid" class="flex min-w-0 items-center gap-1">
-                  <a v-if="/^\d+$/.test(entry.steamid)" :href="`https://steamcommunity.com/profiles/${entry.steamid}`" target="_blank" rel="noopener noreferrer" class="break-all whitespace-normal font-mono text-xs text-emerald-700 underline underline-offset-2 dark:text-emerald-300 hover:text-foreground">{{ entry.steamid }}</a>
-                  <span v-else class="break-all whitespace-normal font-mono text-xs">{{ entry.steamid }}</span>
-                  <Button variant="ghost" size="icon-sm" class="shrink-0" :aria-label="`复制 Steam ID ${entry.steamid}`" @click="copyId(entry.steamid, 'Steam ID')"><PhCopy aria-hidden="true" /></Button>
-                </div>
-                <span v-else class="text-muted-foreground">—</span>
-              </TableCell>
-              <TableCell class="break-all whitespace-normal font-mono text-xs">{{ entry.ip || '—' }}</TableCell>
-              <TableCell><Badge variant="outline" :class="eventClasses[entry.kind]">{{ labels[entry.kind] || entry.kind }}</Badge></TableCell>
-              <TableCell class="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-5">{{ entry.message }}</TableCell>
-              <TableCell class="pr-4 text-right">
-                <IconAction
-                  v-if="/^KU_[A-Za-z0-9_-]{1,32}$/.test(entry.userid || '')" variant="destructive" icon="ban"
-                  :label="blocked.has(entry.userid) ? '已封禁' : blocking === entry.userid ? '处理中…' : '封禁'"
-                  :disabled="!!blocking || deleting || blocked.has(entry.userid)"
-                  @click="blockPlayer(entry)"
-                />
-              </TableCell>
-            </TableRow>
-            <TableRow v-for="n in pendingSkeletonCount" :key="`stream-skeleton-${n}`" role="status" aria-label="继续加载日志">
-              <TableCell class="px-0"><div class="flex items-center justify-center"><Skeleton class="size-4" /></div></TableCell>
-              <TableCell class="py-2"><div class="flex flex-col gap-1"><Skeleton class="h-3.5 w-20" /><Skeleton class="h-3.5 w-16" /></div></TableCell>
-              <TableCell><Skeleton class="h-4 w-20" /></TableCell>
-              <TableCell><Skeleton class="h-4 w-24" /></TableCell>
-              <TableCell><Skeleton class="size-9 rounded-md" /></TableCell>
-              <TableCell><Skeleton class="h-4 w-32" /></TableCell>
-              <TableCell><Skeleton class="h-4 w-24" /></TableCell>
-              <TableCell><Skeleton class="h-5 w-12 rounded-full" /></TableCell>
-              <TableCell><Skeleton class="h-4 w-3/4" /></TableCell>
-              <TableCell class="pr-4 text-right"><div class="flex justify-end"><Skeleton class="size-7 rounded-md" /></div></TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-      </div>
+      <span v-if="activeSection === 'lists' && rooms.current" class="hidden truncate text-xs text-muted-foreground sm:inline">
+        当前房间：{{ rooms.current.name }}（名单改动需重启生效）
+      </span>
     </div>
 
-    <nav
-      v-if="rooms.current"
-      aria-label="日志分页"
-      class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t bg-card px-[var(--panel-padding)] py-3 text-xs"
-    >
-      <p v-if="loading && !result" class="flex items-center">
-        <Skeleton class="h-4 w-32" />
-      </p>
-      <p v-else-if="total > 0" class="text-muted-foreground tabular-nums">
-        第 {{ start + 1 }}–{{ Math.min(start + size, total) }} 条，共 {{ total }} 条
-      </p>
-      <p v-else class="text-muted-foreground tabular-nums">共 0 条</p>
-      <div class="flex flex-wrap items-center gap-2">
-        <Select v-model="pageSize" :disabled="loading && !result">
-          <SelectTrigger class="w-28" aria-label="每页日志条数"><SelectValue /></SelectTrigger>
-          <SelectContent position="popper" align="end">
-            <SelectGroup><SelectItem v-for="count in [10, 15, 20, 50, 100]" :key="count" :value="String(count)">{{ count }} 条 / 页</SelectItem></SelectGroup>
-          </SelectContent>
-        </Select>
-        <Button variant="outline" size="icon-sm" aria-label="上一页" :disabled="loading || page === 1" @click="page--">
-          <PhCaretLeft aria-hidden="true" />
-        </Button>
-        <span class="min-w-16 text-center tabular-nums">第 {{ page }} / {{ pageCount }} 页</span>
-        <Button variant="outline" size="icon-sm" aria-label="下一页" :disabled="loading || page >= pageCount" @click="page++">
-          <PhCaretRight aria-hidden="true" />
-        </Button>
+    <template v-if="activeSection === 'logs'">
+      <UiToolbar aria-label="玩家日志工具栏" layout-class="flex-nowrap">
+        <form class="flex min-w-0 flex-1 items-center gap-2" @submit.prevent="refresh">
+          <UiToolbarFilters v-slot="{ compact }" label="日志筛选" :active="kind !== 'all'">
+            <Select v-model="shard" :disabled="!shards.length">
+              <SelectTrigger id="chat_shard" aria-label="记录分片" :class="compact ? 'w-full' : 'w-24'" class="min-w-0 shrink-0 bg-background"><SelectValue placeholder="选择分片" /></SelectTrigger>
+              <SelectContent position="popper" align="start">
+                <SelectGroup>
+                  <SelectItem v-for="item in shards" :key="item.name" :value="item.name">{{ roomShardLabel(rooms.current, item) }}{{ item.disabled ? '（停用）' : '' }}</SelectItem>
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Select v-model="kind">
+              <SelectTrigger id="chat_kind" aria-label="记录类型" :class="compact ? 'w-full' : 'w-28'" class="min-w-0 shrink-0 bg-background"><SelectValue /></SelectTrigger>
+              <SelectContent position="popper" align="start">
+                <SelectGroup><SelectItem v-for="(label, key) in labels" :key="key" :value="key">{{ label }}</SelectItem></SelectGroup>
+              </SelectContent>
+            </Select>
+          </UiToolbarFilters>
+          <div class="relative min-w-0 flex-1 basis-64">
+            <Input id="chat_search" v-model="search" aria-label="搜索历史记录" class="bg-background pr-10" placeholder="昵称、ID、IP、角色或内容" maxlength="200" />
+            <IconAction type="button" variant="ghost" class="absolute end-0 top-1/2 -translate-y-1/2" icon="x" label="重置筛选" :disabled="kind === 'all' && !search" @click="resetFilters" />
+          </div>
+        </form>
+        <template #actions>
+          <IconAction :variant="selected.size ? 'destructive' : 'ghost'" show-label="lg" icon="trash" :label="`删除所选（${selected.size}）`" :disabled="!selected.size || deleting || !!blocking || loading" @click="removeEntries([...selected])" />
+          <IconAction variant="outline" icon="refresh" :icon-class="loading ? 'animate-spin motion-reduce:animate-none' : ''" label="刷新记录" :disabled="loading || !rooms.currentId || !shard" @click="refresh" />
+        </template>
+      </UiToolbar>
+
+      <div data-slot="page-scroll" class="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="玩家日志列表">
+        <p v-if="error" role="alert" class="break-words text-sm text-destructive">读取失败：{{ error }}</p>
+        <div v-else-if="loading && !result" role="status" aria-label="加载中" class="log-table-frame flex min-w-0 flex-auto shrink-0 flex-col overflow-hidden rounded-lg border">
+          <Table class="min-w-[1240px] table-fixed">
+            <TableHeader class="bg-muted/50">
+              <TableRow>
+                <TableHead scope="col" class="w-10 px-0"><div class="flex items-center justify-center"><Skeleton class="size-4" /></div></TableHead>
+                <TableHead scope="col" class="w-28">记录时间</TableHead>
+                <TableHead scope="col" class="w-32">玩家</TableHead>
+                <TableHead scope="col" class="w-40">Klei ID</TableHead>
+                <TableHead scope="col" class="w-16">角色</TableHead>
+                <TableHead scope="col" class="w-48">Steam ID</TableHead>
+                <TableHead scope="col" class="w-32">IP</TableHead>
+                <TableHead scope="col" class="w-20">事件</TableHead>
+                <TableHead scope="col">内容</TableHead>
+                <TableHead scope="col" class="w-20 pr-4 text-right">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="i in initialSkeletonRows" :key="i">
+                <TableCell class="px-0"><div class="flex items-center justify-center"><Skeleton class="size-4" /></div></TableCell>
+                <TableCell class="py-2"><div class="flex flex-col gap-1"><Skeleton class="h-3.5 w-20" /><Skeleton class="h-3.5 w-16" /></div></TableCell>
+                <TableCell><Skeleton class="h-4 w-20" /></TableCell>
+                <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+                <TableCell><Skeleton class="size-9 rounded-md" /></TableCell>
+                <TableCell><Skeleton class="h-4 w-32" /></TableCell>
+                <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+                <TableCell><Skeleton class="h-5 w-12 rounded-full" /></TableCell>
+                <TableCell><Skeleton class="h-4 w-3/4" /></TableCell>
+                <TableCell class="pr-4 text-right"><div class="flex justify-end"><Skeleton class="size-7 rounded-md" /></div></TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
+        <UiEmpty v-else-if="!rooms.current" text="请先选择房间" />
+        <UiEmpty v-else-if="!result?.exists" text="该分片还没有聊天日志，开服并产生聊天或进出记录后显示" />
+        <UiEmpty v-else-if="!entries.length && pendingSkeletonCount === 0" text="历史日志中没有匹配的记录" />
+        <div v-else class="log-table-frame flex min-w-0 flex-auto shrink-0 flex-col overflow-hidden rounded-lg border">
+          <Table class="min-w-[1240px] table-fixed" role="region" aria-label="日志表格，可横向滚动" tabindex="0">
+            <caption class="sr-only">游戏聊天记录</caption>
+            <TableHeader class="bg-muted/50">
+              <TableRow>
+                <TableHead scope="col" class="w-10 px-0">
+                  <div class="flex items-center justify-center">
+                    <Checkbox aria-label="选择本页日志" :disabled="deleting || loading" :model-value="entries.length > 0 && selected.size === entries.length ? true : selected.size ? 'indeterminate' : false" @update:model-value="selected = $event ? new Set(entries.map(entry => entry.id)) : new Set()" />
+                  </div>
+                </TableHead>
+                <TableHead scope="col" class="w-28">记录时间</TableHead>
+                <TableHead scope="col" class="w-32">玩家</TableHead>
+                <TableHead scope="col" class="w-40">Klei ID</TableHead>
+                <TableHead scope="col" class="w-16">角色</TableHead>
+                <TableHead scope="col" class="w-48">Steam ID</TableHead>
+                <TableHead scope="col" class="w-32">IP</TableHead>
+                <TableHead scope="col" class="w-20">事件</TableHead>
+                <TableHead scope="col">内容</TableHead>
+                <TableHead scope="col" class="w-20 pr-4 text-right">操作</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow v-for="entry in entries" :key="entry.id">
+                <TableCell class="px-0">
+                  <div class="flex items-center justify-center">
+                    <Checkbox :aria-label="`选择日志 ${entry.id}`" :disabled="deleting || loading" :model-value="selected.has(entry.id)" @update:model-value="selectEntry(entry.id, $event)" />
+                  </div>
+                </TableCell>
+                <TableCell class="whitespace-normal py-2 font-mono text-xs text-muted-foreground tabular-nums">
+                  <time v-if="entry.recordedAt" :datetime="entry.recordedAt" class="log-timestamp inline-flex flex-col whitespace-nowrap leading-4">
+                    <span v-for="(part, index) in recordedTimeParts(entry.recordedAt)" :key="index">{{ part }}</span>
+                  </time>
+                  <span v-else>运行时长 {{ entry.time }}</span>
+                </TableCell>
+                <TableCell class="whitespace-normal break-words [overflow-wrap:anywhere] font-medium">{{ entry.name || '—' }}</TableCell>
+                <TableCell>
+                  <div v-if="entry.userid" class="flex min-w-0 items-center gap-1">
+                    <span class="min-w-0 break-all whitespace-normal font-mono text-xs">{{ entry.userid }}</span>
+                    <Tooltip>
+                      <TooltipTrigger as-child>
+                        <Button variant="ghost" size="icon-sm" class="shrink-0" :aria-label="`复制 Klei ID ${entry.userid}`" @click="copyId(entry.userid)">
+                          <PhCopy aria-hidden="true" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>复制 Klei ID</TooltipContent>
+                    </Tooltip>
+                  </div>
+                  <span v-else class="text-muted-foreground">—</span>
+                </TableCell>
+                <TableCell>
+                  <Tooltip v-if="entry.prefab">
+                    <TooltipTrigger as-child>
+                      <img
+                        :src="`/character-avatars/${Object.hasOwn(CHARACTERS, entry.prefab) ? entry.prefab : 'unknown'}.png`"
+                        :alt="CHARACTERS[entry.prefab] || entry.prefab"
+                        width="36" height="36" tabindex="0" class="size-9 object-contain"
+                      />
+                    </TooltipTrigger>
+                    <TooltipContent>{{ CHARACTERS[entry.prefab] || entry.prefab }}</TooltipContent>
+                  </Tooltip>
+                  <span v-else class="text-muted-foreground">—</span>
+                </TableCell>
+                <TableCell>
+                  <div v-if="entry.steamid" class="flex min-w-0 items-center gap-1">
+                    <a v-if="/^\d+$/.test(entry.steamid)" :href="`https://steamcommunity.com/profiles/${entry.steamid}`" target="_blank" rel="noopener noreferrer" class="break-all whitespace-normal font-mono text-xs text-emerald-700 underline underline-offset-2 dark:text-emerald-300 hover:text-foreground">{{ entry.steamid }}</a>
+                    <span v-else class="break-all whitespace-normal font-mono text-xs">{{ entry.steamid }}</span>
+                    <Button variant="ghost" size="icon-sm" class="shrink-0" :aria-label="`复制 Steam ID ${entry.steamid}`" @click="copyId(entry.steamid, 'Steam ID')"><PhCopy aria-hidden="true" /></Button>
+                  </div>
+                  <span v-else class="text-muted-foreground">—</span>
+                </TableCell>
+                <TableCell class="break-all whitespace-normal font-mono text-xs">{{ entry.ip || '—' }}</TableCell>
+                <TableCell><Badge variant="outline" :class="eventClasses[entry.kind]">{{ labels[entry.kind] || entry.kind }}</Badge></TableCell>
+                <TableCell class="whitespace-pre-wrap break-words [overflow-wrap:anywhere] leading-5">{{ entry.message }}</TableCell>
+                <TableCell class="pr-4 text-right">
+                  <IconAction
+                    v-if="/^KU_[A-Za-z0-9_-]{1,32}$/.test(entry.userid || '')" variant="destructive" icon="ban"
+                    :label="blocked.has(entry.userid) ? '已封禁' : blocking === entry.userid ? '处理中…' : '封禁'"
+                    :disabled="!!blocking || deleting || blocked.has(entry.userid)"
+                    @click="blockPlayer(entry)"
+                  />
+                </TableCell>
+              </TableRow>
+              <TableRow v-for="n in pendingSkeletonCount" :key="`stream-skeleton-${n}`" role="status" aria-label="继续加载日志">
+                <TableCell class="px-0"><div class="flex items-center justify-center"><Skeleton class="size-4" /></div></TableCell>
+                <TableCell class="py-2"><div class="flex flex-col gap-1"><Skeleton class="h-3.5 w-20" /><Skeleton class="h-3.5 w-16" /></div></TableCell>
+                <TableCell><Skeleton class="h-4 w-20" /></TableCell>
+                <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+                <TableCell><Skeleton class="size-9 rounded-md" /></TableCell>
+                <TableCell><Skeleton class="h-4 w-32" /></TableCell>
+                <TableCell><Skeleton class="h-4 w-24" /></TableCell>
+                <TableCell><Skeleton class="h-5 w-12 rounded-full" /></TableCell>
+                <TableCell><Skeleton class="h-4 w-3/4" /></TableCell>
+                <TableCell class="pr-4 text-right"><div class="flex justify-end"><Skeleton class="size-7 rounded-md" /></div></TableCell>
+              </TableRow>
+            </TableBody>
+          </Table>
+        </div>
       </div>
-    </nav>
+
+      <nav
+        v-if="rooms.current"
+        aria-label="日志分页"
+        class="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t bg-card px-[var(--panel-padding)] py-3 text-xs"
+      >
+        <p v-if="loading && !result" class="flex items-center">
+          <Skeleton class="h-4 w-32" />
+        </p>
+        <p v-else-if="total > 0" class="text-muted-foreground tabular-nums">
+          第 {{ start + 1 }}–{{ Math.min(start + size, total) }} 条，共 {{ total }} 条
+        </p>
+        <p v-else class="text-muted-foreground tabular-nums">共 0 条</p>
+        <div class="flex flex-wrap items-center gap-2">
+          <Select v-model="pageSize" :disabled="loading && !result">
+            <SelectTrigger class="w-28" aria-label="每页日志条数"><SelectValue /></SelectTrigger>
+            <SelectContent position="popper" align="end">
+              <SelectGroup><SelectItem v-for="count in [10, 15, 20, 50, 100]" :key="count" :value="String(count)">{{ count }} 条 / 页</SelectItem></SelectGroup>
+            </SelectContent>
+          </Select>
+          <Button variant="outline" size="icon-sm" aria-label="上一页" :disabled="loading || page === 1" @click="page--">
+            <PhCaretLeft aria-hidden="true" />
+          </Button>
+          <span class="min-w-16 text-center tabular-nums">第 {{ page }} / {{ pageCount }} 页</span>
+          <Button variant="outline" size="icon-sm" aria-label="下一页" :disabled="loading || page >= pageCount" @click="page++">
+            <PhCaretRight aria-hidden="true" />
+          </Button>
+        </div>
+      </nav>
+    </template>
+
+    <div
+      v-else
+      data-slot="page-scroll"
+      class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]"
+      tabindex="0"
+      role="region"
+      aria-label="管理员与准入名单"
+    >
+      <UiEmpty v-if="!rooms.current" text="请先在「房间管理」页新建一个房间" />
+      <div v-else class="grid items-start gap-4 lg:grid-cols-2">
+        <RoomAdmins :key="rooms.current.id" :room="rooms.current" />
+        <RoomPlayerLists :key="`lists-${rooms.current.id}`" :room="rooms.current" />
+      </div>
+    </div>
   </UiCard>
 </template>
 

@@ -2,12 +2,12 @@
 import { onMounted } from 'vue';
 import iconUrl from '@/assets/icon.png';
 import {
-  PhArchive, PhChatCircle, PhCode, PhFolder, PhGear, PhGlobe, PhPackage, PhSquaresFour, PhStack,
+  PhArchive, PhFolder, PhGear, PhGlobe, PhPackage, PhSquaresFour, PhStack, PhUsers,
 } from '@phosphor-icons/vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
-  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarTrigger,
+  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent, SidebarGroupLabel,
+  SidebarMenu, SidebarMenuButton, SidebarMenuItem, SidebarHeader, SidebarSeparator, SidebarTrigger,
   useSidebar,
 } from '@/components/ui/sidebar';
 import { useUiStore } from '@/stores/ui.js';
@@ -19,7 +19,7 @@ const system = useSystemStore();
 const { setOpenMobile } = useSidebar();
 const icons = {
   dashboard: PhSquaresFour, server: PhStack, globe: PhGlobe,
-  package: PhPackage, message: PhChatCircle, archive: PhArchive, folder: PhFolder, fileCode: PhCode,
+  package: PhPackage, users: PhUsers, archive: PhArchive, folder: PhFolder,
   settings: PhGear,
 };
 onMounted(() => guard(() => system.refresh()));
@@ -47,26 +47,30 @@ function navigate(key) {
       </div>
     </SidebarHeader>
     <SidebarContent>
-      <SidebarGroup class="group-data-[collapsible=icon]:pt-0">
-        <SidebarGroupContent>
-          <nav id="app-navigation" aria-label="主导航">
-            <SidebarMenu>
-              <SidebarMenuItem v-for="tab in ui.tabs" :key="tab.key">
-                <SidebarMenuButton
-                  class="transition-colors"
-                  :is-active="ui.activeTab === tab.key"
-                  :aria-current="ui.activeTab === tab.key ? 'page' : undefined"
-                  :tooltip="tab.label"
-                  @click="navigate(tab.key)"
-                >
-                  <component :is="icons[tab.icon]" aria-hidden="true" />
-                  <span>{{ tab.label }}</span>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </nav>
-        </SidebarGroupContent>
-      </SidebarGroup>
+      <nav id="app-navigation" aria-label="主导航" class="flex flex-1 flex-col">
+        <template v-for="(group, index) in ui.navGroups" :key="group.key">
+          <SidebarSeparator v-if="index > 0" class="my-1" />
+          <SidebarGroup :class="index === 0 ? 'group-data-[collapsible=icon]:pt-0' : 'pt-1 group-data-[collapsible=icon]:pt-1'">
+            <SidebarGroupLabel class="whitespace-nowrap overflow-hidden group-data-[collapsible=icon]:hidden">{{ group.label }}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem v-for="tab in group.items" :key="tab.key">
+                  <SidebarMenuButton
+                    class="transition-colors"
+                    :is-active="ui.activeTab === tab.key"
+                    :aria-current="ui.activeTab === tab.key ? 'page' : undefined"
+                    :tooltip="tab.label"
+                    @click="navigate(tab.key)"
+                  >
+                    <component :is="icons[tab.icon]" aria-hidden="true" />
+                    <span>{{ tab.label }}</span>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </template>
+      </nav>
     </SidebarContent>
   </Sidebar>
 </template>

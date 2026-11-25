@@ -65,7 +65,7 @@ async function openPage(tab, width = 1280) {
 }
 
 test('完整迁移可导出下载，清除临时包后上传预览，默认保留本机计划', async () => {
-  const { page, state } = await openPage('backups');
+  const { page, state } = await openPage('rooms');
   try {
     await page.getByRole('button', { name: '完整迁移', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '完整迁移', exact: true });
@@ -86,7 +86,7 @@ test('完整迁移可导出下载，清除临时包后上传预览，默认保�
 });
 
 test('手机迁移预览不溢出，取消确认不导入，勾选维护计划后明确提交', async () => {
-  const { page, state } = await openPage('backups', 375);
+  const { page, state } = await openPage('rooms', 375);
   try {
     await page.getByRole('button', { name: '完整迁移', exact: true }).click();
     const dialog = page.getByRole('dialog', { name: '完整迁移', exact: true });
