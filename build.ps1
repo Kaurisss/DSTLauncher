@@ -1,7 +1,3 @@
-param(
-    [switch]$Desktop
-)
-
 $ErrorActionPreference = 'Stop'
 
 Push-Location $PSScriptRoot
@@ -18,27 +14,12 @@ try {
         throw "Frontend build failed (exit $LASTEXITCODE)."
     }
 
-    $output = 'dst-windows.exe'
-    $buildArgs = @('build')
-    if ($Desktop) {
-        $targetOS = & go env GOOS
-        if ($targetOS -ne 'windows') {
-            throw 'Desktop builds require GOOS=windows.'
-        }
-        & go generate -tags desktop ./internal/desktopresources
-        if ($LASTEXITCODE -ne 0) {
-            throw "Desktop resource generation failed (exit $LASTEXITCODE)."
-        }
-        $output = 'dst-desktop.exe'
-        $buildArgs += @('-tags', 'desktop', '-ldflags', '-H=windowsgui')
-    }
-    $buildArgs += @('-o', $output, '.')
-    & go @buildArgs
+    & go build -o dst-windows.exe .
     if ($LASTEXITCODE -ne 0) {
         throw "Go build failed (exit $LASTEXITCODE)."
     }
 
-    Write-Host "Built: $(Join-Path $PSScriptRoot $output)"
+    Write-Host "Built: $(Join-Path $PSScriptRoot 'dst-windows.exe')"
 } finally {
     Pop-Location
 }

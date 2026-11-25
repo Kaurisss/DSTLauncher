@@ -312,9 +312,9 @@ func main() {
 		close(stopped)
 	}()
 
-	windowErr := runPanelWindow(panelURL(listener.Addr()), workDir, stopped)
+	<-stopped
 	fmt.Println("\n正在安全关闭…")
-	// 窗口关闭与系统信号共用同一条停服路径，等待全部分片保存并退出。
+	// 收到退出信号后等待全部分片保存并退出。
 	mgr.BeginShutdown()
 	_ = steam.Cancel()
 	api.CancelBackupChecks()
@@ -331,25 +331,9 @@ func main() {
 	stopPlayerLogs()
 	stopNotifications()
 	fmt.Println("已安全退出")
-	if windowErr != nil {
-		log.Fatalf("桌面窗口启动失败: %v", windowErr)
-	}
 	if err := <-serveErr; err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatalf("面板服务失败: %v", err)
 	}
-}
-
-func panelURL(addr net.Addr) string {
-	tcp := addr.(*net.TCPAddr)
-	host := tcp.IP.String()
-	if tcp.IP.IsUnspecified() {
-		if tcp.IP.To4() != nil {
-			host = "127.0.0.1"
-		} else {
-			host = "::1"
-		}
-	}
-	return "http://" + net.JoinHostPort(host, fmt.Sprint(tcp.Port))
 }
 
 // hintBindError 对 Windows 下端口绑定失败给出针对性提示。
