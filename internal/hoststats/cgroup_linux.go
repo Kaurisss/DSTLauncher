@@ -67,7 +67,7 @@ func containerMemory(membership, mounts string, read func(string) ([]byte, error
 				relative = "."
 				err = nil
 			}
-			if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) || !filepath.IsAbs(mount) {
+			if err != nil || !filepath.IsLocal(relative) || !filepath.IsAbs(mount) {
 				continue
 			}
 			dir := filepath.Join(mount, relative)

@@ -49,6 +49,15 @@ func (m *Manager) extractPlatformArchive(ctx context.Context, archivePath, desti
 	}
 	defer compressed.Close()
 
+	if err := os.MkdirAll(destination, 0755); err != nil {
+		return fmt.Errorf("创建 SteamCMD 解压目录失败: %w", err)
+	}
+	root, err := os.OpenRoot(destination)
+	if err != nil {
+		return fmt.Errorf("打开 SteamCMD 解压目录失败: %w", err)
+	}
+	defer root.Close()
+
 	archive := tar.NewReader(compressed)
 	for {
 		if err := ctx.Err(); err != nil {
@@ -61,20 +70,28 @@ func (m *Manager) extractPlatformArchive(ctx context.Context, archivePath, desti
 		if err != nil {
 			return fmt.Errorf("读取 SteamCMD tar 压缩包失败: %w", err)
 		}
-		target, err := safeArchiveTarget(destination, header.Name)
+		clean, err := safeArchiveEntry(header.Name)
 		if err != nil {
 			return err
 		}
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if err := os.MkdirAll(target, os.FileMode(header.Mode)); err != nil {
+			if clean == "." {
+				continue
+			}
+			if err := root.MkdirAll(clean, os.FileMode(header.Mode)); err != nil {
 				return err
 			}
 		case tar.TypeReg, tar.TypeRegA:
-			if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-				return err
+			if clean == "." {
+				return fmt.Errorf("SteamCMD 压缩包包含非法路径: %s", header.Name)
 			}
-			out, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
+			if dir := filepath.Dir(clean); dir != "." {
+				if err := root.MkdirAll(dir, 0755); err != nil {
+					return err
+				}
+			}
+			out, err := root.OpenFile(clean, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.FileMode(header.Mode))
 			if err != nil {
 				return err
 			}
@@ -92,13 +109,12 @@ func (m *Manager) extractPlatformArchive(ctx context.Context, archivePath, desti
 	}
 }
 
-func safeArchiveTarget(destination, name string) (string, error) {
-	target := filepath.Join(destination, name)
-	rel, err := filepath.Rel(destination, target)
-	if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+func safeArchiveEntry(name string) (string, error) {
+	local := filepath.FromSlash(strings.ReplaceAll(name, "\\", "/"))
+	if !filepath.IsLocal(local) {
 		return "", fmt.Errorf("SteamCMD 压缩包包含非法路径: %s", name)
 	}
-	return target, nil
+	return filepath.Clean(local), nil
 }
 
 func serverPaths(root, arch string) (serverDir, executable string) {

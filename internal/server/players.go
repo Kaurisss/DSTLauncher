@@ -1,6 +1,7 @@
 package server
 
 import (
+	"cmp"
 	"context"
 	"crypto/rand"
 	_ "embed"
@@ -8,7 +9,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -82,9 +83,7 @@ func (m *Manager) Players(ctx context.Context, clusterKey string) (PlayerList, e
 		if !running || !p.playersReady.Load() {
 			continue
 		}
-		wg.Add(1)
-		go func(shard string) {
-			defer wg.Done()
+		wg.Go(func() {
 			reply, err := m.playerRequest(ctx, clusterKey, PlayerAction{Shard: shard, Action: "list"})
 			mu.Lock()
 			defer mu.Unlock()
@@ -96,15 +95,14 @@ func (m *Manager) Players(ctx context.Context, clusterKey string) (PlayerList, e
 				player.Shard = shard
 				result.Players = append(result.Players, player)
 			}
-		}(shard)
+		})
 	}
 	wg.Wait()
-	sort.Slice(result.Players, func(i, j int) bool {
-		a, b := result.Players[i], result.Players[j]
-		if a.Shard != b.Shard {
-			return a.Shard < b.Shard
-		}
-		return a.UserID < b.UserID
+	slices.SortFunc(result.Players, func(a, b Player) int {
+		return cmp.Or(
+			cmp.Compare(a.Shard, b.Shard),
+			cmp.Compare(a.UserID, b.UserID),
+		)
 	})
 	// Parallel snapshots may catch one player on both sides of a migration.
 	seen := make(map[string]bool, len(result.Players))

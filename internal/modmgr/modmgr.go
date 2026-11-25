@@ -12,10 +12,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/fs"
+	"maps"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -340,11 +341,7 @@ func (o *Overrides) String() string {
 
 		if cfg, ok := o.Config[id]; ok && len(cfg) > 0 {
 			sb.WriteString(",\n        configuration_options = {\n")
-			keys := make([]string, 0, len(cfg))
-			for k := range cfg {
-				keys = append(keys, k)
-			}
-			sort.Strings(keys) // 稳定输出，便于 diff 与版本管理
+			keys := slices.Sorted(maps.Keys(cfg)) // 稳定输出，便于 diff 与版本管理
 			for j, k := range keys {
 				comma := ","
 				if j == len(keys)-1 {
@@ -525,7 +522,7 @@ func (o *Overrides) EnabledWorkshopIDs() []string {
 		}
 		ids = append(ids, strings.TrimPrefix(id, "workshop-"))
 	}
-	sort.Strings(ids)
+	slices.Sort(ids)
 	return ids
 }
 
@@ -547,11 +544,7 @@ func (m *Manager) EnabledWorkshopIDs() ([]string, error) {
 			seen[id] = true
 		}
 	}
-	ids := make([]string, 0, len(seen))
-	for id := range seen {
-		ids = append(ids, id)
-	}
-	sort.Strings(ids)
+	ids := slices.Sorted(maps.Keys(seen))
 	return ids, nil
 }
 
@@ -567,7 +560,7 @@ func (m *Manager) WriteSetupLua(ids []string) error {
 		return nil
 	}
 	sorted := append([]string(nil), ids...)
-	sort.Strings(sorted)
+	slices.Sort(sorted)
 
 	var sb strings.Builder
 	sb.WriteString("-- 由 dst-windows 自动生成，请勿手工编辑\n")
@@ -909,7 +902,7 @@ func extractModInfoName(text string) string {
 		text = text[:a] + text[b+1:]
 	}
 
-	for _, line := range strings.Split(text, "\n") {
+	for line := range strings.SplitSeq(text, "\n") {
 		line = strings.TrimSpace(line)
 		// 整行注释直接跳过：不少 mod 在注释里给出台名写法示例
 		if line == "" || strings.HasPrefix(line, "--") {

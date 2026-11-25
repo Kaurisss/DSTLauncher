@@ -369,7 +369,7 @@ func loadHistory(path string) (*historyState, error) {
 }
 
 func resolveShardDir(clusterDir, shard string) (string, error) {
-	if shard == "" || shard == "." || shard == ".." || strings.ContainsAny(shard, "/\\") {
+	if !filepath.IsLocal(shard) || shard == "." || strings.ContainsAny(shard, "/\\") {
 		return "", fmt.Errorf("分片名无效")
 	}
 	base, err := filepath.EvalSymlinks(clusterDir)
@@ -387,7 +387,7 @@ func resolveShardDir(clusterDir, shard string) (string, error) {
 		return "", err
 	}
 	relative, err := filepath.Rel(base, dir)
-	if err != nil || relative == ".." || strings.HasPrefix(relative, ".."+string(filepath.Separator)) {
+	if err != nil || !filepath.IsLocal(relative) {
 		return "", fmt.Errorf("分片日志路径超出当前房间")
 	}
 	return dir, nil

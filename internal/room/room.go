@@ -11,7 +11,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -551,7 +551,7 @@ func (r *Room) ConflictPorts(others []*Room, excludeID int) []int {
 		add(s.AuthenticationPort)
 	}
 	add(r.MasterPort)
-	sort.Ints(out)
+	slices.Sort(out)
 	return out
 }
 
@@ -588,19 +588,29 @@ func defaultShards() []Shard {
 }
 
 // RandomKey 生成 n 位随机字符串，用作 cluster_key。
-// 使用 crypto/rand 而非 math/rand：这是分片间的认证密钥。
+// 使用 crypto/rand 拒绝采样（丢弃 >= 248 的字节）消除取模偏差：这是分片间的认证密钥。
 func RandomKey(n int) string {
 	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	const limit = 256 - 256%len(charset)
 	buf := make([]byte, n)
-	if _, err := rand.Read(buf); err != nil {
-		// 极端情况下退化为固定值，至少保证配置可用
-		for i := range buf {
-			buf[i] = charset[i%len(charset)]
+	var raw [64]byte
+	for i := 0; i < n; {
+		if _, err := rand.Read(raw[:]); err != nil {
+			// 极端情况下退化为固定值，至少保证配置可用
+			for ; i < n; i++ {
+				buf[i] = charset[i%len(charset)]
+			}
+			return string(buf)
 		}
-		return string(buf)
-	}
-	for i := range buf {
-		buf[i] = charset[int(buf[i])%len(charset)]
+		for _, b := range raw {
+			if int(b) < limit {
+				buf[i] = charset[int(b)%len(charset)]
+				i++
+				if i == n {
+					break
+				}
+			}
+		}
 	}
 	return string(buf)
 }

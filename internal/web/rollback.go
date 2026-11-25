@@ -10,11 +10,6 @@ import (
 )
 
 func (s *Server) handleRollback(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	// Unlike read-only endpoints, never default a destructive operation to the first room.
 	if query(r, "room") == "" {
 		respond(w, 200, nil, fmt.Errorf("请明确指定要回档的房间"))

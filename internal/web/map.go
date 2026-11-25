@@ -9,10 +9,6 @@ import (
 )
 
 func (s *Server) handleMap(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(405)
-		return
-	}
 	w.Header().Set("Cache-Control", "no-store")
 	rm, err := s.roomByID(r)
 	if err != nil {

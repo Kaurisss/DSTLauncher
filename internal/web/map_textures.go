@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 
 	"dst-windows/internal/modmgr"
@@ -235,15 +235,11 @@ func (s *Server) availableMapTextures(data *worldsettings.SavedMap) []string {
 			available = append(available, key)
 		}
 	}
-	sort.Strings(available)
+	slices.Sort(available)
 	return available
 }
 
 func (s *Server) handleMapTexture(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	tile := query(r, "tile")
 	if !validMapTileKey.MatchString(tile) {
 		http.NotFound(w, r)

@@ -2,16 +2,18 @@
 package web
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"net/http"
 	"net/url"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -145,111 +147,125 @@ func respond(w http.ResponseWriter, code int, data interface{}, err error) {
 
 // Handler 构建路由。
 func (s *Server) Handler() http.Handler {
-	mux := http.NewServeMux()
+	apiMux := http.NewServeMux()
 
+	// 面板登录与密码配置
+	apiMux.HandleFunc("/api/auth/status", s.handleAuthStatus)
+	apiMux.HandleFunc("/api/auth/login", s.handleAuthLogin)
+	apiMux.HandleFunc("/api/auth/logout", s.handleAuthLogout)
+	apiMux.HandleFunc("/api/auth/password", s.handleAuthPassword)
+
+	// 房间（配置的唯一事实来源）
+	apiMux.HandleFunc("/api/rooms", s.handleRooms)
+	apiMux.HandleFunc("PUT /api/rooms/connect", s.handleRoomConnect)
+	apiMux.HandleFunc("/api/rooms/meta", s.handleRoomMeta)
+	apiMux.HandleFunc("POST /api/rooms/copy", s.handleProfileApply)
+	apiMux.HandleFunc("GET /api/network/public-ip", s.handlePublicIP)
+	apiMux.HandleFunc("GET /api/profiles", s.handleProfiles)
+	apiMux.HandleFunc("POST /api/profiles", s.handleProfiles)
+	apiMux.HandleFunc("DELETE /api/profiles", s.handleProfiles)
+	apiMux.HandleFunc("POST /api/migration/export", s.handleMigrationExport)
+	apiMux.HandleFunc("POST /api/migration/upload", s.handleMigrationUpload)
+	apiMux.HandleFunc("POST /api/migration/apply", s.handleMigrationApply)
+	apiMux.HandleFunc("GET /api/migration/job", s.handleMigrationJob)
+	apiMux.HandleFunc("DELETE /api/migration/job", s.handleMigrationJob)
+	apiMux.HandleFunc("GET /api/migration/download", s.handleMigrationDownload)
+	apiMux.HandleFunc("GET /api/map", s.handleMap)
+	apiMux.HandleFunc("GET /api/map/texture", s.handleMapTexture)
+	apiMux.HandleFunc("GET /api/map/icon", s.handleMapIcon)
+	apiMux.HandleFunc("POST /api/profiles/import", s.handleProfileImport)
+	apiMux.HandleFunc("POST /api/profiles/apply", s.handleProfileApply)
+	apiMux.HandleFunc("GET /api/diagnostics", s.handleDiagnostics)
+	apiMux.HandleFunc("GET /api/notifications", s.handleNotifications)
+	apiMux.HandleFunc("PUT /api/notifications", s.handleNotifications)
+	apiMux.HandleFunc("POST /api/notifications/test", s.handleNotificationTest)
+
+	// 房间管理员（adminlist.txt）
+	apiMux.HandleFunc("/api/admins", s.handleAdmins)
+	apiMux.HandleFunc("GET /api/player-lists", s.handlePlayerLists)
+	apiMux.HandleFunc("POST /api/player-lists", s.handlePlayerLists)
+	apiMux.HandleFunc("DELETE /api/player-lists", s.handlePlayerLists)
+
+	// 在线玩家与结构化管理操作
+	apiMux.HandleFunc("GET /api/players", s.handlePlayers)
+	apiMux.HandleFunc("POST /api/players/action", s.handlePlayerAction)
+
+	// 宿主机资源（独立于房间和分片进程）
+	apiMux.HandleFunc("GET /api/host", s.handleHostStats)
+	apiMux.HandleFunc("GET /api/automation", s.handleAutomation)
+	apiMux.HandleFunc("PUT /api/automation", s.handleAutomation)
+	apiMux.HandleFunc("GET /api/worldstate", s.handleWorldState)
+
+	// 进程控制
+	apiMux.HandleFunc("/api/status", s.handleStatus)
+	apiMux.HandleFunc("/api/start", s.handleStart)
+	apiMux.HandleFunc("/api/stop", s.handleStop)
+	apiMux.HandleFunc("/api/restart", s.handleRestart)
+	apiMux.HandleFunc("POST /api/rollback", s.handleRollback)
+	apiMux.HandleFunc("/api/cmd", s.handleCmd)
+	apiMux.HandleFunc("POST /api/quick-action", s.handleQuickAction)
+
+	// 日志
+	apiMux.HandleFunc("/api/logs", s.handleLogs)
+	apiMux.HandleFunc("/api/logs/stream", s.handleLogStream)
+	apiMux.HandleFunc("GET /api/chat-log", s.handleChatLog)
+	apiMux.HandleFunc("DELETE /api/chat-log", s.handleChatLog)
+
+	// 模组
+	apiMux.HandleFunc("/api/mods", s.handleMods)
+	apiMux.HandleFunc("GET /api/mods/icon", s.handleModIcon)
+	apiMux.HandleFunc("/api/mods/toggle", s.handleModToggle)
+	apiMux.HandleFunc("/api/mods/config", s.handleModConfig)
+	apiMux.HandleFunc("/api/mods/schema", s.handleModSchema)
+	apiMux.HandleFunc("/api/mods/delete", s.handleModDelete)
+	apiMux.HandleFunc("/api/mods/update", s.handleModsUpdate)
+	apiMux.HandleFunc("/api/mods/updates", s.handleModUpdates)
+
+	// 创意工坊（搜索 / 详情 / API Key 设置）
+	apiMux.HandleFunc("/api/workshop/details", s.handleWorkshopDetails)
+	apiMux.HandleFunc("/api/workshop/search", s.handleWorkshopSearch)
+	apiMux.HandleFunc("/api/workshop/key", s.handleWorkshopKey)
+
+	// 世界配置（worldgenoverride.lua）
+	apiMux.HandleFunc("/api/worldconfig", s.handleWorldConfig)
+
+	// 备份
+	apiMux.HandleFunc("/api/backups", s.handleBackups)
+	apiMux.HandleFunc("/api/backups/create", s.handleBackupCreate)
+	apiMux.HandleFunc("GET /api/backups/check", s.handleBackupCheck)
+	apiMux.HandleFunc("POST /api/backups/check", s.handleBackupCheck)
+	apiMux.HandleFunc("DELETE /api/backups/check", s.handleBackupCheck)
+	apiMux.HandleFunc("GET /api/backups/check/map", s.handleBackupCheckMap)
+	apiMux.HandleFunc("GET /api/backup-remote", s.handleBackupRemote)
+	apiMux.HandleFunc("PUT /api/backup-remote", s.handleBackupRemote)
+	apiMux.HandleFunc("POST /api/backup-remote/test", s.handleBackupRemoteTest)
+	apiMux.HandleFunc("POST /api/backup-remote/sync", s.handleBackupRemoteSync)
+	apiMux.HandleFunc("/api/backups/delete", s.handleBackupDelete)
+	apiMux.HandleFunc("GET /api/backups/restore", s.handleBackupRestore)
+	apiMux.HandleFunc("POST /api/backups/restore", s.handleCheckedRestore)
+	apiMux.HandleFunc("/api/backups/download", s.handleBackupDownload)
+
+	// 存档上传（外部存档整包 -> 房间）
+	apiMux.HandleFunc("/api/saves/upload", s.handleSaveUpload)
+
+	// 存档管理（磁盘上的集群目录盘点 / 清理）
+	apiMux.HandleFunc("/api/saves", s.handleSaveArchives)
+
+	// 生成结果预览
+	apiMux.HandleFunc("/api/config", s.handleConfig)
+
+	// SteamCMD 安装
+	apiMux.HandleFunc("/api/install", s.handleInstall)
+	apiMux.HandleFunc("/api/install/update", s.handleUpdate)
+
+	// 服务器文件位置（可在面板里切换安装目录与架构）
+	apiMux.HandleFunc("/api/server", s.handleServer)
+
+	mux := http.NewServeMux()
 	// 健康检查：供容器编排/反向代理探活。只要面板进程在跑、路由能响应就算健康，
 	// 不以「游戏是否已安装/是否有分片在跑」为失败条件——那会让未安装时容器被误判为不健康。
 	mux.HandleFunc("/healthz", s.handleHealth)
-
-	// 面板登录与密码配置
-	mux.HandleFunc("/api/auth/status", s.handleAuthStatus)
-	mux.HandleFunc("/api/auth/login", s.handleAuthLogin)
-	mux.HandleFunc("/api/auth/logout", s.handleAuthLogout)
-	mux.HandleFunc("/api/auth/password", s.handleAuthPassword)
-
-	// 房间（配置的唯一事实来源）
-	mux.HandleFunc("/api/rooms", s.handleRooms)
-	mux.HandleFunc("/api/rooms/connect", s.handleRoomConnect)
-	mux.HandleFunc("/api/rooms/meta", s.handleRoomMeta)
-	mux.HandleFunc("/api/rooms/copy", s.handleProfileApply)
-	mux.HandleFunc("/api/network/public-ip", s.handlePublicIP)
-	mux.HandleFunc("/api/profiles", s.handleProfiles)
-	mux.HandleFunc("/api/migration/export", s.handleMigrationExport)
-	mux.HandleFunc("/api/migration/upload", s.handleMigrationUpload)
-	mux.HandleFunc("/api/migration/apply", s.handleMigrationApply)
-	mux.HandleFunc("/api/migration/job", s.handleMigrationJob)
-	mux.HandleFunc("/api/migration/download", s.handleMigrationDownload)
-	mux.HandleFunc("/api/map", s.handleMap)
-	mux.HandleFunc("/api/map/texture", s.handleMapTexture)
-	mux.HandleFunc("/api/map/icon", s.handleMapIcon)
-	mux.HandleFunc("/api/profiles/import", s.handleProfileImport)
-	mux.HandleFunc("/api/profiles/apply", s.handleProfileApply)
-	mux.HandleFunc("/api/diagnostics", s.handleDiagnostics)
-	mux.HandleFunc("/api/notifications", s.handleNotifications)
-	mux.HandleFunc("/api/notifications/test", s.handleNotificationTest)
-
-	// 房间管理员（adminlist.txt）
-	mux.HandleFunc("/api/admins", s.handleAdmins)
-	mux.HandleFunc("/api/player-lists", s.handlePlayerLists)
-
-	// 在线玩家与结构化管理操作
-	mux.HandleFunc("/api/players", s.handlePlayers)
-	mux.HandleFunc("/api/players/action", s.handlePlayerAction)
-
-	// 宿主机资源（独立于房间和分片进程）
-	mux.HandleFunc("/api/host", s.handleHostStats)
-	mux.HandleFunc("/api/automation", s.handleAutomation)
-	mux.HandleFunc("/api/worldstate", s.handleWorldState)
-
-	// 进程控制
-	mux.HandleFunc("/api/status", s.handleStatus)
-	mux.HandleFunc("/api/start", s.handleStart)
-	mux.HandleFunc("/api/stop", s.handleStop)
-	mux.HandleFunc("/api/restart", s.handleRestart)
-	mux.HandleFunc("/api/rollback", s.handleRollback)
-	mux.HandleFunc("/api/cmd", s.handleCmd)
-	mux.HandleFunc("/api/quick-action", s.handleQuickAction)
-
-	// 日志
-	mux.HandleFunc("/api/logs", s.handleLogs)
-	mux.HandleFunc("/api/logs/stream", s.handleLogStream)
-	mux.HandleFunc("/api/chat-log", s.handleChatLog)
-
-	// 模组
-	mux.HandleFunc("/api/mods", s.handleMods)
-	mux.HandleFunc("/api/mods/icon", s.handleModIcon)
-	mux.HandleFunc("/api/mods/toggle", s.handleModToggle)
-	mux.HandleFunc("/api/mods/config", s.handleModConfig)
-	mux.HandleFunc("/api/mods/schema", s.handleModSchema)
-	mux.HandleFunc("/api/mods/delete", s.handleModDelete)
-	mux.HandleFunc("/api/mods/update", s.handleModsUpdate)
-	mux.HandleFunc("/api/mods/updates", s.handleModUpdates)
-
-	// 创意工坊（搜索 / 详情 / API Key 设置）
-	mux.HandleFunc("/api/workshop/details", s.handleWorkshopDetails)
-	mux.HandleFunc("/api/workshop/search", s.handleWorkshopSearch)
-	mux.HandleFunc("/api/workshop/key", s.handleWorkshopKey)
-
-	// 世界配置（worldgenoverride.lua）
-	mux.HandleFunc("/api/worldconfig", s.handleWorldConfig)
-
-	// 备份
-	mux.HandleFunc("/api/backups", s.handleBackups)
-	mux.HandleFunc("/api/backups/create", s.handleBackupCreate)
-	mux.HandleFunc("/api/backups/check", s.handleBackupCheck)
-	mux.HandleFunc("/api/backups/check/map", s.handleBackupCheckMap)
-	mux.HandleFunc("/api/backup-remote", s.handleBackupRemote)
-	mux.HandleFunc("/api/backup-remote/test", s.handleBackupRemoteTest)
-	mux.HandleFunc("/api/backup-remote/sync", s.handleBackupRemoteSync)
-	mux.HandleFunc("/api/backups/delete", s.handleBackupDelete)
-	mux.HandleFunc("/api/backups/restore", s.handleBackupRestore)
-	mux.HandleFunc("/api/backups/download", s.handleBackupDownload)
-
-	// 存档上传（外部存档整包 -> 房间）
-	mux.HandleFunc("/api/saves/upload", s.handleSaveUpload)
-
-	// 存档管理（磁盘上的集群目录盘点 / 清理）
-	mux.HandleFunc("/api/saves", s.handleSaveArchives)
-
-	// 生成结果预览
-	mux.HandleFunc("/api/config", s.handleConfig)
-
-	// SteamCMD 安装
-	mux.HandleFunc("/api/install", s.handleInstall)
-	mux.HandleFunc("/api/install/update", s.handleUpdate)
-
-	// 服务器文件位置（可在面板里切换安装目录与架构）
-	mux.HandleFunc("/api/server", s.handleServer)
+	mux.Handle("/api/", apiMux)
 
 	// 静态资源。index.html 必须禁缓存：前端产物带 hash 文件名，
 	// 浏览器缓存了旧 index.html 就会继续加载旧 bundle，
@@ -991,7 +1007,7 @@ func (s *Server) handleModUpdates(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// 最近更新的排前面：最可能是客户端点名的那个
-	sort.Slice(updates, func(i, j int) bool { return updates[i].RemoteTime > updates[j].RemoteTime })
+	slices.SortFunc(updates, func(a, b modUpdateView) int { return cmp.Compare(b.RemoteTime, a.RemoteTime) })
 
 	respond(w, 200, map[string]interface{}{
 		"checked":      len(ids),
@@ -1125,12 +1141,7 @@ func (s *Server) MissingModIDs() ([]string, error) {
 			seen[id] = true
 		}
 	}
-	out := make([]string, 0, len(seen))
-	for id := range seen {
-		out = append(out, id)
-	}
-	sort.Strings(out)
-	return out, nil
+	return slices.Sorted(maps.Keys(seen)), nil
 }
 
 // syncModsSetup 重写安装级的 dedicated_server_mods_setup.lua。
@@ -1213,7 +1224,7 @@ func (s *Server) handleMods(w http.ResponseWriter, r *http.Request) {
 			extra = append(extra, id)
 		}
 	}
-	sort.Strings(extra)
+	slices.Sort(extra)
 	candidates = append(candidates, extra...)
 
 	inspect := func(id string) *modmgr.Mod {
@@ -1259,9 +1270,7 @@ func (s *Server) handleMods(w http.ResponseWriter, r *http.Request) {
 
 		var wg sync.WaitGroup
 		for range workers {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				for idx := range jobs {
 					if wctx.Err() != nil {
 						return
@@ -1273,7 +1282,7 @@ func (s *Server) handleMods(w http.ResponseWriter, r *http.Request) {
 						return
 					}
 				}
-			}()
+			})
 		}
 
 		go func() {
@@ -1559,14 +1568,6 @@ func (s *Server) handleBackupDelete(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleBackupRestore(w http.ResponseWriter, r *http.Request) {
-	if r.Method == http.MethodPost {
-		s.handleCheckedRestore(w, r)
-		return
-	}
-	if r.Method != http.MethodGet {
-		w.WriteHeader(405)
-		return
-	}
 	s.taskMu.Lock()
 	defer s.taskMu.Unlock()
 	s.backupMu.Lock()
@@ -2403,7 +2404,7 @@ func (s *Server) handleConfig(w http.ResponseWriter, r *http.Request) {
 		})
 	}
 	// 按路径排序，保证前端每次展示顺序一致
-	sort.Slice(out, func(i, j int) bool { return out[i].Path < out[j].Path })
+	slices.SortFunc(out, func(a, b fileView) int { return cmp.Compare(a.Path, b.Path) })
 
 	respond(w, 200, map[string]interface{}{
 		"clusterDir": rm.ClusterDir(s.rootDir, s.confDir),

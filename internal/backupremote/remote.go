@@ -118,7 +118,7 @@ func (e *Engine) validate(c Config) error {
 			if err != nil {
 				continue
 			}
-			if rel == "." || rel != ".." && !strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+			if filepath.IsLocal(rel) {
 				return fmt.Errorf("异地目录须与面板存档目录分开，不能互相包含")
 			}
 		}
@@ -178,9 +178,7 @@ func (e *Engine) Snapshot() Snapshot {
 	return Snapshot{Config: c, PasswordSet: set, Results: append([]Result{}, e.results...), Namespace: e.saved.Namespace}
 }
 func (e *Engine) Start() func() {
-	e.wg.Add(1)
-	go func() {
-		defer e.wg.Done()
+	e.wg.Go(func() {
 		for {
 			select {
 			case <-e.ctx.Done():
@@ -202,7 +200,7 @@ func (e *Engine) Start() func() {
 				e.finish(item.result, err)
 			}
 		}
-	}()
+	})
 	return func() { e.mu.Lock(); e.closed = true; e.cancel(); e.mu.Unlock(); e.wg.Wait() }
 }
 func (e *Engine) setState(id, state, message string) {

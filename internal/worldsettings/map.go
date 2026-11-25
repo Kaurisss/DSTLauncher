@@ -2,17 +2,19 @@ package worldsettings
 
 import (
 	"bytes"
+	"cmp"
 	"compress/zlib"
 	"encoding/base64"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"io/fs"
+	"maps"
 	"math"
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -268,7 +270,7 @@ func parseSavedMap(text string) (*SavedMap, error) {
 		for id, name := range names {
 			specs = append(specs, MapTileSpec{id, name})
 		}
-		sort.Slice(specs, func(i, j int) bool { return specs[i].ID < specs[j].ID })
+		slices.SortFunc(specs, func(a, b MapTileSpec) int { return cmp.Compare(a.ID, b.ID) })
 		result.Terrain = &MapTerrain{Tiles: base64.StdEncoding.EncodeToString(bytes), Specs: specs}
 		result.Kind = "terrain"
 	}
@@ -422,11 +424,7 @@ func pairLinkedLandmarks(landmarks []MapLandmark, kind, label string) {
 			indices[point.recordID] = i
 		}
 	}
-	var ids []int64
-	for id := range indices {
-		ids = append(ids, id)
-	}
-	sort.Slice(ids, func(i, j int) bool { return ids[i] < ids[j] })
+	ids := slices.Sorted(maps.Keys(indices))
 	pair := 0
 	for _, id := range ids {
 		i := indices[id]

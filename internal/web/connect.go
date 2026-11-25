@@ -107,11 +107,6 @@ func (s *Server) probePublicIP(ctx context.Context) publicIPState {
 // handlePublicIP 返回自动探测到的公网 IP（带 10 分钟缓存，?refresh=1 强制重新探测）。
 func (s *Server) handlePublicIP(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", http.MethodGet)
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	refresh := query(r, "refresh") == "1"
 
 	s.publicIPMu.Lock()
@@ -140,11 +135,6 @@ func (s *Server) handlePublicIP(w http.ResponseWriter, r *http.Request) {
 // handleRoomConnect 更新单个房间的自定义直连地址与端口，无需重启游戏进程。
 func (s *Server) handleRoomConnect(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	if r.Method != http.MethodPut {
-		w.Header().Set("Allow", http.MethodPut)
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	rm, err := s.roomByID(r)
 	if err != nil {
 		respond(w, 200, nil, err)

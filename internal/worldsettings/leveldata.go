@@ -1,10 +1,11 @@
 package worldsettings
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"dst-windows/internal/config"
@@ -87,7 +88,7 @@ func (l *LevelData) WithOverrides(updates map[string]string) (string, error) {
 		}
 		names = append(names, name)
 	}
-	sort.Strings(names)
+	slices.Sort(names)
 	type patch struct {
 		start, end int
 		text       string
@@ -139,7 +140,7 @@ func (l *LevelData) WithOverrides(updates map[string]string) (string, error) {
 		}
 		patches = append(patches, patch{table.close, table.close, additions.String()})
 	}
-	sort.SliceStable(patches, func(i, j int) bool { return patches[i].start < patches[j].start })
+	slices.SortStableFunc(patches, func(a, b patch) int { return cmp.Compare(a.start, b.start) })
 	var out strings.Builder
 	at := 0
 	for _, p := range patches {

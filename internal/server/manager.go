@@ -10,13 +10,15 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"cmp"
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -602,7 +604,7 @@ func (m *Manager) RunningShards() []string {
 			out = append(out, p.cluster.Key()+"/"+p.shard)
 		}
 	}
-	sort.Strings(out)
+	slices.Sort(out)
 	return out
 }
 
@@ -747,11 +749,7 @@ func (m *Manager) Stop(clusterKey string, timeout time.Duration) error {
 	}
 	m.mu.RUnlock()
 
-	shards := make([]string, 0, len(names))
-	for n := range names {
-		shards = append(shards, n)
-	}
-	sort.Strings(shards)
+	shards := slices.Sorted(maps.Keys(names))
 
 	var firstErr error
 	for _, shard := range shards {
@@ -949,11 +947,11 @@ func (m *Manager) Status(clusterKey string) []Status {
 		out = append(out, st)
 	}
 	// 按集群、分片排序，保证前端每次拿到的顺序一致
-	sort.Slice(out, func(i, j int) bool {
-		if out[i].ClusterID != out[j].ClusterID {
-			return out[i].ClusterID < out[j].ClusterID
-		}
-		return out[i].Shard < out[j].Shard
+	slices.SortFunc(out, func(a, b Status) int {
+		return cmp.Or(
+			cmp.Compare(a.ClusterID, b.ClusterID),
+			cmp.Compare(a.Shard, b.Shard),
+		)
 	})
 	return out
 }

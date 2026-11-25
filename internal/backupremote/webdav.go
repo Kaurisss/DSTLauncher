@@ -1,6 +1,7 @@
 package backupremote
 
 import (
+	"cmp"
 	"context"
 	"encoding/xml"
 	"fmt"
@@ -9,7 +10,7 @@ import (
 	"net/url"
 	"os"
 	"path"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -179,7 +180,7 @@ func (e *Engine) pruneDAV(ctx context.Context, c Config, dir string, room int, c
 			seen[name] = true
 		}
 	}
-	sort.Slice(names, func(i, j int) bool { return backupOrder(names[i]) > backupOrder(names[j]) })
+	slices.SortFunc(names, func(a, b string) int { return cmp.Compare(backupOrder(b), backupOrder(a)) })
 	retained := 1
 	for _, name := range names {
 		if name == current {

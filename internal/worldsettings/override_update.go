@@ -1,9 +1,11 @@
 package worldsettings
 
 import (
+	"cmp"
 	"fmt"
+	"maps"
 	"os"
-	"sort"
+	"slices"
 	"strings"
 
 	"dst-windows/internal/config"
@@ -103,11 +105,7 @@ func UpdateFile(clusterDir, shard string, o *Override) error {
 				return err
 			}
 		} else {
-			names := make([]string, 0, len(updates))
-			for name := range updates {
-				names = append(names, name)
-			}
-			sort.Strings(names)
+			names := slices.Sorted(maps.Keys(updates))
 			var table strings.Builder
 			table.WriteByte('{')
 			for _, name := range names {
@@ -162,11 +160,7 @@ func patchLiteralFields(src string, table *levelTable, changes map[string]string
 		}
 	}
 	if len(missing) > 0 {
-		names := make([]string, 0, len(missing))
-		for name := range missing {
-			names = append(names, name)
-		}
-		sort.Strings(names)
+		names := slices.Sorted(maps.Keys(missing))
 		if n := len(table.fields); n > 0 && !table.fields[n-1].separated {
 			end := table.fields[n-1].value.end
 			patches = append(patches, patch{end, end, ","})
@@ -177,7 +171,7 @@ func patchLiteralFields(src string, table *levelTable, changes map[string]string
 		}
 		patches = append(patches, patch{table.close, table.close, added.String()})
 	}
-	sort.SliceStable(patches, func(i, j int) bool { return patches[i].start < patches[j].start })
+	slices.SortStableFunc(patches, func(a, b patch) int { return cmp.Compare(a.start, b.start) })
 	var out strings.Builder
 	at := 0
 	for _, p := range patches {

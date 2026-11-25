@@ -44,7 +44,7 @@ func ReadPlayerList(clusterDir, kind string) ([]string, error) {
 func normalizePlayerList(content string) []string {
 	result := []string{}
 	seen := map[string]bool{}
-	for _, line := range strings.Split(strings.TrimPrefix(content, "\uFEFF"), "\n") {
+	for line := range strings.SplitSeq(strings.TrimPrefix(content, "\uFEFF"), "\n") {
 		id := NormalizeKleiID(line)
 		key := strings.ToLower(id)
 		if ValidKleiID(id) && !seen[key] {

@@ -535,29 +535,46 @@ func (m *Manager) extractZip(ctx context.Context, zipPath, destination string) e
 	}
 	defer archive.Close()
 
+	if err := os.MkdirAll(destination, 0755); err != nil {
+		return fmt.Errorf("创建 SteamCMD 解压目录失败: %w", err)
+	}
+	root, err := os.OpenRoot(destination)
+	if err != nil {
+		return fmt.Errorf("打开 SteamCMD 解压目录失败: %w", err)
+	}
+	defer root.Close()
+
 	for _, entry := range archive.File {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
-		target := filepath.Join(destination, entry.Name)
-		rel, err := filepath.Rel(destination, target)
-		if err != nil || rel == ".." || strings.HasPrefix(rel, ".."+string(os.PathSeparator)) {
+		name := filepath.FromSlash(strings.ReplaceAll(entry.Name, "\\", "/"))
+		if !filepath.IsLocal(name) {
 			return fmt.Errorf("SteamCMD 压缩包包含非法路径: %s", entry.Name)
 		}
+		clean := filepath.Clean(name)
 		if entry.FileInfo().IsDir() {
-			if err := os.MkdirAll(target, 0755); err != nil {
+			if clean == "." {
+				continue
+			}
+			if err := root.MkdirAll(clean, 0755); err != nil {
 				return err
 			}
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-			return err
+		if clean == "." {
+			return fmt.Errorf("SteamCMD 压缩包包含非法路径: %s", entry.Name)
+		}
+		if dir := filepath.Dir(clean); dir != "." {
+			if err := root.MkdirAll(dir, 0755); err != nil {
+				return err
+			}
 		}
 		src, err := entry.Open()
 		if err != nil {
 			return err
 		}
-		dst, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, entry.Mode())
+		dst, err := root.OpenFile(clean, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, entry.Mode())
 		if err == nil {
 			_, err = io.Copy(dst, src)
 			closeErr := dst.Close()

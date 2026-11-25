@@ -9,10 +9,5 @@ import (
 
 func (s *Server) handleHostStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", http.MethodGet)
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	respond(w, 200, hoststats.Read(filepath.Join(s.rootDir, s.confDir)), nil)
 }

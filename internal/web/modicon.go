@@ -11,11 +11,6 @@ import (
 )
 
 func (s *Server) handleModIcon(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet && r.Method != http.MethodHead {
-		w.Header().Set("Allow", "GET, HEAD")
-		http.Error(w, "不支持的方法", http.StatusMethodNotAllowed)
-		return
-	}
 	rm, err := s.roomByID(r)
 	if err != nil {
 		http.NotFound(w, r)

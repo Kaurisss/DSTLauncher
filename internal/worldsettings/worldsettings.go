@@ -13,10 +13,11 @@
 package worldsettings
 
 import (
+	"cmp"
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 )
@@ -210,14 +211,12 @@ func Groups(location, category string) []Group {
 			out = append(out, filtered)
 		}
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].Category != out[j].Category {
-			return out[i].Category < out[j].Category
-		}
-		if out[i].Order != out[j].Order {
-			return out[i].Order < out[j].Order
-		}
-		return out[i].ID < out[j].ID
+	slices.SortStableFunc(out, func(a, b Group) int {
+		return cmp.Or(
+			cmp.Compare(a.Category, b.Category),
+			cmp.Compare(a.Order, b.Order),
+			cmp.Compare(a.ID, b.ID),
+		)
 	})
 	return out
 }

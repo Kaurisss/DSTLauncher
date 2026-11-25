@@ -37,7 +37,7 @@ func parseLegacyOverride(content string) *Override {
 	}
 	if loc := legacyBlockRe.FindStringIndex(content); loc != nil {
 		if body, ok := extractBraces(content, loc[1]-1); ok {
-			for _, line := range strings.Split(body, "\n") {
+			for line := range strings.SplitSeq(body, "\n") {
 				if m := legacyItemRe.FindStringSubmatch(strings.TrimSpace(stripLuaComment(line))); m != nil {
 					name := m[1]
 					if name == "" {

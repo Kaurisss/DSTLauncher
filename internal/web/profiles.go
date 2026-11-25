@@ -77,8 +77,6 @@ func (s *Server) handleProfiles(w http.ResponseWriter, r *http.Request) {
 		s.profileMu.Lock()
 		defer s.profileMu.Unlock()
 		respond(w, 200, nil, store.Delete(query(r, "id")))
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
 
@@ -94,10 +92,6 @@ func (s *Server) captureProfile(id int, name string) (*roomprofile.Profile, erro
 }
 
 func (s *Server) handleProfileImport(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	var p roomprofile.Profile
 	if err := readJSON(w, r, &p, roomprofile.MaxSize); err != nil {
 		respond(w, 200, nil, err)
@@ -110,10 +104,6 @@ func (s *Server) handleProfileImport(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleProfileApply(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	var in struct {
 		ID   string `json:"id"`
 		Room int    `json:"room"`

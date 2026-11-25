@@ -175,46 +175,58 @@ func Extract(zipPath, dstDir string) error {
 	if err := os.MkdirAll(absDst, 0755); err != nil {
 		return fmt.Errorf("创建解压目录失败: %w", err)
 	}
+	root, err := os.OpenRoot(absDst)
+	if err != nil {
+		return fmt.Errorf("打开解压目录失败: %w", err)
+	}
+	defer root.Close()
 
 	for _, f := range rc.File {
-		name := filepath.FromSlash(f.Name)
+		name := filepath.FromSlash(strings.ReplaceAll(f.Name, "\\", "/"))
 		if name == "" {
 			continue
 		}
-		target := filepath.Join(absDst, name)
-		// 校验解压目标仍在目标目录内
-		if target != absDst && !strings.HasPrefix(target, absDst+string(os.PathSeparator)) {
+		if !filepath.IsLocal(name) {
 			return fmt.Errorf("压缩包中存在非法路径: %s", f.Name)
 		}
+		clean := filepath.Clean(name)
 		if isJunkPath(f.Name) {
 			continue
 		}
 
 		if f.FileInfo().IsDir() {
-			if err := os.MkdirAll(target, 0755); err != nil {
+			if clean == "." {
+				continue
+			}
+			if err := root.MkdirAll(clean, 0755); err != nil {
 				return err
 			}
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(target), 0755); err != nil {
-			return err
+		if clean == "." {
+			return fmt.Errorf("压缩包中存在非法路径: %s", f.Name)
 		}
-		if err := writeZipEntry(f, target); err != nil {
+		if dir := filepath.Dir(clean); dir != "." {
+			if err := root.MkdirAll(dir, 0755); err != nil {
+				return err
+			}
+		}
+		if err := writeZipEntry(root, f, clean); err != nil {
 			return fmt.Errorf("解压 %s 失败: %w", f.Name, err)
 		}
 	}
 	return nil
 }
 
-// writeZipEntry 把一个压缩包条目写到 target。
-func writeZipEntry(f *zip.File, target string) error {
+// writeZipEntry 把一个压缩包条目写到 root 内的 target。
+func writeZipEntry(root *os.Root, f *zip.File, target string) error {
 	src, err := f.Open()
 	if err != nil {
 		return err
 	}
 	defer src.Close()
 
-	dst, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	dst, err := root.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
@@ -227,7 +239,7 @@ func writeZipEntry(f *zip.File, target string) error {
 
 // isJunkPath 判断条目路径里是否含应当忽略的段。
 func isJunkPath(name string) bool {
-	for _, seg := range strings.Split(filepath.ToSlash(name), "/") {
+	for seg := range strings.SplitSeq(filepath.ToSlash(name), "/") {
 		if seg == "" || seg == "." {
 			continue
 		}

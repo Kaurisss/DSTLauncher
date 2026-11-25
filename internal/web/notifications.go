@@ -102,16 +102,10 @@ func (s *Server) handleNotifications(w http.ResponseWriter, r *http.Request) {
 		}
 		err := s.notifications.Configure(notify.Config{Enabled: in.Enabled, URL: in.URL, Events: in.Events, Rooms: in.Rooms}, in.Secret)
 		respond(w, 200, s.notifications.Snapshot(), err)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
 
 func (s *Server) handleNotificationTest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	if s.notificationErr != nil {
 		respond(w, 200, nil, s.notificationErr)
 		return

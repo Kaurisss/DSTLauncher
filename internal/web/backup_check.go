@@ -91,10 +91,6 @@ func (s *Server) handleBackupCheck(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, j, nil)
 		return
 	}
-	if r.Method != http.MethodPost {
-		w.WriteHeader(405)
-		return
-	}
 	rm, err := s.roomByID(r)
 	if err != nil {
 		respond(w, 200, nil, err)
@@ -156,17 +152,14 @@ func (s *Server) handleBackupCheck(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, nil, err)
 		return
 	}
-	ctx, cancel := context.WithCancel(m.ctx)
-	j := &backupCheck{ID: rand.Text(), Room: rm.ID, Name: in.Name, State: "checking", dir: dir, payload: filepath.Join(dir, "world", s.confDir, config.ClusterName(rm.ID)), created: time.Now(), cancel: cancel}
-	m.items[j.ID] = j
-	m.wg.Add(1)
-	m.mu.Unlock()
-	names := []string{}
+	names := make([]string, 0, len(rm.Shards))
 	for _, shard := range rm.Shards {
 		names = append(names, shard.Name)
 	}
-	go func() {
-		defer m.wg.Done()
+	ctx, cancel := context.WithCancel(m.ctx)
+	j := &backupCheck{ID: rand.Text(), Room: rm.ID, Name: in.Name, State: "checking", dir: dir, payload: filepath.Join(dir, "world", s.confDir, config.ClusterName(rm.ID)), created: time.Now(), cancel: cancel}
+	m.items[j.ID] = j
+	m.wg.Go(func() {
 		defer cancel()
 		s.backupMu.Lock()
 		report, err := s.bakFor(rm).Stage(ctx, in.Name, j.payload, names, func(d, t int) { m.mu.Lock(); j.Done, j.Total = d, t; m.mu.Unlock() })
@@ -184,14 +177,11 @@ func (s *Server) handleBackupCheck(w http.ResponseWriter, r *http.Request) {
 		} else {
 			j.State, j.Report = "ready", report
 		}
-	}()
+	})
+	m.mu.Unlock()
 	respond(w, 200, map[string]string{"id": j.ID}, nil)
 }
 func (s *Server) handleBackupCheckMap(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(405)
-		return
-	}
 	w.Header().Set("Cache-Control", "no-store")
 	m := s.backupChecks
 	m.mu.Lock()
@@ -250,10 +240,7 @@ func (s *Server) handleCheckedRestore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	j.State = "restoring"
-	m.wg.Add(1)
-	m.mu.Unlock()
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		s.maintenanceMu.Lock()
 		defer s.maintenanceMu.Unlock()
 		s.taskMu.Lock()
@@ -286,6 +273,7 @@ func (s *Server) handleCheckedRestore(w http.ResponseWriter, r *http.Request) {
 		} else {
 			j.State, j.PreviousDirectory = "restored", previous
 		}
-	}()
+	})
+	m.mu.Unlock()
 	respond(w, 200, map[string]string{"id": in.ID}, nil)
 }

@@ -45,15 +45,9 @@ func (s *Server) handleBackupRemote(w http.ResponseWriter, r *http.Request) {
 		}
 		err := s.backupRemote.Configure(backupremote.Config{Enabled: in.Enabled, Kind: in.Kind, Directory: in.Directory, URL: in.URL, Username: in.Username, Keep: in.Keep}, in.Password)
 		respond(w, 200, s.backupRemote.Snapshot(), err)
-	default:
-		w.WriteHeader(405)
 	}
 }
 func (s *Server) handleBackupRemoteTest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(405)
-		return
-	}
 	if s.backupRemoteErr != nil {
 		respond(w, 200, nil, s.backupRemoteErr)
 		return
@@ -61,10 +55,6 @@ func (s *Server) handleBackupRemoteTest(w http.ResponseWriter, r *http.Request) 
 	respond(w, 200, nil, s.backupRemote.Test(r.Context()))
 }
 func (s *Server) handleBackupRemoteSync(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(405)
-		return
-	}
 	if s.backupRemoteErr != nil {
 		respond(w, 200, nil, s.backupRemoteErr)
 		return

@@ -46,11 +46,6 @@ func (s *Server) collectPlayerLogs() {
 
 func (s *Server) handleChatLog(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	if r.Method != http.MethodGet && r.Method != http.MethodDelete {
-		w.Header().Set("Allow", "GET, DELETE")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	if query(r, "room") == "" {
 		respond(w, 200, nil, fmt.Errorf("请明确指定聊天记录所属房间"))
 		return

@@ -7,9 +7,10 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"maps"
 	"net/http"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -73,8 +74,6 @@ func (s *Server) handleAutomation(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		respond(w, 200, s.automation.Snapshot(), nil)
-	default:
-		w.WriteHeader(http.StatusMethodNotAllowed)
 	}
 }
 
@@ -101,10 +100,6 @@ func (s *Server) guardMaintenance(next http.Handler) http.Handler {
 }
 
 func (s *Server) handleWorldState(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	w.Header().Set("Cache-Control", "no-store")
 	rm, err := s.roomByID(r)
 	if err != nil {
@@ -368,11 +363,7 @@ func (s *Server) pendingMods(rooms []*room.Room) ([]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	list := make([]string, 0, len(ids))
-	for id := range ids {
-		list = append(list, id)
-	}
-	sort.Strings(list)
+	list := slices.Sorted(maps.Keys(ids))
 	items, err := workshop.Details(list)
 	if err != nil {
 		return nil, err

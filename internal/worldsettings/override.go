@@ -2,9 +2,10 @@ package worldsettings
 
 import (
 	"fmt"
+	"maps"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"dst-windows/internal/config"
@@ -102,11 +103,7 @@ func (o *Override) String() string {
 
 	sb.WriteString("\toverrides = {\n")
 
-	names := make([]string, 0, len(o.Overrides))
-	for n := range o.Overrides {
-		names = append(names, n)
-	}
-	sort.Strings(names)
+	names := slices.Sorted(maps.Keys(o.Overrides))
 
 	// 等于默认值的项一律省略：官方文档说可以直接省略，而且省略能避免
 	// 游戏以后新增选项时被这里的旧默认值覆盖。

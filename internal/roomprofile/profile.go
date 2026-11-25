@@ -9,7 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -216,7 +216,7 @@ func (s *Store) List() ([]Summary, error) {
 		}
 		result = append(result, Summary{p.ID, p.Name, p.CreatedAt, len(p.Room.Shards)})
 	}
-	sort.Slice(result, func(i, j int) bool { return result[i].CreatedAt.After(result[j].CreatedAt) })
+	slices.SortFunc(result, func(a, b Summary) int { return b.CreatedAt.Compare(a.CreatedAt) })
 	return result, nil
 }
 

@@ -10,6 +10,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"dst-windows/internal/server"
@@ -92,7 +93,7 @@ func main() {
 	logs, _ := mgr.ReadLog(clusterKey, "Master", 50)
 	found := false
 	for _, l := range logs {
-		if contains(l, "ms_setseason") {
+		if strings.Contains(l, "ms_setseason") {
 			found = true
 			fmt.Println("PASS 日志回读到命令:", trim(l))
 			break
@@ -153,17 +154,6 @@ func main() {
 	}
 
 	fmt.Println("\n=== 全部验证通过 ===")
-}
-
-func contains(s, sub string) bool {
-	return len(s) >= len(sub) && (func() bool {
-		for i := 0; i+len(sub) <= len(s); i++ {
-			if s[i:i+len(sub)] == sub {
-				return true
-			}
-		}
-		return false
-	})()
 }
 
 func trim(s string) string {

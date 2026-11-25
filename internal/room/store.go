@@ -1,11 +1,12 @@
 package room
 
 import (
+	"cmp"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 
@@ -106,7 +107,7 @@ func (s *Store) load() error {
 
 // save 原子写入房间定义。调用方必须已持有写锁。
 func (s *Store) save() error {
-	sort.Slice(s.rooms, func(i, j int) bool { return s.rooms[i].ID < s.rooms[j].ID })
+	slices.SortFunc(s.rooms, func(a, b *Room) int { return cmp.Compare(a.ID, b.ID) })
 	data, err := json.MarshalIndent(fileFormat{Version: roomsFileVersion, Rooms: s.rooms}, "", "  ")
 	if err != nil {
 		return fmt.Errorf("序列化房间定义失败: %w", err)
@@ -133,7 +134,7 @@ func (s *Store) List() []*Room {
 	for _, r := range s.rooms {
 		out = append(out, clone(r))
 	}
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	slices.SortFunc(out, func(a, b *Room) int { return cmp.Compare(a.ID, b.ID) })
 	return out
 }
 

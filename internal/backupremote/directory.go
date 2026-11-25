@@ -1,13 +1,14 @@
 package backupremote
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 )
 
@@ -73,7 +74,7 @@ func (e *Engine) syncDirectory(ctx context.Context, c Config, room int, name str
 			names = append(names, entry.Name())
 		}
 	}
-	sort.Slice(names, func(i, j int) bool { return backupOrder(names[i]) > backupOrder(names[j]) })
+	slices.SortFunc(names, func(a, b string) int { return cmp.Compare(backupOrder(b), backupOrder(a)) })
 	retained := 1 // The copy that just completed must remain available, including a manual retry.
 	for _, old := range names {
 		if old == name {

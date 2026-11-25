@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -280,7 +280,15 @@ func scanShards(clusterDir string, p *Parsed) ([]shardScan, error) {
 	}
 
 	// 主分片排在最前，导入日志读起来才顺
-	sort.SliceStable(out, func(i, j int) bool { return out[i].IsMaster && !out[j].IsMaster })
+	slices.SortStableFunc(out, func(a, b shardScan) int {
+		if a.IsMaster == b.IsMaster {
+			return 0
+		}
+		if a.IsMaster {
+			return -1
+		}
+		return 1
+	})
 	return out, nil
 }
 

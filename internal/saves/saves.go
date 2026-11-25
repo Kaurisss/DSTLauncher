@@ -7,10 +7,11 @@
 package saves
 
 import (
+	"cmp"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -98,7 +99,7 @@ func Scan(root, confDir string, rooms []*room.Room, running map[string]bool) ([]
 	}
 
 	// 目录 id 升序，和房间列表保持一致，肉眼好对
-	sort.Slice(out, func(i, j int) bool { return out[i].ID < out[j].ID })
+	slices.SortFunc(out, func(a, b Info) int { return cmp.Compare(a.ID, b.ID) })
 	return out, nil
 }
 
@@ -167,7 +168,7 @@ func dirSize(dir string) (int64, time.Time) {
 // 调用方必须已经确认：房间定义已删除、没有任何进程在跑、用户已二次确认。
 // 这里只做路径安全校验，避免任何形式的目录穿越把别的东西删掉。
 func Delete(root, confDir, cluster string) error {
-	if _, ok := ParseClusterID(cluster); !ok {
+	if _, ok := ParseClusterID(cluster); !ok || !filepath.IsLocal(cluster) {
 		return fmt.Errorf("非法的集群目录名: %s", cluster)
 	}
 
@@ -175,19 +176,19 @@ func Delete(root, confDir, cluster string) error {
 	if err != nil {
 		return err
 	}
-	target, err := filepath.Abs(filepath.Join(base, cluster))
+	baseRoot, err := os.OpenRoot(base)
 	if err != nil {
+		if os.IsNotExist(err) {
+			return fmt.Errorf("存档目录不存在: %s", cluster)
+		}
 		return err
 	}
-	// 双保险：解析后的路径必须仍在存档根目录之下
-	if target == base || !strings.HasPrefix(target, base+string(os.PathSeparator)) {
-		return fmt.Errorf("非法的集群目录: %s", cluster)
-	}
+	defer baseRoot.Close()
 
-	if _, err := os.Stat(target); err != nil {
+	if _, err := baseRoot.Stat(cluster); err != nil {
 		return fmt.Errorf("存档目录不存在: %s", cluster)
 	}
-	if err := os.RemoveAll(target); err != nil {
+	if err := baseRoot.RemoveAll(cluster); err != nil {
 		return fmt.Errorf("删除存档目录失败: %w", err)
 	}
 	return nil

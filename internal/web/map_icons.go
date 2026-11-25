@@ -9,7 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
-	"sort"
+	"slices"
 	"strings"
 
 	"dst-windows/internal/modmgr"
@@ -208,7 +208,7 @@ func (s *Server) availableMapIcons(data *worldsettings.SavedMap) []string {
 			available = append(available, lm.Kind)
 		}
 	}
-	sort.Strings(available)
+	slices.Sort(available)
 	return available
 }
 
@@ -237,10 +237,6 @@ func cropAtlasIconPNG(atlas *image.NRGBA, elem minimapAtlasElement) ([]byte, err
 }
 
 func (s *Server) handleMapIcon(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	kind := query(r, "kind")
 	if !validMapTileKey.MatchString(kind) {
 		http.NotFound(w, r)

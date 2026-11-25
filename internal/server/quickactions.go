@@ -5,7 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
-	"sort"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -80,9 +80,7 @@ func (m *Manager) Quick(ctx context.Context, clusterKey string, a QuickAction) (
 		var wg sync.WaitGroup
 		var resultMu sync.Mutex
 		for _, shard := range running {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
+			wg.Go(func() {
 				err := m.Maintenance(ctx, clusterKey, shard, "save")
 				resultMu.Lock()
 				defer resultMu.Unlock()
@@ -91,10 +89,10 @@ func (m *Manager) Quick(ctx context.Context, clusterKey string, a QuickAction) (
 				} else {
 					result.Shards = append(result.Shards, shard)
 				}
-			}()
+			})
 		}
 		wg.Wait()
-		sort.Strings(result.Shards)
+		slices.Sort(result.Shards)
 		return result, nil
 	}
 	master := c.MasterShard()

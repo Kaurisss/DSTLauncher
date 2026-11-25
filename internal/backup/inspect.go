@@ -8,11 +8,12 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"maps"
 	"os"
 	"path"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"slices"
 	"strings"
 	"time"
 
@@ -274,11 +275,7 @@ func inspectStaged(ctx context.Context, dir string, expected []string, report *I
 			}
 		}
 	}
-	ordered := []string{}
-	for name := range names {
-		ordered = append(ordered, name)
-	}
-	sort.Strings(ordered)
+	ordered := slices.Sorted(maps.Keys(names))
 	totalWorlds := 0
 	for _, name := range ordered {
 		if err := ctx.Err(); err != nil {

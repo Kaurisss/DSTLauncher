@@ -152,10 +152,6 @@ func (s *Server) migrationStopped() error {
 	return s.migrations.ctx.Err()
 }
 func (s *Server) handleMigrationExport(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(405)
-		return
-	}
 	j, err := s.newMigrationJob("export")
 	if err != nil {
 		respond(w, 200, nil, err)
@@ -195,10 +191,6 @@ func (s *Server) handleMigrationExport(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]string{"id": id}, nil)
 }
 func (s *Server) handleMigrationUpload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(405)
-		return
-	}
 	if r.ContentLength > migration.MaxUpload {
 		respond(w, 200, nil, fmt.Errorf("迁移压缩包不能超过 8 GiB"))
 		return
@@ -256,17 +248,9 @@ func (s *Server) handleMigrationJob(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, nil, nil)
 		return
 	}
-	if r.Method != http.MethodGet {
-		w.WriteHeader(405)
-		return
-	}
 	respond(w, 200, j, nil)
 }
 func (s *Server) handleMigrationDownload(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(405)
-		return
-	}
 	m := s.migrations
 	m.mu.Lock()
 	j, ok := m.items[query(r, "id")]
@@ -294,10 +278,6 @@ func (s *Server) handleMigrationDownload(w http.ResponseWriter, r *http.Request)
 	http.ServeContent(w, r, "dst-migration.zip", info.ModTime(), f)
 }
 func (s *Server) handleMigrationApply(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(405)
-		return
-	}
 	var in struct {
 		ID        string `json:"id"`
 		ApplyPlan bool   `json:"applyPlan"`
@@ -322,10 +302,7 @@ func (s *Server) handleMigrationApply(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	j.Kind, j.State = "import", "working"
-	m.wg.Add(1)
-	m.mu.Unlock()
-	go func() {
-		defer m.wg.Done()
+	m.wg.Go(func() {
 		s.maintenanceMu.Lock()
 		defer s.maintenanceMu.Unlock()
 		resume := s.mgr.PauseRecovery()
@@ -339,7 +316,8 @@ func (s *Server) handleMigrationApply(w http.ResponseWriter, r *http.Request) {
 		j.RoomIDs = ids
 		m.mu.Unlock()
 		s.finishMigration(j, nil, err)
-	}()
+	})
+	m.mu.Unlock()
 	respond(w, 200, map[string]string{"id": in.ID}, nil)
 }
 func (s *Server) applyMigration(j *migrationJob, applyPlan bool) ([]int, error) {

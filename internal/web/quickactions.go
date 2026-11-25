@@ -11,11 +11,6 @@ import (
 
 func (s *Server) handleQuickAction(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", "POST")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	if query(r, "room") == "" {
 		respond(w, 200, nil, fmt.Errorf("请明确指定要操作的房间"))
 		return

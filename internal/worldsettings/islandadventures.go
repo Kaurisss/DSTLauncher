@@ -8,10 +8,11 @@
 package worldsettings
 
 import (
+	"cmp"
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"sort"
+	"slices"
 	"sync"
 )
 
@@ -321,16 +322,21 @@ func IAGroups(location string, isMaster bool) []Group {
 			for i, name := range seq {
 				rank[name] = i
 			}
-			sort.SliceStable(g.Options, func(i, j int) bool {
-				ri, okI := rank[g.Options[i].Name]
-				rj, okJ := rank[g.Options[j].Name]
+			slices.SortStableFunc(g.Options, func(a, b Option) int {
+				ri, okI := rank[a.Name]
+				rj, okJ := rank[b.Name]
 				if okI != okJ {
-					return okI // 截图里有的排前面
+					if okI {
+						return -1 // 截图里有的排前面
+					}
+					return 1
 				}
-				if okI && ri != rj {
-					return ri < rj
+				if okI {
+					if c := cmp.Compare(ri, rj); c != 0 {
+						return c
+					}
 				}
-				return g.Options[i].Name < g.Options[j].Name
+				return cmp.Compare(a.Name, b.Name)
 			})
 		}
 		if len(g.Options) > 0 {
@@ -348,27 +354,32 @@ func IAGroups(location string, isMaster bool) []Group {
 	for i, id := range loc.WorldgenGroupOrder {
 		worldgenRank[id] = i
 	}
-	sort.SliceStable(out, func(i, j int) bool {
-		if out[i].Category != out[j].Category {
-			return out[i].Category < out[j].Category
+	slices.SortStableFunc(out, func(a, b Group) int {
+		if c := cmp.Compare(a.Category, b.Category); c != 0 {
+			return c
 		}
 		// 世界规则用 settingsGroupOrder，世界生成用 worldgenGroupOrder
 		rank := groupRank
-		if out[i].Category == CategoryWorldGen && len(loc.WorldgenGroupOrder) > 0 {
+		if a.Category == CategoryWorldGen && len(loc.WorldgenGroupOrder) > 0 {
 			rank = worldgenRank
 		}
-		ri, okI := rank[out[i].ID]
-		rj, okJ := rank[out[j].ID]
+		ri, okI := rank[a.ID]
+		rj, okJ := rank[b.ID]
 		if okI != okJ {
-			return okI
+			if okI {
+				return -1
+			}
+			return 1
 		}
-		if okI && ri != rj {
-			return ri < rj
+		if okI {
+			if c := cmp.Compare(ri, rj); c != 0 {
+				return c
+			}
 		}
-		if out[i].Order != out[j].Order {
-			return out[i].Order < out[j].Order
-		}
-		return out[i].ID < out[j].ID
+		return cmp.Or(
+			cmp.Compare(a.Order, b.Order),
+			cmp.Compare(a.ID, b.ID),
+		)
 	})
 	return out
 }
@@ -407,10 +418,10 @@ func IACategoryOf(location, name string) string {
 
 // sortOptions 按游戏内顺序排选项：先看显式 order，再看名字。
 func sortOptions(opts []Option) {
-	sort.SliceStable(opts, func(i, j int) bool {
-		if opts[i].Order != opts[j].Order {
-			return opts[i].Order < opts[j].Order
-		}
-		return opts[i].Name < opts[j].Name
+	slices.SortStableFunc(opts, func(a, b Option) int {
+		return cmp.Or(
+			cmp.Compare(a.Order, b.Order),
+			cmp.Compare(a.Name, b.Name),
+		)
 	})
 }

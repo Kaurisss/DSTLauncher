@@ -13,11 +13,6 @@ import (
 
 func (s *Server) handlePlayerLists(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	if r.Method != http.MethodGet && r.Method != http.MethodPost && r.Method != http.MethodDelete {
-		w.Header().Set("Allow", "GET, POST, DELETE")
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	if query(r, "room") == "" {
 		respond(w, 200, nil, fmt.Errorf("请明确指定名单所属房间"))
 		return

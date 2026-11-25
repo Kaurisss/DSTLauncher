@@ -11,10 +11,6 @@ import (
 )
 
 func (s *Server) handleDiagnostics(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	w.Header().Set("Cache-Control", "no-store")
 	id, err := strconv.Atoi(query(r, "room"))
 	rm, ok := s.rooms.Get(id)

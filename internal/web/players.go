@@ -13,11 +13,6 @@ import (
 
 func (s *Server) handlePlayers(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	if r.Method != http.MethodGet {
-		w.Header().Set("Allow", http.MethodGet)
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	if query(r, "room") == "" {
 		respond(w, 200, nil, fmt.Errorf("请明确指定要查询的房间"))
 		return
@@ -48,11 +43,6 @@ func (s *Server) handlePlayers(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handlePlayerAction(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
-	if r.Method != http.MethodPost {
-		w.Header().Set("Allow", http.MethodPost)
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
 	if query(r, "room") == "" {
 		respond(w, 200, nil, fmt.Errorf("请明确指定要操作的房间"))
 		return

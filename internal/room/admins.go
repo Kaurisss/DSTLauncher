@@ -112,7 +112,7 @@ func RemoveAdmin(clusterDir, id string) ([]string, error) {
 func normalizeAdmins(content string) []string {
 	seen := make(map[string]bool)
 	out := make([]string, 0, 8)
-	for _, line := range strings.Split(content, "\n") {
+	for line := range strings.SplitSeq(content, "\n") {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.HasPrefix(line, "#") {
 			continue
