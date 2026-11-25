@@ -5,8 +5,9 @@
 // 世界规则（settings）与世界生成（worldgen）分开成两个标签页展示；
 // 服务器运行中整个页面冻结——游戏只在启动时读这份文件，改了也不生效。
 
-import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useElementSize } from '@vueuse/core';
+import { PhLockSimple, PhMagnifyingGlass, PhX } from '@phosphor-icons/vue';
 import { PopoverClose, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger, TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui';
 
 import Icon from '@/components/ui/Icon.vue';
@@ -24,7 +25,7 @@ import {
 } from '@/components/ui/select';
 import OptionGroupPanel from '@/components/world/OptionGroupPanel.vue';
 import { worldApi } from '@/lib/api.js';
-import { iconOf } from '@/lib/worldIcons.js';
+import { iconOf, preloadIconUrls } from '@/lib/worldIcons.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useUiStore } from '@/stores/ui.js';
 import { guard, toast } from '@/lib/toast.js';
@@ -148,6 +149,11 @@ const dirty = computed(() => currentDirty.value || otherShardsDirty.value);
 const canReset = computed(() => settingsChanged.value || displayGroups.value.some(g =>
   !(worldgenFrozen.value && g.category === 'worldgen') && g.options.some(isChanged)));
 
+function isShardDirty(name) {
+  if (name === shard.value) return currentDirty.value;
+  return isShardStateDirty(shardCache[name]);
+}
+
 const worldgenPresets = computed(() => view.value?.presets?.worldgen || []);
 const settingsPresets = computed(() => view.value?.presets?.settings || []);
 
@@ -220,24 +226,34 @@ const visibleGroups = computed(() => {
 const selectedGroup = computed(() =>
   visibleGroups.value.find(g => g.id === activeGroupId.value) || visibleGroups.value[0]);
 
+const hasActiveFilter = computed(() => !!keyword.value.trim() || onlyChanged.value);
+
 watch([shard, category], () => { activeGroupId.value = ''; });
 watch(selectedGroup, async group => {
   preloadIcons(group ? [group] : []);
   await nextTick();
-  if (!groupPanel.value) return;
+  if (!groupPanel.value || !content.value?.$el) return;
   const list = content.value.$el.querySelector('[data-slot="world-options-scroll"]');
+  if (!list) return;
   const nav = groupNav.value;
   const clearance = nav && window.getComputedStyle(nav).flexDirection === 'row' ? nav.offsetHeight + 12 : 12;
   const panel = groupPanel.value.$el;
+  const firstRow = panel.querySelector('.opt-row');
+  if (!firstRow) return;
   const origin = list.getBoundingClientRect().top - list.scrollTop;
   const top = panel.getBoundingClientRect().top - origin - clearance;
   // 极矮视口优先显示第一项，避免分组标题把搜索结果挤到可视区外。
-  const firstRowBottom = panel.querySelector('.opt-row').getBoundingClientRect().bottom - origin;
+  const firstRowBottom = firstRow.getBoundingClientRect().bottom - origin;
   list.scrollTo({ top: Math.max(top, firstRowBottom - list.clientHeight) });
 }, { immediate: true });
 
 function pickGroup(id) {
   activeGroupId.value = id;
+}
+
+function clearFilters() {
+  keyword.value = '';
+  onlyChanged.value = false;
 }
 
 /* ---------- 取值读写 ---------- */
@@ -370,15 +386,22 @@ function selectShard(name) {
 }
 
 /**
- * 预解码一组图标。
- * 切分片/分类会重建整批 OptionField，新的 <img> 要重新解码，
- * 表现为切换后第一帧整片图标空白——先把位图暖进解码缓存就没有这块空白。
- *
- * 只预热当前分类真正会渲染的那批：早先这里是全量预加载（含未展开分类、
- * 被隐藏的火山岛专项），一次 180+ 个请求，既把 loading="lazy" 变成摆设，
- * 也多下几十张永远不会显示的图。
+ * 预解码一组图标并保留引用，切换分组/分类/分片时新挂载的 <img> 可直接命中已解码位图，
+ * 避免第一帧空白闪烁。当前展示组立即预热，其余分组在空闲分批暖进缓存。
  */
-function preloadIcons(groups) {
+let idlePreloadTimer = null;
+
+function cancelIdlePreload() {
+  if (idlePreloadTimer == null) return;
+  if (typeof window !== 'undefined' && typeof window.cancelIdleCallback === 'function') {
+    window.cancelIdleCallback(idlePreloadTimer);
+  } else {
+    clearTimeout(idlePreloadTimer);
+  }
+  idlePreloadTimer = null;
+}
+
+function collectIconUrls(groups) {
   const urls = new Set();
   for (const g of groups) {
     for (const o of g.options) {
@@ -386,12 +409,40 @@ function preloadIcons(groups) {
       if (url) urls.add(url);
     }
   }
-  for (const url of urls) {
-    // eslint-disable-next-line no-undef -- 浏览器全局 Image
-    const img = new Image();
-    img.src = url;
-  }
+  return [...urls];
 }
+
+function preloadIcons(groups) {
+  preloadIconUrls(collectIconUrls(groups));
+}
+
+function scheduleBackgroundIconWarmup(groups) {
+  cancelIdlePreload();
+  const queue = collectIconUrls(groups);
+  if (!queue.length) return;
+  let offset = 0;
+  const BATCH = 16;
+  const step = () => {
+    idlePreloadTimer = null;
+    preloadIconUrls(queue.slice(offset, offset + BATCH));
+    offset += BATCH;
+    if (offset < queue.length) enqueue();
+  };
+  const enqueue = () => {
+    if (typeof window !== 'undefined' && typeof window.requestIdleCallback === 'function') {
+      idlePreloadTimer = window.requestIdleCallback(step, { timeout: 300 });
+    } else {
+      idlePreloadTimer = setTimeout(step, 40);
+    }
+  };
+  enqueue();
+}
+
+watch(displayGroups, groups => {
+  scheduleBackgroundIconWarmup([...activeGroups.value, ...groups]);
+}, { immediate: true });
+
+onUnmounted(cancelIdlePreload);
 
 function buildSavePayload(roomId, shardName, st) {
   const levelData = !!st.view?.levelDataInUse;
@@ -440,6 +491,12 @@ async function save() {
   // 游戏只在启动时读这个文件，运行中的分片感知不到改动
   if (data && data.needRestart) toast('有分片正在运行，重启后才会生效');
   await load(currentShard);
+}
+
+function resetGroup(group) {
+  if (!group || frozen.value) return;
+  if (worldgenFrozen.value && group.category === 'worldgen') return;
+  for (const o of group.options) onOptionChange(o, o.default);
 }
 
 function resetAll() {
@@ -503,13 +560,14 @@ onMounted(() => selectShard(rooms.shards[0]));
           <div class="world-shard-controls">
             <TabsList class="world-shard-tabs" aria-label="配置分片">
               <TabsTrigger v-for="s in rooms.shards" :key="s" :value="s" class="shard-tab" :disabled="saving">
-                {{ labelOf(s) }}
+                <span>{{ labelOf(s) }}</span>
+                <span v-if="isShardDirty(s)" class="shard-tab-dirty" aria-hidden="true" />
               </TabsTrigger>
             </TabsList>
-            <Badge v-if="view" variant="secondary" class="world-type-label">{{ worldLabel }}</Badge>
+            <Badge v-if="view" variant="outline" class="world-type-label rounded-md">{{ worldLabel }}</Badge>
             <PopoverRoot v-if="view" :key="shard">
               <PopoverTrigger as-child>
-                <Button variant="ghost" size="icon-sm" aria-label="路径与说明" title="路径与说明">
+                <Button variant="ghost" size="icon-sm" class="text-muted-foreground hover:text-foreground" aria-label="路径与说明" title="路径与说明">
                   <Icon name="info" size="16" />
                 </Button>
               </PopoverTrigger>
@@ -521,16 +579,19 @@ onMounted(() => selectShard(rooms.shards[0]));
                       <Button variant="ghost" size="icon-sm" aria-label="关闭路径与说明"><Icon name="x" size="14" /></Button>
                     </PopoverClose>
                   </div>
-                  <code class="block break-all bg-transparent p-0 text-xs">{{ view.file }}</code>
+                  <code class="world-details-path block break-all text-xs">{{ view.file }}</code>
                   <p class="text-xs leading-relaxed text-muted-foreground">世界规则在重启后生效；世界生成只在建图时读取，已有地图不会重新生成。</p>
-                  <p v-if="levelDataInUse" class="text-xs text-muted-foreground">此存档使用游戏生成的 leveldataoverride.lua，仅保存修改过的世界规则。</p>
-                  <p v-else class="text-xs text-muted-foreground">使用 worldgenoverride.lua 覆写世界规则与生成项；预设与启用开关已直接展示在下方配置栏。</p>
+                  <p v-if="levelDataInUse" class="text-xs leading-relaxed text-muted-foreground">此存档使用游戏生成的 leveldataoverride.lua，仅保存修改过的世界规则。</p>
+                  <p v-else class="text-xs leading-relaxed text-muted-foreground">使用 worldgenoverride.lua 覆写世界规则与生成项；预设与启用开关已直接展示在下方配置栏。</p>
                 </PopoverContent>
               </PopoverPortal>
             </PopoverRoot>
           </div>
           <div v-if="view" class="world-main-actions">
-            <Badge variant="secondary" class="world-count" role="status">已改 {{ changedCount }} 项</Badge>
+            <Badge variant="outline" class="world-count rounded-md" :class="{ 'is-changed': changedCount > 0, 'is-dirty': dirty }" role="status">
+              <span v-if="dirty" class="world-dirty-dot" aria-hidden="true" />
+              <span>已改 {{ changedCount }} 项</span>
+            </Badge>
             <IconAction variant="outline" show-label="sm" icon="undo" label="重置" :disabled="!canReset || frozen || loading || saving" @click="resetAll" />
             <IconAction show-label="sm" icon="save" :label="saving ? '保存中…' : '保存'" :disabled="!dirty || frozen || loading || saving" @click="save" />
           </div>
@@ -538,16 +599,47 @@ onMounted(() => selectShard(rooms.shards[0]));
         <div v-if="view && !loadError" class="world-toolbar">
           <div class="world-category-controls">
             <div class="seg" role="group" aria-label="配置类别">
-              <button class="seg-btn" :class="{ 'is-active': category === 'settings' }" :aria-pressed="category === 'settings'" type="button" @click="pickCategory('settings')">
-                世界规则 <span class="seg-count">{{ categoryCounts.settings }}</span>
+              <button
+                class="seg-btn"
+                :class="{ 'is-active': category === 'settings' }"
+                :aria-pressed="category === 'settings'"
+                type="button"
+                @pointerenter="preloadIcons(settingsGroups.slice(0, 1))"
+                @focus="preloadIcons(settingsGroups.slice(0, 1))"
+                @click="pickCategory('settings')"
+              >
+                <span>世界规则</span>
+                <span class="seg-count">{{ categoryCounts.settings }}</span>
               </button>
-              <button class="seg-btn" :class="{ 'is-active': category === 'worldgen' }" :aria-pressed="category === 'worldgen'" type="button" @click="pickCategory('worldgen')">
-                世界生成 <span class="seg-count">{{ categoryCounts.worldgen }}</span>
+              <button
+                class="seg-btn"
+                :class="{ 'is-active': category === 'worldgen' }"
+                :aria-pressed="category === 'worldgen'"
+                type="button"
+                @pointerenter="preloadIcons(worldgenGroups.slice(0, 1))"
+                @focus="preloadIcons(worldgenGroups.slice(0, 1))"
+                @click="pickCategory('worldgen')"
+              >
+                <PhLockSimple v-if="worldGenerated" class="size-3 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <span>世界生成</span>
+                <span class="seg-count">{{ categoryCounts.worldgen }}</span>
               </button>
             </div>
             <span v-if="category === 'worldgen' && worldGenerated" class="world-readonly-note" role="status"><Icon name="info" size="14" />地图已生成，仅供查看</span>
           </div>
-          <Input v-model="keyword" aria-label="搜索世界配置" placeholder="搜索选项（中英文均可）" class="world-search" />
+          <div class="world-search-wrap">
+            <PhMagnifyingGlass class="world-search-icon" aria-hidden="true" />
+            <Input v-model="keyword" aria-label="搜索世界配置" placeholder="搜索选项（中英文均可）" class="world-search pl-8 pr-7" />
+            <button
+              v-if="keyword"
+              type="button"
+              class="world-search-clear"
+              aria-label="清空搜索"
+              @click="keyword = ''"
+            >
+              <PhX class="size-3.5" aria-hidden="true" />
+            </button>
+          </div>
           <label class="world-only-changed">
             <Switch v-model="onlyChanged" aria-label="只看已改动" />
             <span>只看已改动</span>
@@ -556,7 +648,8 @@ onMounted(() => selectShard(rooms.shards[0]));
       </div>
 
       <TabsContent ref="content" :value="shard" class="min-h-0 flex-1 overflow-hidden outline-none" aria-label="世界配置列表">
-        <div v-if="!rooms.loaded || (loading && !view)" role="status" aria-label="加载中" class="world-workspace pt-4">
+        <div v-if="!rooms.loaded || (loading && !view)" role="status" aria-label="正在加载世界配置" class="world-workspace">
+          <span class="sr-only">正在加载世界配置…</span>
           <div class="world-group-nav">
             <Skeleton v-for="i in 6" :key="i" class="h-8 w-full rounded-md" />
           </div>
@@ -568,7 +661,7 @@ onMounted(() => selectShard(rooms.shards[0]));
               <div v-for="i in 8" :key="i" class="opt-row">
                 <Skeleton class="size-14 shrink-0 rounded-md" />
                 <div class="grid min-w-0 flex-1 gap-1.5">
-                  <Skeleton class="h-4 w-20" />
+                  <Skeleton class="h-3.5 w-20" />
                   <Skeleton class="h-4 w-16" />
                 </div>
               </div>
@@ -576,16 +669,21 @@ onMounted(() => selectShard(rooms.shards[0]));
           </div>
         </div>
         <UiEmpty v-else-if="!rooms.current">
-          <span>请先在「房间管理」页新建一个房间</span>
+          <span>还没有可配置的房间，请先在「房间管理」新建一个房间。</span>
           <Button size="sm" variant="outline" class="mt-2" @click="ui.openRoomEditor()">前往新建房间</Button>
         </UiEmpty>
-        <p v-else-if="loadError" role="alert" class="p-4 text-sm text-destructive">读取失败：{{ loadError }}</p>
+        <div v-else-if="loadError" role="alert" class="world-error-state">
+          <Icon name="alert" size="18" class="text-destructive" />
+          <p class="text-sm font-medium text-destructive">读取失败：{{ loadError }}</p>
+          <p class="text-xs text-muted-foreground">检查面板服务与存档目录权限后可重试读取当前分片配置。</p>
+          <Button size="sm" variant="outline" class="mt-1" @click="load(shard)">重新加载</Button>
+        </div>
         <div v-else-if="view" data-slot="page-scroll" class="flex h-full min-h-0 flex-col overflow-hidden">
-          <div v-if="!levelDataInUse" role="region" aria-label="预设与启用" class="shrink-0 border-b bg-muted/20 px-[var(--panel-padding)] py-2.5">
+          <div v-if="!levelDataInUse" role="region" aria-label="预设与启用" class="world-presets-bar shrink-0">
             <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
               <UiField block label="世界生成预设" for-id="w-worldgen" class="min-w-[180px] flex-1 max-w-xs">
                 <Select v-model="worldgenPreset" :disabled="worldgenFrozen || loading || saving">
-                  <SelectTrigger id="w-worldgen" class="h-8 w-full bg-background text-xs"><SelectValue :placeholder="worldgenPreset || '选择预设'" /></SelectTrigger>
+                  <SelectTrigger id="w-worldgen" class="h-8 w-full bg-card text-xs"><SelectValue :placeholder="worldgenPreset || '选择预设'" /></SelectTrigger>
                   <SelectContent position="popper" align="start">
                     <SelectGroup>
                       <SelectItem v-for="p in worldgenPresets" :key="p.data" :value="p.data">{{ p.label ? p.label + '（' + p.data + '）' : p.data }}</SelectItem>
@@ -595,7 +693,7 @@ onMounted(() => selectShard(rooms.shards[0]));
               </UiField>
               <UiField block label="世界规则预设" for-id="w-settings" class="min-w-[180px] flex-1 max-w-xs">
                 <Select v-model="settingsPreset" :disabled="frozen || loading || saving">
-                  <SelectTrigger id="w-settings" class="h-8 w-full bg-background text-xs"><SelectValue :placeholder="settingsPreset || '选择预设'" /></SelectTrigger>
+                  <SelectTrigger id="w-settings" class="h-8 w-full bg-card text-xs"><SelectValue :placeholder="settingsPreset || '选择预设'" /></SelectTrigger>
                   <SelectContent position="popper" align="start">
                     <SelectGroup>
                       <SelectItem v-for="p in settingsPresets" :key="p.data" :value="p.data">{{ p.label ? p.label + '（' + p.data + '）' : p.data }}</SelectItem>
@@ -610,15 +708,22 @@ onMounted(() => selectShard(rooms.shards[0]));
             </div>
           </div>
           <div v-if="frozen || (!enabled && !levelDataInUse) || presetMismatch" class="world-notices shrink-0">
-            <p v-if="frozen" role="status" class="flex flex-wrap items-center gap-2">
-              <span>服务器运行中，配置已冻结。请先在「概览」关闭服务器再修改。</span>
-              <Button size="sm" variant="outline" class="h-6 px-2 text-xs" @click="ui.select('overview')">前往概览</Button>
-            </p>
-            <p v-if="!enabled && !levelDataInUse">已关闭 override_enabled，本文件中的设置不会应用。</p>
-            <p v-if="presetMismatch" role="alert">
-              预设 {{ worldgenPreset }} 与 {{ shardHint }} 类型不一致。
-              {{ worldGenerated ? '地图已生成，修改预设不会重建地图。' : '请在上方「世界生成预设」中选择匹配的预设后再启动。' }}
-            </p>
+            <div v-if="frozen" role="status" class="world-notice">
+              <Icon name="alert" size="15" class="shrink-0" />
+              <span class="min-w-0 flex-1">服务器运行中，配置已冻结。请先在「概览」关闭服务器再修改。</span>
+              <Button size="sm" variant="outline" class="h-6 shrink-0 px-2 text-xs" @click="ui.select('overview')">前往概览</Button>
+            </div>
+            <div v-if="!enabled && !levelDataInUse" class="world-notice">
+              <Icon name="info" size="15" class="shrink-0" />
+              <span>已关闭 override_enabled，本文件中的设置不会应用。</span>
+            </div>
+            <div v-if="presetMismatch" role="alert" class="world-notice world-notice-danger">
+              <Icon name="alert" size="15" class="shrink-0" />
+              <span>
+                预设 {{ worldgenPreset }} 与 {{ shardHint }} 类型不一致。
+                {{ worldGenerated ? '地图已生成，修改预设不会重建地图。' : '请在上方「世界生成预设」中选择匹配的预设后再启动。' }}
+              </span>
+            </div>
           </div>
           <div class="world-workspace">
             <nav v-if="activeGroups.length" ref="groupNav" class="world-group-nav" aria-label="配置分组">
@@ -629,24 +734,33 @@ onMounted(() => selectShard(rooms.shards[0]));
                 :aria-current="selectedGroup?.id === g.id ? 'true' : undefined"
                 :aria-controls="selectedGroup?.id === g.id ? 'world-active-group' : undefined"
                 :disabled="!visibleGroups.some(visible => visible.id === g.id)"
+                @pointerenter="preloadIcons([g])"
+                @focus="preloadIcons([g])"
                 @click="pickGroup(g.id)"
               >
-                <span>{{ g.label || g.id }}</span>
+                <span class="world-group-nav-label">{{ g.label || g.id }}</span>
                 <span v-if="g.options.some(isChanged)" class="world-group-changes" :aria-label="g.options.filter(isChanged).length + ' 项已修改'">{{ g.options.filter(isChanged).length }}</span>
               </button>
             </nav>
             <div class="world-group-content" data-slot="world-options-scroll" tabindex="0" role="region" aria-label="世界配置选项">
-              <UiEmpty v-if="!selectedGroup" :text="onlyChanged ? '没有匹配的已改动选项' : '没有匹配的选项'" />
+              <UiEmpty v-if="!selectedGroup">
+                <span>{{ onlyChanged && keyword.trim() ? '当前搜索条件下没有已改动的选项' : onlyChanged ? '当前分类下还没有已改动的选项' : '没有找到匹配的配置项' }}</span>
+                <div v-if="hasActiveFilter" class="mt-2 flex flex-wrap items-center justify-center gap-2">
+                  <Button v-if="keyword.trim()" size="sm" variant="outline" @click="keyword = ''">清空搜索</Button>
+                  <Button v-if="onlyChanged" size="sm" variant="outline" @click="onlyChanged = false">显示全部选项</Button>
+                  <Button v-if="keyword.trim() && onlyChanged" size="sm" variant="ghost" @click="clearFilters">重置筛选</Button>
+                </div>
+              </UiEmpty>
               <OptionGroupPanel
                 v-else
                 id="world-active-group"
                 ref="groupPanel"
-                :key="category + '/' + selectedGroup.id"
                 :group="selectedGroup"
                 :value-of="valueOf"
                 :is-changed="isChanged"
                 :disabled="loading || saving || frozen || (worldGenerated && category === 'worldgen')"
                 @change="onOptionChange"
+                @reset-group="resetGroup"
               />
             </div>
           </div>

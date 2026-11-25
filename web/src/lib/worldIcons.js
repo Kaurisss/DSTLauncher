@@ -343,3 +343,24 @@ export const WORLD_ICONS = {
 export function iconOf(name) {
   return Object.hasOwn(WORLD_ICONS, name) ? '/world-icons/' + WORLD_ICONS[name] : '';
 }
+
+/**
+ * 保留已预解码的图标引用：
+ * 仅靠临时 new Image() 在 GC 后位图可能被浏览器清出解码缓存，
+ * 切分组/分类重建 <img> 时仍会出现一帧空白闪烁；常驻引用 + decode() 可避免闪烁。
+ */
+const decodedIcons = new Map();
+
+export function preloadIconUrls(urls) {
+  if (typeof globalThis.Image !== 'function') return;
+  for (const url of urls) {
+    if (!url || decodedIcons.has(url)) continue;
+    const img = new globalThis.Image();
+    img.decoding = 'async';
+    img.src = url;
+    decodedIcons.set(url, img);
+    if (typeof img.decode === 'function') {
+      img.decode().catch(() => {});
+    }
+  }
+}

@@ -366,11 +366,25 @@ test('已有存档火山岛开关保持只读，隐藏候选值也不被重置�
   await page.close();
 });
 
-test('图标按选项名正确落到模组目录', async () => {
+test('图标按选项名正确落到模组目录，且切换分类后首帧即已就绪不闪烁', async () => {
   const { page } = await openWorldPage(SHIPWRECKED);
   await page.locator('.opt-row img').first().waitFor();
-  const srcs = await page.locator('.opt-row img').evaluateAll(els => els.map(e => e.getAttribute('src')));
-  assert.ok(srcs.every(src => src.startsWith('/world-icons/')), srcs.join(','));
+  const srcs = await page.locator('.opt-row img').evaluateAll(els => els.map(e => ({
+    src: e.getAttribute('src'),
+    loading: e.getAttribute('loading'),
+  })));
+  assert.ok(srcs.every(item => item.src.startsWith('/world-icons/')), JSON.stringify(srcs));
+  assert.ok(srcs.every(item => item.loading !== 'lazy'), '图标不应使用 loading="lazy" 避免切标签闪烁');
+  // 等空闲预热解码完成后切换分类，校验首帧所有新图标立即完整绘制
+  await page.waitForTimeout(150);
+  const firstFrameReady = await page.evaluate(async () => {
+    document.querySelectorAll('.seg-btn')[1].click();
+    await Promise.resolve();
+    await Promise.resolve();
+    const imgs = [...document.querySelectorAll('.opt-row img')];
+    return imgs.length > 0 && imgs.every(img => img.complete && img.naturalWidth > 0);
+  });
+  assert.equal(firstFrameReady, true, '切到世界生成后首帧图标应直接命中解码缓存');
   await page.close();
 });
 
@@ -558,4 +572,53 @@ test('真实选项布局紧凑，桌面两行吸顶保存搜索，浅色深色�
       assert.ok(optionBounds.y >= listBounds.y && optionBounds.y + optionBounds.height <= listBounds.y + listBounds.height, JSON.stringify({ width, listBounds, optionBounds }));
     } finally { await page.close(); }
   }
+});
+
+test('支持清空搜索、筛选空态恢复、按组恢复默认、分组按钮等高与搜索图标不重叠', async () => {
+  const data = ordinaryWorld();
+  data.groups[0].options.push({
+    name: 'autumn', label: '秋季', default: 'default',
+    values: [{ data: 'default', label: '默认' }, { data: 'shortseason', label: '短' }],
+  });
+  const { page } = await openWorldPage(data);
+  try {
+    const navBtn = page.getByRole('navigation', { name: '配置分组' }).getByRole('button').first();
+    const groupHead = page.locator('.opt-group-head');
+    const heightWithoutBadge = (await navBtn.boundingBox()).height;
+    const headHeightWithoutReset = (await groupHead.boundingBox()).height;
+
+    // 搜索框左侧内边距必须大于放大镜图标右边界，避免文本重叠
+    const searchMetrics = await page.evaluate(() => {
+      const icon = document.querySelector('.world-search-icon').getBoundingClientRect();
+      const input = document.querySelector('.world-search');
+      const rect = input.getBoundingClientRect();
+      const padLeft = parseFloat(window.getComputedStyle(input).paddingLeft);
+      return { iconRightOffset: icon.right - rect.left, padLeft };
+    });
+    assert.ok(searchMetrics.padLeft >= searchMetrics.iconRightOffset + 4, JSON.stringify(searchMetrics));
+
+    // 键盘左右方向键步进 + 改动后分组按钮与分组头高度不跳动 + 按组恢复默认
+    const mildNext = page.getByRole('button', { name: '温和季 下一项', exact: true });
+    await mildNext.focus();
+    await page.keyboard.press('ArrowRight');
+    assert.equal(await page.locator('.opt-row', { hasText: '温和季' }).locator('.opt-row-value').innerText(), '短');
+    assert.equal(await page.locator('.opt-changed-dot').count(), 0, '不渲染装饰性圆点');
+    assert.equal(await page.locator('.shard-tab[data-state="active"] .shard-tab-dirty').count(), 1, '有未保存改动时显示分片草稿标记');
+    const heightWithBadge = (await navBtn.boundingBox()).height;
+    const headHeightWithReset = (await groupHead.boundingBox()).height;
+    assert.equal(heightWithBadge, heightWithoutBadge, '分组按钮有/无徽章高度必须完全一致');
+    assert.equal(headHeightWithReset, headHeightWithoutReset, '分组标题栏有/无恢复按钮高度必须完全一致');
+    await page.screenshot({ path: fileURLToPath(new URL('../../.scratch/screenshots/world-changed-light.png', import.meta.url)) });
+
+    await page.getByRole('button', { name: '恢复本组默认', exact: true }).click();
+    assert.equal(await page.locator('.opt-row', { hasText: '温和季' }).locator('.opt-row-value').innerText(), '默认');
+
+    // 搜索无结果时可一键清空搜索
+    const search = page.getByRole('textbox', { name: '搜索世界配置', exact: true });
+    await search.fill('完全不存在的选项名称');
+    await page.getByText('没有找到匹配的配置项', { exact: true }).waitFor();
+    await page.getByRole('button', { name: '清空搜索', exact: true }).first().click();
+    assert.equal(await search.inputValue(), '');
+    assert.ok(await page.locator('.opt-row').count() >= 2);
+  } finally { await page.close(); }
 });
