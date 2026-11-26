@@ -36,7 +36,11 @@ assert.ok(existsSync(new URL('customization_shipwrecked.png', source)));
 const xml = readFileSync(new URL('customization_shipwrecked.xml', source), 'utf8');
 const slices = [...xml.matchAll(/<Element name="([a-zA-Z0-9_]+)\.tex"/g)].map(m => `${m[1]}.png`);
 assert.equal(slices.length, 89);
-assert.deepEqual(readdirSync(new URL('island-adventures/', root)).sort(), slices.sort(), '完整保留图集切片，包括尚未使用的变体');
+const iaFiles = readdirSync(new URL('island-adventures/', root), { withFileTypes: true })
+  .filter(entry => entry.isFile())
+  .map(entry => entry.name)
+  .sort();
+assert.deepEqual(iaFiles, slices.sort(), '完整保留图集切片，包括尚未使用的变体');
 
 const coreSource = new URL('../../tools/world-icon-sources/island-adventures-core/', import.meta.url);
 assert.ok(existsSync(new URL('customization_core.png', coreSource)));
@@ -48,8 +52,17 @@ assert.deepEqual(readdirSync(new URL('island-adventures-core/', root)).sort(), c
 // 原版目录不留失去引用的文件；模组目录保留完整切片以便后续适配。
 const referenced = new Set(Object.values(WORLD_ICONS));
 for (const folder of ['common', 'dst']) {
-  for (const file of readdirSync(new URL(`${folder}/`, root))) {
-    assert.ok(referenced.has(`${folder}/${file}`), `未使用的原版图标：${folder}/${file}`);
+  for (const entry of readdirSync(new URL(`${folder}/`, root), { withFileTypes: true })) {
+    if (!entry.isFile()) continue;
+    assert.ok(referenced.has(`${folder}/${entry.name}`), `未使用的原版图标：${folder}/${entry.name}`);
   }
 }
-console.log(`图标检查通过（${Object.keys(WORLD_ICONS).length} 项映射，${slices.length} 张岛屿冒险切片）`);
+
+// 地图成对彩色图标：虫洞（22 组）与电光三角（24 组）
+const wormholeFiles = readdirSync(new URL('dst/wormhole/', root)).sort();
+const expectedWormholes = Array.from({ length: 22 }, (_, i) => `mark_${i + 1}.png`).sort();
+assert.deepEqual(wormholeFiles, expectedWormholes, '虫洞彩色标记应完整保留 mark_1..22.png');
+
+const triangleFiles = readdirSync(new URL('island-adventures/electric isosceles/', root)).sort();
+assert.equal(triangleFiles.length, 24, '电光三角彩色图标应完整保留 24 张');
+console.log(`图标检查通过（${Object.keys(WORLD_ICONS).length} 项映射，${slices.length} 张岛屿冒险切片，${wormholeFiles.length} 张虫洞图标，${triangleFiles.length} 张电光三角图标）`);

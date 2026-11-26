@@ -1,18 +1,19 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- Go backend (`module dst-windows`, Go 1.25+): root entrypoint (`main.go`) and domain packages in `internal/` (`web`, `room`, `server`, `backup`, `backupremote`, `migration`, `modmgr`, `steamcmd`, `worldsettings`).
+- Go backend (`module dst-windows`, Go 1.25+): root entrypoint (`main.go`) and domain packages in `internal/` (`web`, `room`, `roomprofile`, `server`, `backup`, `backupremote`, `migration`, `modmgr`, `steamcmd`, `worldsettings`, `chatlog`, `automation`, `diagnostics`, `notify`, `hoststats`, etc.).
 - Verification harnesses live in `cmd/fakeserver` and `cmd/verify`; build and asset scripts live in `tools/`.
 - Vue 3 frontend lives in `web/` (`src/views/`, `src/components/`, `src/components/ui/`, `src/stores/`, `src/composables/`, `src/lib/`, static assets in `public/`, check scripts in `scripts/`).
-- `web/dist/` is embedded via `go:embed`; always rebuild the frontend before compiling Go. Feature specs live in `docs/`.
+- `web/dist/` is embedded via `go:embed`; always rebuild the frontend before compiling Go. Active specs live in `docs/`; completed historical records live in `docs/archive/`.
 
 ## Build, Test, and Development Commands
 - `powershell -NoProfile -ExecutionPolicy Bypass -File .\build.ps1`: builds `web/dist` with `pnpm` and outputs `dst-windows.exe`.
 - `pnpm --dir web run dev`: starts Vite on `:5173`, proxying `/api` to a running backend on `127.0.0.1:16800`.
+- `pnpm --dir web run dev:mock`: starts Vite with local mock API data (`scripts/mock-dev.mjs`) without a Go backend.
 - `pnpm --dir web run build`: compiles frontend assets into `web/dist`.
 - `pnpm --dir web run lint`: runs `scripts/check-src.mjs` (validates `@/` imports and single-root views) followed by `eslint .`.
 - `go test ./...`: runs all Go package tests.
-- `pnpm --dir web test`: runs all `web/scripts/check-*.mjs` scripts; run a single check with `node web/scripts/check-shell.mjs`.
+- `pnpm --dir web test`: runs the 5 pure-Node frontend checks configured in `web/package.json` (`check-auto-install`, `check-api-stream`, `check-shell`, `check-room-admin`, `check-world-icons`); run a single check with `node web/scripts/check-shell.mjs`.
 
 ## Coding Style & Naming Conventions
 - Go: format with `gofmt` (tabs), isolate OS-specific code in `*_windows.go` / `*_linux.go`, and colocate tests as `*_test.go`.

@@ -79,7 +79,7 @@ func TestShipwreckedAndVolcanoLandmarksAndBermudaPairing(t *testing.T) {
 		}
 	}
 	pair := byKind["bermudatriangle"]
-	if len(pair) != 2 || pair[0].Target != pair[1].ID || pair[1].Target != pair[0].ID || pair[0].Name != "百慕大三角 1" {
+	if len(pair) != 2 || pair[0].Target != pair[1].ID || pair[1].Target != pair[0].ID || pair[0].Name != "电光三角 1" || pair[0].Pair != 1 || pair[1].Pair != 1 {
 		t.Fatalf("bermudatriangle did not pair properly: %+v", pair)
 	}
 }

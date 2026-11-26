@@ -39,6 +39,7 @@ type MapLandmark struct {
 	Kind     string `json:"kind"`
 	Name     string `json:"name"`
 	Target   string `json:"target,omitempty"`
+	Pair     int    `json:"pair,omitempty"`
 	recordID int64
 	targetID int64
 }
@@ -73,7 +74,7 @@ var mapLandmarks = map[string]string{
 	"monkeyisland_portal": "月亮码头传送门", "terrarium": "泰拉瑞亚",
 	// 海难与火山（Island Adventures）
 	"volcano": "火山入口", "volcano_exit": "火山出口", "volcano_altar": "火山祭坛", "obsidian_workbench": "黑曜石工作台",
-	"octopusking": "章鱼王", "slotmachine": "老虎机", "sharkittenspawner": "虎鲨巢穴", "bermudatriangle": "百慕大三角",
+	"octopusking": "章鱼王", "slotmachine": "老虎机", "sharkittenspawner": "虎鲨巢穴", "bermudatriangle": "电光三角",
 	"seaworthy": "海之传送门", "skyworthy": "天空传送门", "packim_fishbone": "帕克鱼骨", "coral_brain_rock": "智慧树",
 	"tar_pool": "焦油坑", "critterlab_water": "水上岩穴", "doydoy": "渡渡鸟", "doydoynest": "渡渡鸟巢",
 	"woodlegs_cage": "木腿笼子", "kraken": "海妖", "buriedtreasure": "藏宝点", "mermhouse_fisher": "渔夫鱼人房",
@@ -414,7 +415,7 @@ func parseSavedMap(text string) (*SavedMap, error) {
 
 func pairMapWormholes(landmarks []MapLandmark) {
 	pairLinkedLandmarks(landmarks, "wormhole", "虫洞")
-	pairLinkedLandmarks(landmarks, "bermudatriangle", "百慕大三角")
+	pairLinkedLandmarks(landmarks, "bermudatriangle", "电光三角")
 }
 
 func pairLinkedLandmarks(landmarks []MapLandmark, kind, label string) {
@@ -436,5 +437,6 @@ func pairLinkedLandmarks(landmarks []MapLandmark, kind, label string) {
 		name := fmt.Sprintf("%s %d", label, pair)
 		landmarks[i].Target, landmarks[other].Target = landmarks[other].ID, landmarks[i].ID
 		landmarks[i].Name, landmarks[other].Name = name, name
+		landmarks[i].Pair, landmarks[other].Pair = pair, pair
 	}
 }

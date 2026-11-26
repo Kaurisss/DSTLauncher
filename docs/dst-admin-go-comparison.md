@@ -23,7 +23,7 @@
 
 ### 玩家准入名单
 
-进入「房间 → 编辑 → 玩家准入名单」，切换黑名单/白名单，输入 `KU_` 开头的 Klei ID。ID 支持字母、数字、短横线和下划线。输入规范化、大小写去重和读改写互斥在后端执行。
+进入侧边栏「玩家管理 → 管理员与准入名单」或「房间管理 → 编辑 → 管理员与名单」，切换黑名单/白名单，输入 `KU_` 开头的 Klei ID。ID 支持字母、数字、短横线和下划线。输入规范化、大小写去重和读改写互斥在后端执行。
 
 - 黑名单写入 `blocklist.txt`；白名单写入 `whitelist.txt`。不操作其它房间的文件。
 - 白名单用于预留位置，不等于“仅允许白名单进入”。沿用本项目按名单人数预留的位置策略，过滤注释、空行、无效 ID 和重复项，并限制为不超过房间最大人数。预留位包含在最大人数内。
@@ -35,19 +35,20 @@
 
 ### 快捷操作
 
-「概览 → 快捷操作」提供：
+「概览 → 快捷运维」提供：
 
 - **立即保存**：并行请求所有仍运行的启用分片，等待 `ShardGameIndex:SaveCurrent` 的写入完成回调。分别报告成功、未运行而跳过的分片及失败原因；不把部分成功描述为全部成功。
 - **全服公告**：主分片执行游戏原生 `c_announce`。最多 500 个字符，禁止换行和控制字符；中文、表情、引号和反斜线作为文本编码。等待游戏回执后才报告提交完成，不将其等同于每位玩家已经看到消息。
 - **主世界快进一天**：明确确认后，在主分片调用 `c_skip(1)`。它会改变主世界的时间和实体状态，不是保存或回档。与回档共用一分钟冷却；超时不会自动重试。游戏明确拒绝“世界未就绪”时允许重新操作。
+- **重置世界**：明确确认后，在主分片调用 `c_regenerateworld()` 清空并重新生成世界，与快进、回档共用一分钟冷却。
 
-新操作只接受 `POST /api/quick-action?room=<ID>`，请求体为 `{"action":"save"}`、`{"action":"announce","message":"欢迎"}` 或 `{"action":"skipday"}`。必须明确指定房间，不接受任意 Lua 或额外字段。沿用登录鉴权和自动维护互斥。
+新操作只接受 `POST /api/quick-action?room=<ID>`，请求体为 `{"action":"save"}`、`{"action":"announce","message":"欢迎"}`、`{"action":"skipday"}` 或 `{"action":"regenerate"}`。必须明确指定房间，不接受任意 Lua 或额外字段。沿用登录鉴权和自动维护互斥。
 
-游戏命令依据：[游戏控制台函数](https://github.com/taichunmin/dont-starve-together-game-scripts/blob/master/consolecommands.lua)。本批没有添加永久删除全部世界的重置快捷按钮。
+游戏命令依据：[游戏控制台函数](https://github.com/taichunmin/dont-starve-together-game-scripts/blob/master/consolecommands.lua)。
 
 ### 聊天与进出记录
 
-从侧边栏「玩家日志」进入。参照上游的[玩家日志截图](https://github.com/carrot-hu23/dst-admin-go/blob/main/docs/image/playerlog.png)及[前端交互](https://github.com/carrot-hu23/dst-manage-web2/blob/main/src/pages/PlayerLog/index.jsx)，在本项目中独立实现筛选工具栏、事件标签表格、分页、ID 复制及黑名单操作；概览仅保留运行日志。
+从侧边栏「玩家管理 → 玩家日志」进入。参照上游的[玩家日志截图](https://github.com/carrot-hu23/dst-admin-go/blob/main/docs/image/playerlog.png)及[前端交互](https://github.com/carrot-hu23/dst-manage-web2/blob/main/src/pages/PlayerLog/index.jsx)，在本项目中独立实现筛选工具栏、事件标签表格、分页、ID 复制及黑名单操作；实时运行日志已独立到侧边栏「控制台」页。
 
 本次实际克隆并核对相同提交的 [`internal/collect/collect.go`](https://github.com/carrot-hu23/dst-admin-go/blob/d189b9e215f073de2973242f72aacc3bd8747016/internal/collect/collect.go)，独立实现对应采集链路：
 
@@ -76,7 +77,7 @@ Linux 检测到可读的有限 cgroup 内存配额时，概览额外显示「容
 
 ## 仍可考虑的后续项
 
-上游还具有大厅查询、玩家长期活跃/死亡/角色统计和地图预览。这些不是本批已实现功能：大厅查询涉及外部接口与凭据；长期统计需要设计记录保留与清理；地图预览需要独立适配存档格式。
+上游还具有大厅查询和玩家长期活跃/死亡/角色统计，目前暂未纳入：大厅查询涉及外部接口与凭据；长期统计需要设计记录保留与清理。（存档地图预览已独立实现，见 [完整迁移与存档地图预览](migration-map.md)。）
 
 动态 `modinfo.lua` 沙箱仍按原路线图单独评估，避免为少量动态配置引入无资源限制的 Lua 执行。
 
@@ -84,4 +85,4 @@ Linux 检测到可读的有限 cgroup 内存配额时，概览额外显示「容
 
 新增覆盖包括名单并发修改、路径和请求参数校验、保存的部分失败、游戏回执关联、超时与冷却、Lua 5.1 中文和注入文本执行、日志边界/追加/替换，以及 cgroup 层级限额。前端浏览器测试使用拦截 API 的独立 fixture，覆盖确认、房间切换竞态、搜索、轮询停止、HTML 转义及手机深色布局，不写入真实游戏数据。
 
-完整前端回归已将 `check-panel-tools-browser.mjs` 加入 `pnpm test`。玩家历史新增覆盖身份回填、重名冲突、并发连接 GUID、角色变更、进出/死亡/复活、持久化重启、日志轮转、删除隔离及后台采集；本地真实游戏日志可用临时历史目录作只读关联验证，不启动或停止实际游戏。
+当前 `pnpm --dir web test` 运行纯 Node 前端静态与接口检查（浏览器交互回归通过 Chrome DevTools MCP 按需执行）。玩家历史后端测试覆盖身份回填、重名冲突、并发连接 GUID、角色变更、进出/死亡/复活、持久化重启、日志轮转、删除隔离及后台采集。

@@ -1,4 +1,83 @@
 import { PhCrown, PhDiamond, PhDoorOpen, PhFlask, PhKeyhole, PhMountains, PhSparkle, PhSpiral } from '@phosphor-icons/vue';
+import { mapApi } from '@/lib/api.js';
+
+// 彩色配对虫洞图标（共 22 组，对应 web/public/world-icons/dst/wormhole/mark_1..22.png）
+export const WORMHOLE_MARK_ICONS = Array.from({ length: 22 }, (_, i) => `dst/wormhole/mark_${i + 1}.png`);
+
+// 彩色配对电光三角图标（共 24 组：优先 10 个高区分度纯色，再接 14 个双色）
+export const ELECTRIC_ISOSCELES_ICONS = [
+  'red.png',
+  'blue.png',
+  'green.png',
+  'yellow.png',
+  'purple.png',
+  'orange.png',
+  'lightblue.png',
+  'pink.png',
+  'white.png',
+  'brown.png',
+  'red_yellow.png',
+  'blue_green.png',
+  'red_lightblue.png',
+  'green_pink.png',
+  'blue_yellow.png',
+  'purple_white.png',
+  'lightblue_orange.png',
+  'red_green.png',
+  'blue_pink.png',
+  'green_yellow.png',
+  'red_white.png',
+  'blue_white.png',
+  'green_white.png',
+  'yellow_pink.png',
+].map(file => `island-adventures/electric isosceles/${file}`);
+
+function publicIconUrl(relPath) {
+  return '/world-icons/' + relPath.split('/').map(encodeURIComponent).join('/');
+}
+
+const PAIRED_ICON_PACKS = {
+  wormhole: WORMHOLE_MARK_ICONS.map(publicIconUrl),
+  bermudatriangle: ELECTRIC_ISOSCELES_ICONS.map(publicIconUrl),
+};
+
+/**
+ * 为已配对的虫洞与电光三角分配成对的颜色图标 URL（同一对两端同色）。
+ * 优先使用后端给出的 pair 序号；若缺失则按 target 关系稳定顺排。
+ */
+export function buildPairedLandmarkIconMap(landmarks = []) {
+  const result = new Map();
+  const byId = new Map(landmarks.map(point => [point.id, point]));
+  const nextSeq = { wormhole: 0, bermudatriangle: 0 };
+
+  for (const point of landmarks) {
+    const pack = PAIRED_ICON_PACKS[point.kind];
+    if (!pack || !pack.length || result.has(point.id)) continue;
+
+    let pair = Number(point.pair) || 0;
+    const other = point.target ? byId.get(point.target) : null;
+    if (!pair && other && other.kind === point.kind) {
+      pair = Number(other.pair) || ++nextSeq[point.kind];
+    }
+    if (pair < 1) continue;
+
+    if (pair > nextSeq[point.kind]) nextSeq[point.kind] = pair;
+    const url = pack[(pair - 1) % pack.length];
+    result.set(point.id, url);
+    if (other && other.kind === point.kind) {
+      result.set(other.id, url);
+    }
+  }
+  return result;
+}
+
+/** 解析单个地标的图标地址：优先成对彩色图标，其次服务端原生小地图图标，否则回退矢量图标。 */
+export function landmarkIconUrl(point, iconKinds, pairedIconMap) {
+  if (!point) return '';
+  if (pairedIconMap?.has(point.id)) return pairedIconMap.get(point.id);
+  if (iconKinds?.has(point.kind)) return mapApi.iconUrl(point.kind);
+  return '';
+}
 
 const portal = { icon: PhDoorOpen, color: '#28786f', priority: 1 };
 const cave = { icon: PhMountains, color: '#705543', priority: 3 };

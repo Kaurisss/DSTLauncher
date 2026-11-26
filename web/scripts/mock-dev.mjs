@@ -6,13 +6,13 @@
 //   pnpm --dir web run dev:mock -- --auth   # 预览登录页（默认账号 admin / admin）
 
 import { fileURLToPath } from 'node:url';
-import { deflateSync } from 'node:zlib';
 import { createServer } from 'vite';
+import { createLocalGameAssets, encodePng } from './mock-game-assets.mjs';
 
 /* ---------- CLI 参数解析 ---------- */
 
 function parseArgs(argv) {
-  const opts = { port: 5174, host: '127.0.0.1', delay: 0, auth: false, open: false, backend: '', help: false };
+  const opts = { port: 5174, host: '127.0.0.1', delay: 0, auth: false, open: false, backend: '', gameDir: '', help: false };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === '-h' || arg === '--help') opts.help = true;
@@ -26,6 +26,8 @@ function parseArgs(argv) {
     else if (arg.startsWith('--delay=')) opts.delay = Math.max(0, Number(arg.slice('--delay='.length)) || 0);
     else if (arg === '--backend' && argv[i + 1]) opts.backend = argv[++i].replace(/\/+$/, '');
     else if (arg.startsWith('--backend=')) opts.backend = arg.slice('--backend='.length).replace(/\/+$/, '');
+    else if (arg === '--game-dir' && argv[i + 1]) opts.gameDir = argv[++i];
+    else if (arg.startsWith('--game-dir=')) opts.gameDir = arg.slice('--game-dir='.length);
   }
   return opts;
 }
@@ -38,6 +40,7 @@ if (cli.help) {
   --port <端口>      监听端口（默认 5174）
   --host <地址>      监听地址（默认 127.0.0.1）
   --delay <毫秒>     模拟接口延迟（默认 0；如设 600 可直观检查各页骨架屏）
+  --game-dir <目录>  指定本地 DST 安装目录以直接解码真实游戏小地图贴图与图标（默认自动探测 Steam 库）
   --backend <地址>   可选，透传 /api/map/texture 与 /api/map/icon 到本地面板（如 http://127.0.0.1:16800）
   --auth             开启登录态预览（默认用户名 admin，密码 admin）
   --open             启动后自动打开浏览器
@@ -45,6 +48,8 @@ if (cli.help) {
 `);
   process.exit(0);
 }
+
+const localGameAssets = createLocalGameAssets(cli.gameDir);
 
 /* ---------- 工具函数 ---------- */
 
@@ -73,53 +78,7 @@ function readJsonBody(req) {
   });
 }
 
-/* ---------- 模拟羊皮纸材质与地标图标（驱动真实 renderGameTextured 管线） ---------- */
-
-const CRC_TABLE = (() => {
-  const table = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let k = 0; k < 8; k++) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
-    table[i] = c >>> 0;
-  }
-  return table;
-})();
-
-function crc32(buf) {
-  let c = 0xffffffff;
-  for (let i = 0; i < buf.length; i++) c = CRC_TABLE[(c ^ buf[i]) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
-}
-
-function pngChunk(type, data) {
-  const header = Buffer.alloc(8);
-  header.writeUInt32BE(data.length, 0);
-  header.write(type, 4, 4, 'ascii');
-  const body = Buffer.concat([header.subarray(4), data]);
-  const crc = Buffer.alloc(4);
-  crc.writeUInt32BE(crc32(body), 0);
-  return Buffer.concat([header, data, crc]);
-}
-
-function encodePng(width, height, rgba) {
-  const raw = Buffer.alloc(height * (1 + width * 4));
-  for (let y = 0; y < height; y++) {
-    const rowStart = y * (1 + width * 4);
-    raw[rowStart] = 0;
-    rgba.copy(raw, rowStart + 1, y * width * 4, (y + 1) * width * 4);
-  }
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(width, 0);
-  ihdr.writeUInt32BE(height, 4);
-  ihdr[8] = 8; // 8-bit depth
-  ihdr[9] = 6; // RGBA
-  return Buffer.concat([
-    Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
-    pngChunk('IHDR', ihdr),
-    pngChunk('IDAT', deflateSync(raw, { level: 6 })),
-    pngChunk('IEND', Buffer.alloc(0)),
-  ]);
-}
+/* ---------- 程序羊皮纸兜底（仅在本机无 DST 游戏文件时使用） ---------- */
 
 function clampByte(v) {
   return v < 0 ? 0 : v > 255 ? 255 : v | 0;
@@ -400,6 +359,12 @@ function buildMockMap(shardName, location) {
           { id: 's3', kind: 'slotmachine', name: '老虎机', x: 74, y: 58 },
           { id: 's4', kind: 'volcano', name: '火山入口', x: 96, y: 34 },
           { id: 's5', kind: 'coral_brain_rock', name: '智慧树', x: 86, y: 84 },
+          { id: 'bt1', kind: 'bermudatriangle', name: '电光三角 1', x: 42, y: 56, target: 'bt2', pair: 1 },
+          { id: 'bt2', kind: 'bermudatriangle', name: '电光三角 1', x: 90, y: 62, target: 'bt1', pair: 1 },
+          { id: 'bt3', kind: 'bermudatriangle', name: '电光三角 2', x: 52, y: 30, target: 'bt4', pair: 2 },
+          { id: 'bt4', kind: 'bermudatriangle', name: '电光三角 2', x: 62, y: 94, target: 'bt3', pair: 2 },
+          { id: 'bt5', kind: 'bermudatriangle', name: '电光三角 3', x: 26, y: 74, target: 'bt6', pair: 3 },
+          { id: 'bt6', kind: 'bermudatriangle', name: '电光三角 3', x: 82, y: 42, target: 'bt5', pair: 3 },
         ]
       : isCave
         ? [
@@ -411,8 +376,12 @@ function buildMockMap(shardName, location) {
         : [
             { id: 'm1', kind: 'multiplayer_portal', name: '绚丽之门', x: 64, y: 64 },
             { id: 'm2', kind: 'pigking', name: '猪王', x: 82, y: 48 },
-            { id: 'm3', kind: 'wormhole', name: '虫洞 #1', x: 48, y: 52, target: 'm4' },
-            { id: 'm4', kind: 'wormhole', name: '虫洞 #2', x: 84, y: 78, target: 'm3' },
+            { id: 'm3', kind: 'wormhole', name: '虫洞 1', x: 48, y: 52, target: 'm4', pair: 1 },
+            { id: 'm4', kind: 'wormhole', name: '虫洞 1', x: 84, y: 78, target: 'm3', pair: 1 },
+            { id: 'm12', kind: 'wormhole', name: '虫洞 2', x: 40, y: 74, target: 'm13', pair: 2 },
+            { id: 'm13', kind: 'wormhole', name: '虫洞 2', x: 76, y: 38, target: 'm12', pair: 2 },
+            { id: 'm14', kind: 'wormhole', name: '虫洞 3', x: 54, y: 36, target: 'm15', pair: 3 },
+            { id: 'm15', kind: 'wormhole', name: '虫洞 3', x: 66, y: 88, target: 'm14', pair: 3 },
             { id: 'm5', kind: 'cave_entrance', name: '洞穴入口', x: 58, y: 72 },
             { id: 'm6', kind: 'moonbase', name: '月台', x: 44, y: 42 },
             { id: 'm7', kind: 'oasislake', name: '绿洲', x: 88, y: 74 },
@@ -1642,19 +1611,28 @@ function createMockApiPlugin(state, delayMs) {
           return;
         }
 
-        // 地图预览（含羊皮纸材质与地标图标，可选透传本地后端真实游戏材质）
+        // 地图预览：优先透传 --backend，其次直接解码本机 DST 真实 KTEX / minimap 图集，最后回退程序羊皮纸
         if (pathname === '/api/map/texture') {
           if (await tryProxyBinary(cli.backend, req.url, res)) return;
           const tile = params.get('tile') || '__PAPER__';
+          const realPng = localGameAssets.getTexturePng(tile);
           res.statusCode = 200;
           res.setHeader('Content-Type', 'image/png');
           res.setHeader('Cache-Control', 'public, max-age=300');
-          res.end(getMockTexturePng(tile));
+          res.end(realPng || getMockTexturePng(tile));
           return;
         }
         if (pathname === '/api/map/icon') {
           if (await tryProxyBinary(cli.backend, req.url, res)) return;
           const kind = params.get('kind') || '';
+          const realPng = localGameAssets.getIconPng(kind);
+          if (realPng) {
+            res.statusCode = 200;
+            res.setHeader('Content-Type', 'image/png');
+            res.setHeader('Cache-Control', 'public, max-age=300');
+            res.end(realPng);
+            return;
+          }
           res.statusCode = 200;
           res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
           res.setHeader('Cache-Control', 'public, max-age=300');
@@ -1811,7 +1789,7 @@ console.log('  DST 开服控制台 · Mock UI 预览服务已启动');
 console.log('===============================================');
 console.log(`  访问地址  ${addr}`);
 console.log(`  接口延迟  ${cli.delay} ms（加 --delay 600 可观察骨架屏）`);
-console.log(`  地图材质  ${cli.backend ? `优先透传 ${cli.backend}，失败回退程序羊皮纸` : '内置羊皮纸材质管线（加 --backend http://127.0.0.1:16800 可透传真实游戏贴图）'}`);
+console.log(`  地图材质  ${cli.backend ? `优先透传 ${cli.backend}` : localGameAssets.hasAssets ? `已直连本机 DST 真实贴图（${localGameAssets.roots.length} 个目录，${localGameAssets.iconCount} 个小地图图标）` : '未探测到本机 DST，回退程序羊皮纸（可加 --game-dir 或 --backend）'}`);
 console.log(`  登录模式  ${cli.auth ? '已开启（admin / admin）' : '免密直进（加 --auth 可预览登录页）'}`);
 console.log('  预置场景  Room 1 运行中（4 名在线玩家 + 实时日志 + 模拟地图）');
 console.log('            Room 2 四世界停服（可编辑世界配置、模组与分片直连）');

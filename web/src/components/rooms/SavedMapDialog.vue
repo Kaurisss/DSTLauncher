@@ -10,7 +10,7 @@ import IconAction from '@/components/ui/IconAction.vue';
 import { Skeleton } from '@/components/ui/skeleton';
 import SavedMapViewport from '@/components/rooms/SavedMapViewport.vue';
 import { decodeTerrain } from '@/lib/mapTerrain.js';
-import { landmarkStyle, landmarkCoordinates } from '@/lib/mapLandmarks.js';
+import { buildPairedLandmarkIconMap, landmarkCoordinates, landmarkIconUrl, landmarkStyle } from '@/lib/mapLandmarks.js';
 import { mapApi } from '@/lib/api.js';
 import { fmtTime, shardLabel } from '@/lib/format.js';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -47,6 +47,8 @@ const search = ref('');
 const room = computed(() => rooms.list.find(item => String(item.id) === roomId.value));
 const landmarks = computed(() => (data.value?.landmarks || []).filter(point => `${point.name} ${point.kind}`.toLowerCase().includes(search.value.trim().toLowerCase())));
 const iconKinds = computed(() => new Set(data.value?.icons || []));
+const pairedIconMap = computed(() => buildPairedLandmarkIconMap(data.value?.landmarks || []));
+const iconUrlOf = point => landmarkIconUrl(point, iconKinds.value, pairedIconMap.value);
 let revision = 0;
 
 watch(open, value => {
@@ -129,7 +131,7 @@ function selectLandmark(id) { selectedId.value = id; showLandmarks.value = true;
           <ul class="grid min-h-0 content-start gap-1 overflow-y-auto" aria-label="地图地标清单">
             <li v-for="point in landmarks" :key="point.id">
               <Button :variant="selectedId === point.id ? 'secondary' : 'ghost'" class="h-auto w-full justify-start gap-3 px-2 py-2" :aria-label="`定位${point.name}（${landmarkCoordinates(point, data)}）`" :aria-pressed="selectedId === point.id" @click="selectLandmark(point.id)">
-                <img v-if="iconKinds.has(point.kind)" :src="mapApi.iconUrl(point.kind)" alt="" aria-hidden="true" width="24" height="24" class="size-6 shrink-0 object-contain" />
+                <img v-if="iconUrlOf(point)" :src="iconUrlOf(point)" alt="" aria-hidden="true" width="24" height="24" class="size-6 shrink-0 object-contain" />
                 <component :is="landmarkStyle(point.kind).icon" v-else data-icon="inline-start" :style="{ color: landmarkStyle(point.kind).color }" weight="bold" />
                 <span class="grid min-w-0 gap-0.5 text-left"><span class="truncate">{{ point.name }}</span><span class="text-xs font-normal text-muted-foreground tabular-nums">{{ landmarkCoordinates(point, data) }}</span></span>
               </Button>

@@ -1,8 +1,7 @@
 <script setup>
 import { computed, ref, useTemplateRef, watch } from 'vue';
 import { useElementSize } from '@vueuse/core';
-import { mapApi } from '@/lib/api.js';
-import { landmarkCoordinates, landmarkStyle } from '@/lib/mapLandmarks.js';
+import { buildPairedLandmarkIconMap, landmarkCoordinates, landmarkIconUrl, landmarkStyle } from '@/lib/mapLandmarks.js';
 
 const props = defineProps({
   map: { type: Object, required: true },
@@ -27,23 +26,25 @@ const selected = computed(() => props.map.landmarks.find(point => point.id === p
 const paired = computed(() => selected.value?.target ? props.map.landmarks.find(point => point.id === selected.value.target) : null);
 const markers = computed(() => props.map.landmarks.filter(point => point.x >= view.value.x && point.x <= view.value.x + view.value.width && point.y >= view.value.y && point.y <= view.value.y + view.value.height));
 const iconKinds = computed(() => new Set(props.map.icons || []));
-const hasGameIcon = kind => iconKinds.value.has(kind);
+const pairedIconMap = computed(() => buildPairedLandmarkIconMap(props.map.landmarks));
+const iconUrlOf = point => landmarkIconUrl(point, iconKinds.value, pairedIconMap.value);
 
 // As in DMP's map renderer, choose labels in screen space and keep them apart.
 // Important landmarks remain named at fit zoom; selection always takes priority.
 const labels = computed(() => {
   const boxes = [];
   const visible = new Map();
-  const sorted = [...markers.value].sort((a, b) => (a.id === props.selectedId ? -1 : b.id === props.selectedId ? 1 : landmarkStyle(a.kind).priority - landmarkStyle(b.kind).priority));
+  const isHighlighted = id => id === props.selectedId || id === paired.value?.id;
+  const sorted = [...markers.value].sort((a, b) => (isHighlighted(a.id) ? -1 : isHighlighted(b.id) ? 1 : landmarkStyle(a.kind).priority - landmarkStyle(b.kind).priority));
   for (const point of sorted) {
-    if (point.id !== props.selectedId && landmarkStyle(point.kind).priority > 1 && props.zoom < 2) continue;
+    if (!isHighlighted(point.id) && landmarkStyle(point.kind).priority > 1 && props.zoom < 2) continue;
     const x = (point.x - view.value.x) * scale.value + (viewportSize.value.width - view.value.width * scale.value) / 2;
     const y = point.y * scale.value;
     const width = point.name.length * 12;
-    const offset = hasGameIcon(point.kind) ? 18 : 16;
+    const offset = iconUrlOf(point) ? 18 : 16;
     const left = x + offset + 8 + width > viewportSize.value.width;
     const box = { x: left ? x - offset - 8 - width : x + offset, y: y - 10, right: left ? x - offset : x + offset + 8 + width, bottom: y + 10 };
-    if (point.id !== props.selectedId && boxes.some(other => box.x < other.right && box.right > other.x && box.y < other.bottom && box.bottom > other.y)) continue;
+    if (!isHighlighted(point.id) && boxes.some(other => box.x < other.right && box.right > other.x && box.y < other.bottom && box.bottom > other.y)) continue;
     boxes.push(box);
     visible.set(point.id, { x: left ? -offset : offset, anchor: left ? 'end' : 'start' });
   }
@@ -101,14 +102,14 @@ function keydown(event) {
   <div ref="viewport" class="map-viewport min-h-0 min-w-0 overflow-hidden" :data-textured="map.textured ? 'true' : 'false'" tabindex="0" role="region" aria-label="存档地形地图" @keydown="keydown">
     <svg ref="svg" class="block size-full cursor-grab touch-none select-none data-[dragging=true]:cursor-grabbing" :data-dragging="dragging" :viewBox="`${view.x} ${view.y} ${view.width} ${view.height}`" role="group" aria-label="地图地形与地标" @pointerdown="down" @pointermove="move" @pointerup="up" @pointercancel="up" @lostpointercapture="up" @wheel.prevent="wheel">
       <image :href="map.terrainImage" :width="map.width" :height="map.height" :style="map.textured ? undefined : { imageRendering: 'pixelated' }" role="img" aria-label="地形底图" />
-      <line v-if="showLandmarks && selected && paired" :x1="selected.x" :y1="selected.y" :x2="paired.x" :y2="paired.y" stroke="#fff4cd" :stroke-width="2 / scale" :stroke-dasharray="`${5 / scale} ${4 / scale}`" aria-label="虫洞连接" />
+      <line v-if="showLandmarks && selected && paired" :x1="selected.x" :y1="selected.y" :x2="paired.x" :y2="paired.y" stroke="#fff4cd" :stroke-width="2 / scale" :stroke-dasharray="`${5 / scale} ${4 / scale}`" :aria-label="selected.kind === 'bermudatriangle' ? '电光三角连接' : '虫洞连接'" />
       <g v-if="showLandmarks">
         <g v-for="point in markers" :key="point.id" :transform="`translate(${point.x} ${point.y}) scale(${1 / scale})`" class="map-marker cursor-pointer" data-landmark tabindex="0" role="button" :aria-label="`${point.name}（${landmarkCoordinates(point, map)}）`" :aria-pressed="point.id === selectedId" @click.stop="emit('select', point.id)" @keydown.enter.stop.prevent="emit('select', point.id)" @keydown.space.stop.prevent="emit('select', point.id)">
           <title>{{ point.name }}（{{ landmarkCoordinates(point, map) }}）</title>
-          <template v-if="hasGameIcon(point.kind)">
+          <template v-if="iconUrlOf(point)">
             <circle v-if="point.id === selectedId || point.id === paired?.id" r="18" fill="rgba(255, 244, 205, 0.16)" stroke="#fff4cd" stroke-width="2" />
             <circle class="marker-frame" r="16" fill="transparent" stroke="transparent" stroke-width="2" />
-            <image :href="mapApi.iconUrl(point.kind)" x="-15" y="-15" width="30" height="30" preserveAspectRatio="xMidYMid meet" class="map-game-icon" aria-hidden="true" />
+            <image :href="iconUrlOf(point)" x="-15" y="-15" width="30" height="30" preserveAspectRatio="xMidYMid meet" class="map-game-icon" aria-hidden="true" />
           </template>
           <template v-else>
             <circle v-if="point.id === selectedId || point.id === paired?.id" r="15" fill="none" stroke="#fff4cd" stroke-width="2" />
