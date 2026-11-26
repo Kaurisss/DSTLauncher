@@ -3,9 +3,10 @@ import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import tailwindcss from '@tailwindcss/vite';
+import { compressDistImages } from './scripts/vite-compress-images.mjs';
 
 export default defineConfig({
-  plugins: [vue(), tailwindcss()],
+  plugins: [vue(), tailwindcss(), compressDistImages()],
 
   resolve: {
     // 全项目统一用 @/ 绝对导入。
