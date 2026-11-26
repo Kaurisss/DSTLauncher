@@ -65,4 +65,26 @@ assert.deepEqual(wormholeFiles, expectedWormholes, '虫洞彩色标记应完整�
 
 const triangleFiles = readdirSync(new URL('island-adventures/electric isosceles/', root)).sort();
 assert.equal(triangleFiles.length, 24, '电光三角彩色图标应完整保留 24 张');
-console.log(`图标检查通过（${Object.keys(WORLD_ICONS).length} 项映射，${slices.length} 张岛屿冒险切片，${wormholeFiles.length} 张虫洞图标，${triangleFiles.length} 张电光三角图标）`);
+
+// 所有 world-icons 下的 PNG 统一为 128×128
+const pngSig = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+let checkedPngCount = 0;
+function checkPngDimensions(dirUrl, prefix = '') {
+  for (const entry of readdirSync(dirUrl, { withFileTypes: true })) {
+    const childUrl = new URL(encodeURIComponent(entry.name) + (entry.isDirectory() ? '/' : ''), dirUrl);
+    const label = prefix ? `${prefix}/${entry.name}` : entry.name;
+    if (entry.isDirectory()) {
+      checkPngDimensions(childUrl, label);
+      continue;
+    }
+    if (!entry.name.endsWith('.png')) continue;
+    const buf = readFileSync(childUrl);
+    assert.ok(buf.length >= 24 && buf.subarray(0, 8).equals(pngSig), `非法 PNG 文件：${label}`);
+    const width = buf.readUInt32BE(16);
+    const height = buf.readUInt32BE(20);
+    assert.deepEqual([width, height], [128, 128], `图标尺寸必须为 128×128：${label}（实际 ${width}×${height}）`);
+    checkedPngCount += 1;
+  }
+}
+checkPngDimensions(root);
+console.log(`图标检查通过（${Object.keys(WORLD_ICONS).length} 项映射，${checkedPngCount} 张 128×128 PNG，${slices.length} 张岛屿冒险切片，${wormholeFiles.length} 张虫洞图标，${triangleFiles.length} 张电光三角图标）`);

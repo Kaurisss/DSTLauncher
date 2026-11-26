@@ -39,7 +39,7 @@ node web/scripts/check-world-icons.mjs
 
 ## 来源
 
-- 原有图标来自《饥荒联机版》的世界配置素材。
+- `common/` 与 `dst/` 原版图标统一为 128×128 PNG：从本机《饥荒联机版》安装目录 `data/images/worldgen_customization.tex`、`worldsettings_customization.tex` 经 `tools/texcli.exe decode --unpremultiply` 解码为 PNG 后，按同名 `.xml` 的像素中心 UV（`tools/extract_world_icons.py`）和 `scripts/map/customize.lua` 映射切出。
 - 岛屿冒险素材由用户从模组 HUD 提取；配置键与图片名称的对应关系参考模组的 [modservercreationmain.lua](https://gitlab.com/IslandAdventures/IslandAdventures/-/blob/main/modservercreationmain.lua)。
 
 游戏与模组美术素材的权利归各自权利人所有。

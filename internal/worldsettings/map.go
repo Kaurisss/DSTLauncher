@@ -68,17 +68,17 @@ var mapLandmarks = map[string]string{
 	// 森林与洞穴（原版）
 	"multiplayer_portal": "绚丽之门", "multiplayer_portal_moonrock": "天体传送门", "multiplayer_portal_moonrock_constr": "天体传送门",
 	"pigking": "猪王", "resurrectionstone": "试金石", "wormhole": "虫洞",
-	"cave_entrance": "洞穴入口", "cave_entrance_open": "洞穴入口", "cave_exit": "洞穴出口",
-	"atrium_gate": "远古大门", "ancient_altar": "远古伪科学站", "ancient_altar_broken": "损坏的远古伪科学站", "archive_switch": "远古档案馆",
-	"moonbase": "月台", "oasislake": "绿洲", "beequeenhivegrown": "蜂后巢", "hermithouse": "隐士之家",
-	"monkeyisland_portal": "月亮码头传送门", "terrarium": "泰拉瑞亚",
+	"cave_entrance": "被堵住的洞穴", "cave_entrance_open": "洞穴", "cave_exit": "楼梯",
+	"atrium_gate": "远古大门", "ancient_altar": "远古伪科学站", "ancient_altar_broken": "损坏的远古伪科学站", "archive_switch": "华丽基座",
+	"moonbase": "月亮石", "oasislake": "湖泊", "beequeenhivegrown": "巨大蜂窝", "hermithouse": "隐士之家",
+	"monkeyisland_portal": "非自然传送门", "terrarium": "盒中泰拉",
 	// 海难与火山（Island Adventures）
-	"volcano": "火山入口", "volcano_exit": "火山出口", "volcano_altar": "火山祭坛", "obsidian_workbench": "黑曜石工作台",
-	"octopusking": "章鱼王", "slotmachine": "老虎机", "sharkittenspawner": "虎鲨巢穴", "bermudatriangle": "电光三角",
-	"seaworthy": "海之传送门", "skyworthy": "天空传送门", "packim_fishbone": "帕克鱼骨", "coral_brain_rock": "智慧树",
-	"tar_pool": "焦油坑", "critterlab_water": "水上岩穴", "doydoy": "渡渡鸟", "doydoynest": "渡渡鸟巢",
-	"woodlegs_cage": "木腿笼子", "kraken": "海妖", "buriedtreasure": "藏宝点", "mermhouse_fisher": "渔夫鱼人房",
-	"daywalker_pillar_tropical": "噩梦疯猪柱",
+	"volcano": "火山", "volcano_exit": "火山出口", "volcano_altar": "火山祭坛", "obsidian_workbench": "黑曜石工作台",
+	"octopusking": "章鱼王", "slotmachine": "老虎机", "sharkittenspawner": "猫鲨巢穴", "bermudatriangle": "电光三角",
+	"seaworthy": "海洋之椅", "skyworthy": "天空之椅", "packim_fishbone": "鱼骨", "coral_brain_rock": "智慧树",
+	"tar_pool": "焦油浮膜", "critterlab_water": "珊瑚巢穴", "doydoy": "渡渡鸟", "doydoynest": "渡渡鸟巢",
+	"woodlegs_cage": "伍德莱格的囚笼", "kraken": "海妖", "buriedtreasure": "X标记点", "mermhouse_fisher": "渔人小屋",
+	"daywalker_pillar_tropical": "开裂的柱子",
 }
 
 // ReadSavedMap only examines direct numeric world files, never player subdirectories.

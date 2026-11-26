@@ -354,10 +354,10 @@ function buildMockMap(shardName, location) {
       ]
     : isShip
       ? [
-          { id: 's1', kind: 'seaworthy', name: '海之传送门', x: 64, y: 64 },
+          { id: 's1', kind: 'seaworthy', name: '海洋之椅', x: 64, y: 64 },
           { id: 's2', kind: 'octopusking', name: '章鱼王', x: 34, y: 40 },
           { id: 's3', kind: 'slotmachine', name: '老虎机', x: 74, y: 58 },
-          { id: 's4', kind: 'volcano', name: '火山入口', x: 96, y: 34 },
+          { id: 's4', kind: 'volcano', name: '火山', x: 96, y: 34 },
           { id: 's5', kind: 'coral_brain_rock', name: '智慧树', x: 86, y: 84 },
           { id: 'bt1', kind: 'bermudatriangle', name: '电光三角 1', x: 42, y: 56, target: 'bt2', pair: 1 },
           { id: 'bt2', kind: 'bermudatriangle', name: '电光三角 1', x: 90, y: 62, target: 'bt1', pair: 1 },
@@ -368,10 +368,10 @@ function buildMockMap(shardName, location) {
         ]
       : isCave
         ? [
-            { id: 'c1', kind: 'cave_exit', name: '洞穴出口', x: 64, y: 64 },
+            { id: 'c1', kind: 'cave_exit', name: '楼梯', x: 64, y: 64 },
             { id: 'c2', kind: 'ancient_altar', name: '远古伪科学站', x: 86, y: 82 },
             { id: 'c3', kind: 'atrium_gate', name: '远古大门', x: 94, y: 74 },
-            { id: 'c4', kind: 'archive_switch', name: '远古档案馆', x: 40, y: 46 },
+            { id: 'c4', kind: 'archive_switch', name: '华丽基座', x: 40, y: 46 },
           ]
         : [
             { id: 'm1', kind: 'multiplayer_portal', name: '绚丽之门', x: 64, y: 64 },
@@ -382,13 +382,13 @@ function buildMockMap(shardName, location) {
             { id: 'm13', kind: 'wormhole', name: '虫洞 2', x: 76, y: 38, target: 'm12', pair: 2 },
             { id: 'm14', kind: 'wormhole', name: '虫洞 3', x: 54, y: 36, target: 'm15', pair: 3 },
             { id: 'm15', kind: 'wormhole', name: '虫洞 3', x: 66, y: 88, target: 'm14', pair: 3 },
-            { id: 'm5', kind: 'cave_entrance', name: '洞穴入口', x: 58, y: 72 },
-            { id: 'm6', kind: 'moonbase', name: '月台', x: 44, y: 42 },
-            { id: 'm7', kind: 'oasislake', name: '绿洲', x: 88, y: 74 },
-            { id: 'm8', kind: 'beequeenhivegrown', name: '蜂后巢', x: 52, y: 82 },
+            { id: 'm5', kind: 'cave_entrance', name: '被堵住的洞穴', x: 58, y: 72 },
+            { id: 'm6', kind: 'moonbase', name: '月亮石', x: 44, y: 42 },
+            { id: 'm7', kind: 'oasislake', name: '湖泊', x: 88, y: 74 },
+            { id: 'm8', kind: 'beequeenhivegrown', name: '巨大蜂窝', x: 52, y: 82 },
             { id: 'm9', kind: 'resurrectionstone', name: '试金石', x: 70, y: 42 },
             { id: 'm10', kind: 'hermithouse', name: '隐士之家', x: 24, y: 86 },
-            { id: 'm11', kind: 'terrarium', name: '泰拉瑞亚', x: 46, y: 66 },
+            { id: 'm11', kind: 'terrarium', name: '盒中泰拉', x: 46, y: 66 },
           ];
 
   const textures = [
@@ -485,7 +485,7 @@ function buildWorldGroups(location) {
         { name: 'summer', label: '夏', default: 'default', values: SEASON_VALUES },
         { name: 'day', label: '昼夜选项', default: 'default', values: [{ data: 'default', label: '默认' }, { data: 'longday', label: '长白天' }, { data: 'longdusk', label: '长黄昏' }, { data: 'longnight', label: '长夜晚' }] },
         { name: 'spawnmode', label: '出生模式', default: 'fixed', values: [{ data: 'fixed', label: '绚丽之门' }, { data: 'scatter', label: '随机分布' }] },
-        { name: 'portalrez', label: '在绚丽之门复活', default: 'none', values: ENABLE_VALUES },
+        { name: 'portalresurection', label: '在绚丽之门复活', default: 'none', values: ENABLE_VALUES },
         { name: 'ghostsanitydrain', label: '鬼魂理智值惩罚', default: 'always', values: [{ data: 'none', label: '无' }, { data: 'always', label: '启用' }] },
         { name: 'resettime', label: '死亡重置倒计时', default: 'default', values: [{ data: 'none', label: '禁用' }, { data: 'slow', label: '慢' }, { data: 'default', label: '默认' }, { data: 'fast', label: '快' }] },
       ],
@@ -921,7 +921,7 @@ function getWorldConfig(state, roomId, shardName) {
         overrideEnabled: true,
         worldgenPreset: preset,
         settingsPreset: preset,
-        overrides: location === 'cave' ? { earthquakes: 'rare' } : { wildfires: 'never', portalrez: 'default' },
+        overrides: location === 'cave' ? { earthquakes: 'rare' } : { wildfires: 'never', portalresurection: 'default' },
       },
     };
   }
