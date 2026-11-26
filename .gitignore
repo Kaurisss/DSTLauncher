@@ -42,3 +42,6 @@ __pycache__/
 
 # graphify-out
 /graphify-out/
+
+# 模组文件
+/mod_src/

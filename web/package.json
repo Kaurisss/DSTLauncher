@@ -6,6 +6,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:mock": "node scripts/mock-dev.mjs",
     "build": "vite build",
     "test": "node scripts/check-auto-install.mjs && node scripts/check-api-stream.mjs && node scripts/check-shell.mjs && node scripts/check-room-admin.mjs && node scripts/check-world-icons.mjs",
     "preview": "vite preview",
