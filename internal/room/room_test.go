@@ -232,6 +232,41 @@ func TestStorePersists(t *testing.T) {
 	}
 }
 
+func TestNewStoreRejectsInvalidPersistedRoom(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "rooms.json")
+
+	s, err := NewStore(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	created, err := s.Create(Defaults())
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var file fileFormat
+	if err := json.Unmarshal(data, &file); err != nil {
+		t.Fatal(err)
+	}
+	file.Rooms[0].Name = created.Name + "\ncluster_password = injected"
+	data, err = json.Marshal(file)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, data, 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	if _, err := NewStore(path); err == nil {
+		t.Fatal("加载带换行的已保存房间时应失败")
+	}
+}
+
 // 生成的 ini 必须严格落在 DST 认识的节里。
 // 这是本项目踩过最深的坑：节名写错不会报错，只会让设置静默失效。
 func TestGeneratedIniStructure(t *testing.T) {
@@ -421,6 +456,12 @@ func TestValidateRejectsInvalidValues(t *testing.T) {
 		mutin func(*Room)
 	}{
 		{"空房名", func(r *Room) { r.Name = "  " }},
+		{"房间名含换行", func(r *Room) { r.Name = "name\ninjected" }},
+		{"房间描述含换行", func(r *Room) { r.Description = "description\r\ninjected" }},
+		{"密码含换行", func(r *Room) { r.Password = "password\ninjected" }},
+		{"令牌含换行", func(r *Room) { r.Token = "token\ninjected" }},
+		{"主分片地址含换行", func(r *Room) { r.MasterIP = "127.0.0.1\ninjected" }},
+		{"通信密钥含换行", func(r *Room) { r.ClusterKey = "key\ninjected" }},
 		{"非法游戏模式", func(r *Room) { r.GameMode = "custom" }},
 		{"人数越界", func(r *Room) { r.MaxPlayers = 200 }},
 		{"tick 非法", func(r *Room) { r.TickRate = 45 }},

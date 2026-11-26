@@ -401,6 +401,21 @@ func (r *Room) Validate() error {
 	if err := ValidateConnect(r.ConnectIP, r.ConnectPort, r.ConnectPorts); err != nil {
 		return err
 	}
+	for _, field := range []struct {
+		name  string
+		value string
+	}{
+		{"房间名", r.Name},
+		{"房间描述", r.Description},
+		{"房间密码", r.Password},
+		{"服务器令牌", r.Token},
+		{"主分片地址", r.MasterIP},
+		{"分片通信密钥", r.ClusterKey},
+	} {
+		if strings.ContainsAny(field.value, "\r\n\x00") {
+			return fmt.Errorf("%s不能包含换行或空字符", field.name)
+		}
+	}
 	if strings.TrimSpace(r.Name) == "" {
 		return fmt.Errorf("房间名不能为空")
 	}

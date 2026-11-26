@@ -143,7 +143,7 @@ func (m *Manager) CreateAutomatic(keep int) (*BackupItem, error) {
 
 // zipDir 将目录递归压缩为 zip。
 func (m *Manager) zipDir(srcDir, dstPath string) error {
-	f, err := os.Create(dstPath)
+	f, err := os.OpenFile(dstPath, os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		return fmt.Errorf("创建备份文件失败: %w", err)
 	}

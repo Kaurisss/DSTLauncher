@@ -228,7 +228,7 @@ func WriteFileAtomic(path string, data []byte) error {
 	}
 	tmp := path + ".tmp"
 	// 显式指定无 BOM 的 UTF-8
-	if err := os.WriteFile(tmp, data, 0644); err != nil {
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
 		return fmt.Errorf("写入临时文件失败: %w", err)
 	}
 	if err := os.Rename(tmp, path); err != nil {

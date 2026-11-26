@@ -29,6 +29,12 @@ import (
 // clusterIniName 是存档根目录的判定文件，同时用于定位与解析。
 const clusterIniName = "cluster.ini"
 
+const (
+	maxArchiveBytes = int64(8 << 30)
+	maxExtractBytes = int64(32 << 30)
+	maxExtractItems = 100000
+)
+
 // levelDataOverrideName 是游戏实际使用的世界配置文件。
 //
 // Klei 在服务器源码里写明：leveldataoverride.lua 供游戏使用、会完全覆盖已保存的世界数据，
@@ -162,6 +168,13 @@ func isJunkName(name string) bool {
 //
 // 条目名一律当作不可信输入：压缩包可以被伪造，必须防路径穿越（Zip Slip）。
 func Extract(zipPath, dstDir string) error {
+	info, err := os.Stat(zipPath)
+	if err != nil {
+		return err
+	}
+	if !info.Mode().IsRegular() || info.Size() > maxArchiveBytes {
+		return fmt.Errorf("存档压缩包不是普通文件或超过 8 GiB")
+	}
 	rc, err := zip.OpenReader(zipPath)
 	if err != nil {
 		return fmt.Errorf("不是有效的 zip 压缩包: %w", err)
@@ -181,6 +194,8 @@ func Extract(zipPath, dstDir string) error {
 	}
 	defer root.Close()
 
+	seen := map[string]bool{}
+	var total int64
 	for _, f := range rc.File {
 		name := filepath.FromSlash(strings.ReplaceAll(f.Name, "\\", "/"))
 		if name == "" {
@@ -190,8 +205,26 @@ func Extract(zipPath, dstDir string) error {
 			return fmt.Errorf("压缩包中存在非法路径: %s", f.Name)
 		}
 		clean := filepath.Clean(name)
+		if len(seen) >= maxExtractItems {
+			return fmt.Errorf("压缩包条目超过 %d 个", maxExtractItems)
+		}
+		key := strings.ToLower(filepath.ToSlash(clean))
+		if seen[key] {
+			return fmt.Errorf("压缩包存在重复路径: %s", f.Name)
+		}
+		seen[key] = true
 		if isJunkPath(f.Name) {
 			continue
+		}
+		if f.Mode()&os.ModeSymlink != 0 || (!f.FileInfo().IsDir() && !f.Mode().IsRegular()) {
+			return fmt.Errorf("压缩包不允许链接或特殊文件: %s", f.Name)
+		}
+		if f.UncompressedSize64 > uint64(maxExtractBytes) ||
+			total > maxExtractBytes-int64(f.UncompressedSize64) {
+			return fmt.Errorf("压缩包解压内容超过 32 GiB")
+		}
+		if !f.FileInfo().IsDir() {
+			total += int64(f.UncompressedSize64)
 		}
 
 		if f.FileInfo().IsDir() {
@@ -230,9 +263,14 @@ func writeZipEntry(root *os.Root, f *zip.File, target string) error {
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(dst, src); err != nil {
+	n, err := io.Copy(dst, io.LimitReader(src, int64(f.UncompressedSize64)+1))
+	if err != nil {
 		_ = dst.Close()
 		return err
+	}
+	if n != int64(f.UncompressedSize64) {
+		_ = dst.Close()
+		return fmt.Errorf("压缩包条目大小不符")
 	}
 	return dst.Close()
 }

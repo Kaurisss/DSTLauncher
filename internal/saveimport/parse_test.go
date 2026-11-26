@@ -2,6 +2,7 @@ package saveimport
 
 import (
 	"archive/zip"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -426,6 +427,66 @@ func TestExtractRejectsZipSlip(t *testing.T) {
 
 	if err := Extract(zipPath, filepath.Join(root, "out")); err == nil {
 		t.Fatalf("含 ../ 的压缩包应当被拒绝")
+	}
+}
+
+func TestExtractRejectsDuplicatePaths(t *testing.T) {
+	root := t.TempDir()
+	zipPath := filepath.Join(root, "duplicate.zip")
+
+	f, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	for _, content := range []string{"first", "second"} {
+		w, err := zw.Create("Cluster_1/cluster.ini")
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Extract(zipPath, filepath.Join(root, "out")); err == nil {
+		t.Fatal("重复路径应当被拒绝")
+	}
+}
+
+func TestExtractCountsJunkEntriesAgainstLimit(t *testing.T) {
+	root := t.TempDir()
+	zipPath := filepath.Join(root, "too-many-junk.zip")
+
+	f, err := os.Create(zipPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	zw := zip.NewWriter(f)
+	for i := 0; i <= maxExtractItems; i++ {
+		w, err := zw.Create(fmt.Sprintf("__MACOSX/%06d", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := w.Write([]byte("junk")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := Extract(zipPath, filepath.Join(root, "out")); err == nil {
+		t.Fatal("垃圾条目也应计入压缩包条目上限")
 	}
 }
 

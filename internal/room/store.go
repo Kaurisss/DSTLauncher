@@ -100,6 +100,9 @@ func (s *Store) load() error {
 			continue
 		}
 		r.Normalize()
+		if err := r.Validate(); err != nil {
+			return fmt.Errorf("房间 %d 配置无效: %w", r.ID, err)
+		}
 		s.rooms = append(s.rooms, r)
 	}
 	return nil
@@ -116,7 +119,7 @@ func (s *Store) save() error {
 		return fmt.Errorf("创建房间定义目录失败: %w", err)
 	}
 	tmp := s.path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0644); err != nil {
+	if err := os.WriteFile(tmp, data, 0600); err != nil {
 		return fmt.Errorf("写入房间定义失败: %w", err)
 	}
 	if err := os.Rename(tmp, s.path); err != nil {
