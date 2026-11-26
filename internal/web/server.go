@@ -65,9 +65,8 @@ type Server struct {
 	authMu         sync.Mutex
 	authConfigSeen bool
 	loginMu        sync.Mutex
-	failCount      int
-	lockUntil      time.Time
-	loginDelay     time.Duration
+	loginStates    map[string]loginState
+	globalLogin    loginState
 
 	// taskMu 串行化「开服 / 安装更新服务端 / 模组下载」这四类会改动共享状态
 	// （游戏安装目录、共享 ugc 目录）的操作，让「检查是否忙 → 启动」成为原子动作，
@@ -84,6 +83,9 @@ type Server struct {
 	mapMu           sync.Mutex
 	mapTexMu        sync.RWMutex
 	mapTexCache     map[string][]byte
+	mapRootsMu      sync.Mutex
+	mapRootsAt      time.Time
+	mapRoots        []string
 	mapIconMu       sync.Mutex
 	mapIconCache    map[string][]byte
 	mapIconIdxKey   string
@@ -115,6 +117,7 @@ func NewServer(o Options) *Server {
 		envPassword:    strings.TrimSpace(o.Password),
 		authSecret:     generateSecret(),
 		authConfigSeen: o.WorkDir != "" && panelcfg.Exists(o.WorkDir),
+		loginStates:    map[string]loginState{},
 		playerLogs:     chatlog.NewHistory(filepath.Join(o.RootDir, "playerlogs")),
 	}
 	s.automation, s.automationErr = automation.New(filepath.Join(o.RootDir, "automation.json"))

@@ -128,6 +128,13 @@ func main() {
 			log.Fatalf("创建目录失败 %s: %v", d, err)
 		}
 	}
+	if err := config.HardenPrivateFiles(
+		panelcfg.Path(workDir),
+		rootDir,
+		logDir,
+	); err != nil {
+		log.Printf("[!] 收紧旧敏感文件权限失败: %v", err)
+	}
 
 	// 架构偏好：命令行 > 面板配置 > auto
 	cfg := panelcfg.Load(workDir)

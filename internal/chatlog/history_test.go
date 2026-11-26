@@ -312,6 +312,26 @@ func TestHistoryKeepsMoreThanLegacyTailAndSearchesAllArchivedRows(t *testing.T) 
 	}
 }
 
+func TestFacesKeepsLastKnownNameAfterHistoryTrim(t *testing.T) {
+	state := &historyState{
+		StartedAt: time.Date(2026, time.November, 26, 12, 0, 0, 0, time.UTC),
+		Players: map[string]identity{
+			"KU_PLAYER": {
+				Names:          map[string]bool{"旧名字": true, "新名字": true},
+				LastName:       "新名字",
+				LastNameAt:     time.Hour,
+				LastNameDirect: true,
+			},
+		},
+		Entries: []storedEntry{},
+	}
+
+	faces := state.faces()
+	if faces["ku_player"].Name != "新名字" {
+		t.Fatalf("历史裁剪后应保留最后名称: %+v", faces)
+	}
+}
+
 func TestFacesKeepsLatestNameAndCharacterAcrossShards(t *testing.T) {
 	cluster := filepath.Join(t.TempDir(), "Cluster_1")
 	start := time.Now().Add(-2 * time.Hour)

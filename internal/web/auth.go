@@ -5,9 +5,11 @@ import (
 	"crypto/rand"
 	"crypto/sha256"
 	"crypto/subtle"
+	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -19,13 +21,24 @@ import (
 )
 
 const (
-	sessionCookieName    = "dst_session"
-	sessionMaxAge        = 30 * 24 * 3600 // 30 天
-	hashIterations       = 10000
-	maxLoginFailures     = 5
-	loginLockDuration    = 30 * time.Second
-	maxLoginLockDuration = 15 * time.Minute
+	sessionCookieName      = "dst_session"
+	sessionMaxAge          = 30 * 24 * 3600 // 30 天
+	legacyHashIterations   = 10000
+	pbkdf2Iterations       = 600000
+	pbkdf2KeySize          = 32
+	maxLoginFailures       = 5
+	maxGlobalLoginFailures = 50
+	loginLockDuration      = 30 * time.Second
+	maxLoginLockDuration   = 15 * time.Minute
+	maxLoginStates         = 1024
 )
+
+type loginState struct {
+	failCount int
+	lockUntil time.Time
+	delay     time.Duration
+	lastSeen  time.Time
+}
 
 func generateSecret() []byte {
 	b := make([]byte, 32)
@@ -35,32 +48,106 @@ func generateSecret() []byte {
 	return b
 }
 
-// HashPassword 生成带随机盐的迭代 SHA-256 密码摘要（格式：saltHex:hashHex）。
+// HashPassword 生成带随机盐的 PBKDF2-SHA256 密码摘要。
 func HashPassword(password string) (string, error) {
 	saltBytes := make([]byte, 16)
 	if _, err := rand.Read(saltBytes); err != nil {
 		return "", err
 	}
-	salt := hex.EncodeToString(saltBytes)
-	return salt + ":" + derivePasswordHash(salt, password), nil
+	hash := derivePBKDF2(saltBytes, password, pbkdf2Iterations)
+	return fmt.Sprintf("pbkdf2-sha256$%d$%s$%s",
+		pbkdf2Iterations,
+		hex.EncodeToString(saltBytes),
+		hex.EncodeToString(hash),
+	), nil
 }
 
 func derivePasswordHash(salt, password string) string {
 	h := sha256.Sum256([]byte(salt + ":" + password))
-	for i := 0; i < hashIterations; i++ {
+	for i := 0; i < legacyHashIterations; i++ {
 		h = sha256.Sum256(h[:])
 	}
 	return hex.EncodeToString(h[:])
 }
 
-// VerifyPassword 常量时间校验密码与存储的 salt:hash 摘要。
+func derivePBKDF2(salt []byte, password string, iterations int) []byte {
+	mac := hmac.New(sha256.New, []byte(password))
+	var block [4]byte
+	binary.BigEndian.PutUint32(block[:], 1)
+	mac.Write(salt)
+	mac.Write(block[:])
+	previous := mac.Sum(nil)
+	result := append([]byte(nil), previous...)
+	for i := 1; i < iterations; i++ {
+		mac.Reset()
+		mac.Write(previous)
+		previous = mac.Sum(nil)
+		for j := range result {
+			result[j] ^= previous[j]
+		}
+	}
+	return result
+}
+
+// VerifyPassword 常量时间校验密码与存储的摘要，兼容旧版 salt:hash 格式。
 func VerifyPassword(stored, password string) bool {
+	if strings.HasPrefix(stored, "pbkdf2-sha256$") {
+		parts := strings.Split(stored, "$")
+		if len(parts) != 4 || parts[0] != "pbkdf2-sha256" {
+			return false
+		}
+		iterations, err := strconv.Atoi(parts[1])
+		if err != nil || iterations < 100000 || iterations > 10000000 {
+			return false
+		}
+		salt, err := hex.DecodeString(parts[2])
+		if err != nil || len(salt) < 16 {
+			return false
+		}
+		want, err := hex.DecodeString(parts[3])
+		if err != nil || len(want) != pbkdf2KeySize {
+			return false
+		}
+		return subtle.ConstantTimeCompare(derivePBKDF2(salt, password, iterations), want) == 1
+	}
 	parts := strings.SplitN(stored, ":", 2)
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" {
 		return false
 	}
 	got := derivePasswordHash(parts[0], password)
 	return subtle.ConstantTimeCompare([]byte(got), []byte(parts[1])) == 1
+}
+
+func needsPasswordUpgrade(stored string) bool {
+	return stored != "" && !strings.HasPrefix(stored, "pbkdf2-sha256$")
+}
+
+func loginClientKey(r *http.Request) string {
+	remote := r.RemoteAddr
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		remote = host
+	}
+	if remoteIP := net.ParseIP(remote); remoteIP != nil && remoteIP.IsLoopback() {
+		for _, header := range []string{"X-Forwarded-For", "X-Real-IP"} {
+			for _, value := range strings.Split(r.Header.Get(header), ",") {
+				if ip := net.ParseIP(strings.TrimSpace(value)); ip != nil {
+					return ip.String()
+				}
+			}
+		}
+	}
+	return remote
+}
+
+func (s *Server) pruneLoginStates(now time.Time) {
+	if len(s.loginStates) < maxLoginStates {
+		return
+	}
+	for key, state := range s.loginStates {
+		if state.lockUntil.Before(now) && now.Sub(state.lastSeen) > maxLoginLockDuration {
+			delete(s.loginStates, key)
+		}
+	}
 }
 
 func configuredUsername(cfg panelcfg.Config) string {
@@ -231,7 +318,7 @@ func rejectAPI(w http.ResponseWriter, status int, message string) {
 
 func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	s.loginMu.Lock()
-	retryAfter := s.loginRetryAfter()
+	retryAfter := s.loginRetryAfter(loginClientKey(r))
 	s.loginMu.Unlock()
 	_, username, _, envManaged, err := s.activeAuth()
 	respond(w, 200, map[string]interface{}{
@@ -243,8 +330,17 @@ func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	}, err)
 }
 
-func (s *Server) loginRetryAfter() int {
-	return max(0, int((time.Until(s.lockUntil)+time.Second-1)/time.Second))
+func retryAfter(state loginState, now time.Time) int {
+	return max(0, int((time.Until(state.lockUntil)+time.Second-1)/time.Second))
+}
+
+func (s *Server) loginRetryAfter(clientKey string) int {
+	now := time.Now()
+	wait := retryAfter(s.globalLogin, now)
+	if client := s.loginStates[clientKey]; retryAfter(client, now) > wait {
+		wait = retryAfter(client, now)
+	}
+	return wait
 }
 
 func rejectLoginCooldown(w http.ResponseWriter, wait int) {
@@ -268,7 +364,9 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 
 	s.loginMu.Lock()
 	defer s.loginMu.Unlock()
-	if wait := s.loginRetryAfter(); wait > 0 {
+	clientKey := loginClientKey(r)
+	now := time.Now()
+	if wait := s.loginRetryAfter(clientKey); wait > 0 {
 		rejectLoginCooldown(w, wait)
 		return
 	}
@@ -288,22 +386,47 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	if !valid {
-		if s.failCount < maxLoginFailures {
-			s.failCount++
+		client := s.loginStates[clientKey]
+		client.lastSeen = now
+		if client.failCount < maxLoginFailures {
+			client.failCount++
 		}
-		if s.failCount >= maxLoginFailures {
-			s.loginDelay = min(max(s.loginDelay*2, loginLockDuration), maxLoginLockDuration)
-			s.lockUntil = time.Now().Add(s.loginDelay)
-			rejectLoginCooldown(w, s.loginRetryAfter())
+		if client.failCount >= maxLoginFailures {
+			client.delay = min(max(client.delay*2, loginLockDuration), maxLoginLockDuration)
+			client.lockUntil = now.Add(client.delay)
+		}
+		s.loginStates[clientKey] = client
+		s.globalLogin.lastSeen = now
+		if s.globalLogin.failCount < maxGlobalLoginFailures {
+			s.globalLogin.failCount++
+		}
+		if s.globalLogin.failCount >= maxGlobalLoginFailures {
+			s.globalLogin.delay = min(max(s.globalLogin.delay*2, loginLockDuration), maxLoginLockDuration)
+			s.globalLogin.lockUntil = now.Add(s.globalLogin.delay)
+		}
+		if wait := s.loginRetryAfter(clientKey); wait > 0 {
+			s.pruneLoginStates(now)
+			rejectLoginCooldown(w, wait)
 			return
 		}
+		s.pruneLoginStates(now)
 		respond(w, 200, nil, fmt.Errorf("用户名或密码错误"))
 		return
 	}
 
-	s.failCount = 0
-	s.lockUntil = time.Time{}
-	s.loginDelay = 0
+	if factor != "" && s.envPassword == "" && s.envUsername == "" && needsPasswordUpgrade(cfg.PasswordHash) {
+		if upgraded, hashErr := HashPassword(body.Password); hashErr == nil {
+			cfg.PasswordHash = upgraded
+			if saveErr := panelcfg.Save(s.workDir, cfg); saveErr == nil {
+				factor = "cfg:" + username + "|" + upgraded
+				s.authMu.Lock()
+				s.authConfigSeen = true
+				s.authMu.Unlock()
+			}
+		}
+	}
+	delete(s.loginStates, clientKey)
+	s.globalLogin = loginState{}
 
 	if factor != "" {
 		s.setSessionCookie(w, factor)

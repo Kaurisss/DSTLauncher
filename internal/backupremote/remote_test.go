@@ -102,6 +102,57 @@ func TestDirectorySyncRetentionAndPasswordPersistence(t *testing.T) {
 		}
 	}
 }
+
+func TestEnqueueKeepsTasksWhenQueueIsFull(t *testing.T) {
+	root := t.TempDir()
+	dest := filepath.Join(t.TempDir(), "remote")
+	e, err := New(filepath.Join(root, "config.json"), root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Configure(Config{Enabled: true, Kind: "directory", Directory: dest, Keep: 10}, nil); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < cap(e.queue)+3; i++ {
+		name, path := sourceBackup(t, i)
+		if _, err := e.Enqueue(1, name, path, true); err != nil {
+			t.Fatalf("队列满后不应丢弃任务: %v", err)
+		}
+	}
+	if got := len(e.pending); got != 3 {
+		t.Fatalf("队列满后应保留待同步任务: got=%d", got)
+	}
+	stop := e.Start()
+	stop()
+}
+
+func TestEnqueueRejectsTasksPastPendingLimit(t *testing.T) {
+	root := t.TempDir()
+	dest := filepath.Join(t.TempDir(), "remote")
+	e, err := New(filepath.Join(root, "config.json"), root, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Configure(Config{Enabled: true, Kind: "directory", Directory: dest, Keep: 10}, nil); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < cap(e.queue)+maxPendingDeliveries+1; i++ {
+		name, path := sourceBackup(t, i)
+		_, err := e.Enqueue(1, name, path, true)
+		if i < cap(e.queue)+maxPendingDeliveries && err != nil {
+			t.Fatalf("队列未达到上限却入队失败: %v", err)
+		}
+		if i == cap(e.queue)+maxPendingDeliveries && err == nil {
+			t.Fatal("超出待同步上限应返回错误")
+		}
+	}
+	if got := len(e.pending); got != maxPendingDeliveries {
+		t.Fatalf("待同步任务应受上限限制: got=%d", got)
+	}
+	stop := e.Start()
+	stop()
+}
+
 func TestWebDAVUploadsThenMovesAndPrunesOnlyOwnNames(t *testing.T) {
 	var mu sync.Mutex
 	objects := map[string][]byte{}

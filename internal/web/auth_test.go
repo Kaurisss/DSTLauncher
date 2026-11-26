@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"testing"
 	"testing/fstest"
@@ -221,9 +222,35 @@ func TestAuthEnvironmentUsername(t *testing.T) {
 	}
 }
 
+func TestPasswordHashUpgradeOnLogin(t *testing.T) {
+	srv := newAuthTestServer(t, "")
+	legacy := "legacy-salt:" + derivePasswordHash("legacy-salt", "secret123")
+	if err := panelcfg.Save(srv.workDir, panelcfg.Config{PasswordHash: legacy}); err != nil {
+		t.Fatal(err)
+	}
+	rec, body := doJSON(t, srv.Handler(), http.MethodPost, "/api/auth/login", map[string]string{
+		"username": "admin",
+		"password": "secret123",
+	}, nil)
+	if body["code"] != float64(200) || len(rec.Result().Cookies()) == 0 {
+		t.Fatalf("旧摘要兼容登录失败: %v", body)
+	}
+	cfg, err := panelcfg.Read(srv.workDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.HasPrefix(cfg.PasswordHash, "pbkdf2-sha256$") {
+		t.Fatalf("登录后旧摘要未升级: %q", cfg.PasswordHash)
+	}
+	if !VerifyPassword(cfg.PasswordHash, "secret123") {
+		t.Fatal("升级后的摘要无法验证原密码")
+	}
+}
+
 func TestAuthLoginLockout(t *testing.T) {
 	srv := newAuthTestServer(t, "fixedpass")
 	h := srv.Handler()
+	clientKey := loginClientKey(httptest.NewRequest(http.MethodPost, "/api/auth/login", nil))
 	synctest.Test(t, func(t *testing.T) {
 		for i := 1; i < maxLoginFailures; i++ {
 			rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": "wrong"}, nil)
@@ -236,11 +263,11 @@ func TestAuthLoginLockout(t *testing.T) {
 			if rec.Code != http.StatusTooManyRequests || body["code"] != float64(429) || rec.Header().Get("Retry-After") != strconv.Itoa(wait) {
 				t.Fatalf("应返回递增冷却 %ds: status=%d headers=%v body=%v", wait, rec.Code, rec.Header(), body)
 			}
-			deadline := srv.lockUntil
+			deadline := srv.loginStates[clientKey].lockUntil
 			time.Sleep(8 * time.Second)
 			for _, password := range []string{"wrong", "fixedpass"} {
 				rec, _ = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": password}, nil)
-				if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != strconv.Itoa(wait-8) || len(rec.Result().Cookies()) != 0 || !srv.lockUntil.Equal(deadline) {
+				if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != strconv.Itoa(wait-8) || len(rec.Result().Cookies()) != 0 || !srv.loginStates[clientKey].lockUntil.Equal(deadline) {
 					t.Fatalf("冷却期请求必须拒绝且不能重置截止时间: %d %v", rec.Code, rec.Header())
 				}
 			}
@@ -273,6 +300,7 @@ func TestAuthConcurrentLoginLockout(t *testing.T) {
 		t.Fatal(err)
 	}
 	h := srv.Handler()
+	clientKey := loginClientKey(httptest.NewRequest(http.MethodPost, "/api/auth/login", nil))
 	start := make(chan struct{})
 	var pending sync.WaitGroup
 	responses := make(chan int, 50)
@@ -297,8 +325,34 @@ func TestAuthConcurrentLoginLockout(t *testing.T) {
 	if blocked != cap(responses)-maxLoginFailures+1 {
 		t.Fatalf("达到阈值及后续并发请求都应返回 429: got=%d", blocked)
 	}
-	if srv.loginDelay != loginLockDuration || srv.failCount != maxLoginFailures {
-		t.Fatalf("冷却期并发请求不得继续计数或加重惩罚: delay=%s failures=%d", srv.loginDelay, srv.failCount)
+	state := srv.loginStates[clientKey]
+	if state.delay != loginLockDuration || state.failCount != maxLoginFailures {
+		t.Fatalf("冷却期并发请求不得继续计数或加重惩罚: delay=%s failures=%d", state.delay, state.failCount)
+	}
+}
+
+func TestAuthLoginLockoutIsPerClient(t *testing.T) {
+	srv := newAuthTestServer(t, "fixedpass")
+	h := srv.Handler()
+	fail := func(remote string) (*httptest.ResponseRecorder, map[string]interface{}) {
+		req := httptest.NewRequest(http.MethodPost, "/api/auth/login", bytes.NewBufferString(`{"username":"admin","password":"wrong"}`))
+		req.RemoteAddr = remote
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		var body map[string]interface{}
+		_ = json.Unmarshal(rec.Body.Bytes(), &body)
+		return rec, body
+	}
+	for i := 0; i < maxLoginFailures; i++ {
+		fail("192.0.2.10:1000")
+	}
+	rec, body := fail("192.0.2.10:1000")
+	if rec.Code != http.StatusTooManyRequests || body["code"] != float64(http.StatusTooManyRequests) {
+		t.Fatalf("同一客户端应进入冷却: status=%d body=%v", rec.Code, body)
+	}
+	rec, body = fail("192.0.2.11:1000")
+	if rec.Code != http.StatusOK || body["message"] != "用户名或密码错误" {
+		t.Fatalf("不同客户端不应继承冷却: status=%d body=%v", rec.Code, body)
 	}
 }
 

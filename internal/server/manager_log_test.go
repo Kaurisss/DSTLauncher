@@ -26,3 +26,26 @@ func TestReadLogReturnsRequestedLineCount(t *testing.T) {
 		t.Fatalf("ReadLog() = %q, want %q", got, "four,five")
 	}
 }
+
+func TestCompactLogFileKeepsRecentLines(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "server.log")
+	file, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR, 0600)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	if _, err := file.WriteString("old-1\nold-2\nnew-1\nnew-2\n"); err != nil {
+		t.Fatal(err)
+	}
+	if file, err = compactLogFile(file, 20); err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(data), "new-2") || strings.Contains(string(data), "old-1") {
+		t.Fatalf("压缩后的日志内容不正确: %q", data)
+	}
+}

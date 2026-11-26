@@ -9,11 +9,14 @@ import (
 )
 
 type identity struct {
-	Names   map[string]bool  `json:"names"`
-	SteamID string           `json:"steamid,omitempty"`
-	IP      string           `json:"ip,omitempty"`
-	Prefab  string           `json:"prefab,omitempty"`
-	Changes []identityChange `json:"changes,omitempty"`
+	Names          map[string]bool  `json:"names"`
+	LastName       string           `json:"lastName,omitempty"`
+	LastNameAt     time.Duration    `json:"lastNameAt,omitempty"`
+	LastNameDirect bool             `json:"lastNameDirect,omitempty"`
+	SteamID        string           `json:"steamid,omitempty"`
+	IP             string           `json:"ip,omitempty"`
+	Prefab         string           `json:"prefab,omitempty"`
+	Changes        []identityChange `json:"changes,omitempty"`
 }
 
 type identityChange struct {
@@ -53,7 +56,9 @@ func (s *historyState) observeServer(line string) {
 	}
 	if m := authLine.FindStringSubmatch(body); m != nil {
 		p := s.player(m[1])
-		p.Names[strings.TrimSpace(m[2])] = true
+		p.LastName = strings.TrimSpace(m[2])
+		p.Names[p.LastName] = true
+		p.LastNameAt = at
 		s.putPlayer(m[1], p, at)
 	}
 	if m := clientLine.FindStringSubmatch(body); m != nil {
@@ -81,7 +86,10 @@ func (s *historyState) observeServer(line string) {
 		}
 		if json.Unmarshal([]byte(m[1]), &reply) == nil && reply.Player != nil && strings.HasPrefix(reply.Player.UserID, "KU_") {
 			p := s.player(reply.Player.UserID)
+			p.LastName = reply.Player.Name
 			p.Names[reply.Player.Name] = true
+			p.LastNameAt = at
+			p.LastNameDirect = true
 			p.Prefab = reply.Player.Prefab
 			s.putPlayer(reply.Player.UserID, p, at)
 		}

@@ -11,6 +11,7 @@ import (
 	"regexp"
 	"slices"
 	"strings"
+	"time"
 
 	"dst-windows/internal/modmgr"
 	"dst-windows/internal/worldsettings"
@@ -22,6 +23,9 @@ const (
 	mapTexEdgeKey       = "__MAP_EDGE__"
 	maxMapTexSize       = 256
 	maxMapTexFileBytes  = 16 << 20
+	mapRootsCacheTTL    = 10 * time.Second
+	maxMapTextureCache  = 256
+	maxMapIconCache     = 512
 )
 
 var validMapTileKey = regexp.MustCompile(`^[A-Za-z0-9_]{1,64}$`)
@@ -126,6 +130,26 @@ var mapTileTextures = map[string][]string{
 }
 
 func (s *Server) mapTextureRoots() []string {
+	now := time.Now()
+	s.mapRootsMu.Lock()
+	if !s.mapRootsAt.IsZero() && now.Sub(s.mapRootsAt) < mapRootsCacheTTL {
+		roots := append([]string(nil), s.mapRoots...)
+		s.mapRootsMu.Unlock()
+		return roots
+	}
+	roots := s.discoverMapTextureRoots()
+	oldKey := strings.Join(s.mapRoots, "|")
+	newKey := strings.Join(roots, "|")
+	s.mapRoots = append([]string(nil), roots...)
+	s.mapRootsAt = now
+	s.mapRootsMu.Unlock()
+	if oldKey != newKey {
+		s.invalidateMapCaches()
+	}
+	return roots
+}
+
+func (s *Server) discoverMapTextureRoots() []string {
 	var roots []string
 	seen := map[string]bool{}
 	add := func(dir string) {
@@ -299,10 +323,24 @@ func (s *Server) handleMapTexture(w http.ResponseWriter, r *http.Request) {
 	if s.mapTexCache == nil {
 		s.mapTexCache = map[string][]byte{}
 	}
+	if len(s.mapTexCache) >= maxMapTextureCache {
+		s.mapTexCache = map[string][]byte{}
+	}
 	s.mapTexCache[filePath] = encoded
 	s.mapTexMu.Unlock()
 
 	writeMapTexturePNG(w, encoded)
+}
+
+func (s *Server) invalidateMapCaches() {
+	s.mapTexMu.Lock()
+	s.mapTexCache = nil
+	s.mapTexMu.Unlock()
+	s.mapIconMu.Lock()
+	s.mapIconCache = nil
+	s.mapIconIdxKey = ""
+	s.mapIconIdx = nil
+	s.mapIconMu.Unlock()
 }
 
 func writeMapTexturePNG(w http.ResponseWriter, data []byte) {

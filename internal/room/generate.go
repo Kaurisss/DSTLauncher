@@ -2,6 +2,7 @@ package room
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -159,6 +160,9 @@ func Generate(root, confDir string, r *Room) error {
 	if err := config.EnsureDirExists(clusterDir); err != nil {
 		return fmt.Errorf("创建集群目录失败: %w", err)
 	}
+	if err := removeInactiveShardConfigs(clusterDir, r); err != nil {
+		return fmt.Errorf("清理停用分片配置失败: %w", err)
+	}
 
 	// 名单文件缺失时 DST 会报错，先建空文件
 	for _, name := range []string{"adminlist.txt", "blocklist.txt", "whitelist.txt"} {
@@ -186,6 +190,27 @@ func Generate(root, confDir string, r *Room) error {
 
 	// 世界预设必须赶在分片第一次启动之前落盘，否则引擎会按地表生成
 	return ensureWorldPresets(root, confDir, r)
+}
+
+func removeInactiveShardConfigs(clusterDir string, r *Room) error {
+	active := make(map[string]bool, len(r.ShardNames()))
+	for _, name := range r.ShardNames() {
+		active[name] = true
+	}
+	entries, err := os.ReadDir(clusterDir)
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() || active[entry.Name()] {
+			continue
+		}
+		path := filepath.Join(clusterDir, entry.Name(), serverIniName)
+		if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+	return nil
 }
 
 // ensureWorldPresets 给还没有世界配置的分片补一份与其类型匹配的默认预设。

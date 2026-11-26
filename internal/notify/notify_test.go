@@ -88,3 +88,38 @@ func TestFailureFeedbackAndNoRedirect(t *testing.T) {
 		}
 	}
 }
+
+func TestPublishKeepsEventsWhenQueueIsFull(t *testing.T) {
+	e, err := New(filepath.Join(t.TempDir(), "notifications.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Configure(Config{Enabled: true, URL: "http://127.0.0.1:1", Events: []string{"started"}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < cap(e.queue)+5; i++ {
+		e.Publish(Event{Event: "started", RoomID: i + 1})
+	}
+	if got := len(e.pending); got != 5 {
+		t.Fatalf("队列满后应保留待发送通知: got=%d", got)
+	}
+}
+
+func TestPublishRejectsEventsPastPendingLimit(t *testing.T) {
+	e, err := New(filepath.Join(t.TempDir(), "notifications.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := e.Configure(Config{Enabled: true, URL: "http://127.0.0.1:1", Events: []string{"started"}}, nil); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < cap(e.queue)+maxPendingEvents+1; i++ {
+		e.Publish(Event{Event: "started", RoomID: i + 1})
+	}
+	if got := len(e.pending); got != maxPendingEvents {
+		t.Fatalf("待发送通知应受上限限制: got=%d", got)
+	}
+	if len(e.results) == 0 || e.results[0].Error == "" {
+		t.Fatal("超出待发送上限应记录失败结果")
+	}
+}

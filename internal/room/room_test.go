@@ -386,6 +386,31 @@ func TestGenerateSkipsDisabledShard(t *testing.T) {
 	}
 }
 
+func TestGenerateRemovesInactiveShardConfigButKeepsWorldFiles(t *testing.T) {
+	r := Defaults()
+	r.ID = 3
+	root := t.TempDir()
+	if err := Generate(root, "DST", r); err != nil {
+		t.Fatalf("首次生成配置失败: %v", err)
+	}
+	cavesDir := filepath.Join(root, "DST", "Cluster_3", "Caves")
+	savePath := filepath.Join(cavesDir, "save", "session", "world")
+	if err := os.WriteFile(savePath, []byte("keep"), 0600); err != nil {
+		t.Fatal(err)
+	}
+
+	r.Shards[1].Disabled = true
+	if err := Generate(root, "DST", r); err != nil {
+		t.Fatalf("停用分片后重新生成失败: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(cavesDir, "server.ini")); !os.IsNotExist(err) {
+		t.Fatalf("停用分片的 server.ini 未清理: %v", err)
+	}
+	if _, err := os.Stat(savePath); err != nil {
+		t.Fatalf("停用分片的存档不应被删除: %v", err)
+	}
+}
+
 // 旧版配置用 caves=false 关洞穴，加载后必须迁移成「Caves 分片停用」，
 // 不能因为字段消失就把洞穴重新启用。
 func TestLegacyCavesMigratesToDisabledShard(t *testing.T) {

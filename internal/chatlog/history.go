@@ -22,6 +22,8 @@ type History struct {
 	states map[string]*historyState
 }
 
+const maxHistoryEntries = 50000
+
 type logCursor struct {
 	Offset     int64     `json:"offset"`
 	PrefixSize int       `json:"prefixSize"`
@@ -171,6 +173,11 @@ func (s *historyState) faces() map[string]faceStamp {
 		face := faceStamp{Face: Face{ID: id, Prefab: player.Prefab}, prefabAt: s.prefabTime(id)}
 		if named, ok := latest[key]; ok {
 			face.Name, face.nameAt = named.Name, named.nameAt
+		} else if player.LastNameDirect && player.LastName != "" {
+			face.Name = player.LastName
+			if !s.StartedAt.IsZero() {
+				face.nameAt = s.StartedAt.Add(player.LastNameAt)
+			}
 		} else if len(player.Names) == 1 {
 			for name := range player.Names {
 				face.Name = name
@@ -291,7 +298,12 @@ func (h *History) sync(clusterDir, shard string) (*historyState, error) {
 				if e, ok := parse(line, offset); ok {
 					if e.UserID != "" {
 						p := s.player(e.UserID)
-						p.Names[e.Name] = true
+						if e.Name != "" {
+							p.Names[e.Name] = true
+							p.LastName = e.Name
+							p.LastNameAt = uptime(e.Time)
+							p.LastNameDirect = true
+						}
 						s.Players[e.UserID] = p
 					}
 					e.ID, e.CollectedAt = s.NextID, time.Now()
@@ -309,6 +321,10 @@ func (h *History) sync(clusterDir, shard string) (*historyState, error) {
 		if serverCursor != s.Server || chatCursor != s.Chat {
 			s.dirty = true
 		}
+	}
+	if len(s.Entries) > maxHistoryEntries {
+		s.Entries = s.Entries[len(s.Entries)-maxHistoryEntries:]
+		s.dirty = true
 	}
 	s.enrich()
 	if s.dirty {

@@ -3,7 +3,9 @@ package server
 import (
 	"bufio"
 	"bytes"
+	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -34,27 +36,44 @@ type LogTailer struct {
 	mu      sync.Mutex
 	buf     []byte
 	maxLen  int
+	fileLen int64
 	closed  bool
 	onLine  func(string)
 	partial []byte // 尚未收到换行符的残留行
 }
 
 const defaultTailSize = 512 * 1024 // 保留最近 512KB
+const maxLogFileSize = 64 * 1024 * 1024
 
 // 单行超过该长度即丢弃，防止服务器输出无换行的刷屏内容把内存撑爆
 const maxLineLen = 16 * 1024
 
 // NewLogTailer 打开日志文件并创建尾随缓冲。onLine 可为 nil。
 func NewLogTailer(path string, onLine func(string)) *LogTailer {
-	if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
 		// 日志目录创建失败不应阻断进程启动
 		_ = err
 	}
-	f, err := os.OpenFile(path, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	f, err := os.OpenFile(path, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0600)
 	if err != nil {
 		f = nil
 	}
-	return &LogTailer{file: f, maxLen: defaultTailSize, onLine: onLine}
+	var fileLen int64
+	if f != nil {
+		if info, statErr := f.Stat(); statErr == nil {
+			fileLen = info.Size()
+			if fileLen > maxLogFileSize {
+				var compactErr error
+				f, compactErr = compactLogFile(f, maxLogFileSize)
+				if compactErr == nil && f != nil {
+					if info, statErr = f.Stat(); statErr == nil {
+						fileLen = info.Size()
+					}
+				}
+			}
+		}
+	}
+	return &LogTailer{file: f, maxLen: defaultTailSize, fileLen: fileLen, onLine: onLine}
 }
 
 // Write 实现 io.Writer：写文件 + 更新内存缓冲 + 按行回调。
@@ -63,7 +82,18 @@ func (l *LogTailer) Write(p []byte) (int, error) {
 	defer l.mu.Unlock()
 
 	if l.file != nil {
-		_, _ = l.file.Write(p)
+		if written, err := l.file.Write(p); err == nil {
+			l.fileLen += int64(written)
+			if l.fileLen > maxLogFileSize {
+				var compactErr error
+				l.file, compactErr = compactLogFile(l.file, maxLogFileSize)
+				if compactErr == nil && l.file != nil {
+					if info, statErr := l.file.Stat(); statErr == nil {
+						l.fileLen = info.Size()
+					}
+				}
+			}
+		}
 	}
 
 	l.buf = append(l.buf, p...)
@@ -89,6 +119,57 @@ func (l *LogTailer) Write(p []byte) (int, error) {
 		}
 	}
 	return len(p), nil
+}
+
+func compactLogFile(file *os.File, maxSize int64) (*os.File, error) {
+	info, err := file.Stat()
+	if err != nil || info.Size() <= maxSize {
+		return file, err
+	}
+	keep := maxSize / 2
+	if _, err := file.Seek(-keep, io.SeekEnd); err != nil {
+		return file, err
+	}
+	data := make([]byte, keep)
+	if _, err := io.ReadFull(file, data); err != nil {
+		return file, err
+	}
+	if index := bytes.IndexByte(data, '\n'); index >= 0 {
+		data = data[index+1:]
+	}
+	temp, err := os.CreateTemp(filepath.Dir(file.Name()), ".log-compact-*")
+	if err != nil {
+		return file, err
+	}
+	tempName := temp.Name()
+	defer os.Remove(tempName)
+	if _, err := temp.Write(data); err != nil {
+		_ = temp.Close()
+		return file, err
+	}
+	if err := temp.Sync(); err != nil {
+		_ = temp.Close()
+		return file, err
+	}
+	if err := temp.Close(); err != nil {
+		return file, err
+	}
+	name := file.Name()
+	if err := file.Close(); err != nil {
+		return nil, err
+	}
+	if err := os.Rename(tempName, name); err != nil {
+		reopened, reopenErr := os.OpenFile(name, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0600)
+		if reopenErr != nil {
+			return nil, errors.Join(err, reopenErr)
+		}
+		return reopened, err
+	}
+	reopened, err := os.OpenFile(name, os.O_CREATE|os.O_RDWR|os.O_APPEND, 0600)
+	if err != nil {
+		return nil, err
+	}
+	return reopened, nil
 }
 
 // Tail 返回最近的 n 字节日志。

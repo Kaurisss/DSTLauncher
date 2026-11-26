@@ -23,6 +23,8 @@ import (
 
 var Events = []string{"crash_limit", "maintenance_failed", "backup_failed", "update_failed", "start_failed", "started", "stopped"}
 
+const maxPendingEvents = 256
+
 type Config struct {
 	Enabled bool     `json:"enabled"`
 	URL     string   `json:"url"`
@@ -90,11 +92,14 @@ type Engine struct {
 	config  Config
 	results []Result
 	queue   chan delivery
+	pending []delivery
+	queueMu sync.Mutex
+	wake    chan struct{}
 	client  *http.Client
 }
 
 func New(path string) (*Engine, error) {
-	e := &Engine{path: path, config: Config{Events: []string{"crash_limit", "maintenance_failed", "backup_failed", "update_failed"}, Rooms: []int{}}, queue: make(chan delivery, 64)}
+	e := &Engine{path: path, config: Config{Events: []string{"crash_limit", "maintenance_failed", "backup_failed", "update_failed"}, Rooms: []int{}}, queue: make(chan delivery, 64), wake: make(chan struct{}, 1)}
 	e.client = &http.Client{Timeout: 8 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	b, err := os.ReadFile(path)
 	if err == nil {
@@ -183,10 +188,22 @@ func (e *Engine) Publish(event Event) {
 	if event.Time.IsZero() {
 		event.Time = time.Now()
 	}
+	item := delivery{c, event}
 	select {
-	case e.queue <- delivery{c, event}:
+	case e.queue <- item:
 	default:
-		e.record(Result{Time: time.Now(), Event: event.Event, RoomID: event.RoomID, Error: "通知队列已满，本次未发送"})
+		e.queueMu.Lock()
+		if len(e.pending) >= maxPendingEvents {
+			e.queueMu.Unlock()
+			e.record(Result{Time: time.Now(), Event: event.Event, RoomID: event.RoomID, Error: "通知队列已满，本次未发送"})
+			return
+		}
+		e.pending = append(e.pending, item)
+		e.queueMu.Unlock()
+		select {
+		case e.wake <- struct{}{}:
+		default:
+		}
 	}
 }
 
@@ -197,6 +214,28 @@ func (e *Engine) Serve(ctx context.Context) {
 			return
 		case item := <-e.queue:
 			e.send(ctx, item.config, item.event)
+			e.flushPending()
+		case <-e.wake:
+			e.flushPending()
+		}
+	}
+}
+
+func (e *Engine) flushPending() {
+	for {
+		e.queueMu.Lock()
+		if len(e.pending) == 0 {
+			e.queueMu.Unlock()
+			return
+		}
+		item := e.pending[0]
+		select {
+		case e.queue <- item:
+			e.pending = e.pending[1:]
+			e.queueMu.Unlock()
+		default:
+			e.queueMu.Unlock()
+			return
 		}
 	}
 }

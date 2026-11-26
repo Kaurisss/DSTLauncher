@@ -56,6 +56,9 @@ type Engine struct {
 	saved     diskState
 	results   []Result
 	queue     chan delivery
+	pending   []delivery
+	queueMu   sync.Mutex
+	wake      chan struct{}
 	ctx       context.Context
 	cancel    context.CancelFunc
 	wg        sync.WaitGroup
@@ -67,9 +70,11 @@ type Engine struct {
 var ownBackupName = regexp.MustCompile(`^Cluster_[1-9][0-9]*(?:_auto)?_[0-9]{8}_[0-9]{6}\.[0-9]{9}\.zip$`)
 var namespaceName = regexp.MustCompile(`^[a-zA-Z0-9_-]+$`)
 
+const maxPendingDeliveries = 32
+
 func New(path, root string, onFailure func(Result)) (*Engine, error) {
 	ctx, cancel := context.WithCancel(context.Background())
-	e := &Engine{path: path, root: root, queue: make(chan delivery, 8), ctx: ctx, cancel: cancel, onFailure: onFailure, results: []Result{}, saved: diskState{Config: Config{Kind: "directory", Keep: 10}, Namespace: rand.Text()}}
+	e := &Engine{path: path, root: root, queue: make(chan delivery, 8), wake: make(chan struct{}, 1), ctx: ctx, cancel: cancel, onFailure: onFailure, results: []Result{}, saved: diskState{Config: Config{Kind: "directory", Keep: 10}, Namespace: rand.Text()}}
 	e.client = &http.Client{Timeout: 30 * time.Minute, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
 	b, err := os.ReadFile(path)
 	if err == nil {
@@ -182,15 +187,11 @@ func (e *Engine) Start() func() {
 		for {
 			select {
 			case <-e.ctx.Done():
-				for {
-					select {
-					case item := <-e.queue:
-						_ = item.file.Close()
-						e.finish(item.result, fmt.Errorf("面板关闭，同步已取消"))
-					default:
-						return
-					}
+				for _, item := range e.takePending() {
+					_ = item.file.Close()
+					e.finish(item.result, fmt.Errorf("面板关闭，同步已取消"))
 				}
+				return
 			case item := <-e.queue:
 				e.setState(item.result.ID, "syncing", "")
 				ctx, cancel := context.WithTimeout(e.ctx, 30*time.Minute)
@@ -198,6 +199,9 @@ func (e *Engine) Start() func() {
 				cancel()
 				_ = item.file.Close()
 				e.finish(item.result, err)
+				e.flushPending()
+			case <-e.wake:
+				e.flushPending()
 			}
 		}
 	})
@@ -257,16 +261,61 @@ func (e *Engine) Enqueue(room int, name, path string, explicit bool) (*Result, e
 			return nil, fmt.Errorf("此备份已在同步队列中")
 		}
 	}
+	item := delivery{c, result, f}
 	select {
-	case e.queue <- delivery{c, result, f}:
-		e.results = append([]Result{result}, e.results...)
-		if len(e.results) > 40 {
-			e.results = e.results[:40]
-		}
-		return &result, nil
+	case e.queue <- item:
 	default:
-		f.Close()
-		return nil, fmt.Errorf("同步队列已满，请稍后重试")
+		e.queueMu.Lock()
+		if len(e.pending) >= maxPendingDeliveries {
+			e.queueMu.Unlock()
+			_ = f.Close()
+			return nil, fmt.Errorf("同步队列已满，请稍后重试")
+		}
+		e.pending = append(e.pending, item)
+		e.queueMu.Unlock()
+		select {
+		case e.wake <- struct{}{}:
+		default:
+		}
+	}
+	e.results = append([]Result{result}, e.results...)
+	if len(e.results) > 40 {
+		e.results = e.results[:40]
+	}
+	return &result, nil
+}
+
+func (e *Engine) flushPending() {
+	for {
+		e.queueMu.Lock()
+		if len(e.pending) == 0 {
+			e.queueMu.Unlock()
+			return
+		}
+		item := e.pending[0]
+		select {
+		case e.queue <- item:
+			e.pending = e.pending[1:]
+			e.queueMu.Unlock()
+		default:
+			e.queueMu.Unlock()
+			return
+		}
+	}
+}
+
+func (e *Engine) takePending() []delivery {
+	e.queueMu.Lock()
+	defer e.queueMu.Unlock()
+	items := append([]delivery{}, e.pending...)
+	e.pending = nil
+	for {
+		select {
+		case item := <-e.queue:
+			items = append(items, item)
+		default:
+			return items
+		}
 	}
 }
 func (e *Engine) Test(ctx context.Context) error {

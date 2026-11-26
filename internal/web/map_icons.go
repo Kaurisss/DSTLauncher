@@ -298,6 +298,9 @@ func (s *Server) loadCachedMapIcon(hit resolvedMapIcon) ([]byte, bool) {
 		if len(s.mapIconCache[k]) > 0 {
 			continue
 		}
+		if len(s.mapIconCache) >= maxMapIconCache {
+			s.mapIconCache = map[string][]byte{}
+		}
 		if encoded, err := cropAtlasIconPNG(atlasImg, elem); err == nil {
 			s.mapIconCache[k] = encoded
 		}
