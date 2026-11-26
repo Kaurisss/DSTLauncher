@@ -67,6 +67,7 @@ function date(value) {
     <template #title>自动维护</template>
     <template #actions>
       <IconAction v-if="draft" type="submit" form="automation-plan-form" show-label icon="save" :label="saving ? '保存中…' : '保存计划'" :disabled="saving || !!snapshot?.running" />
+      <Skeleton v-else-if="!error" class="h-7 w-[86px] rounded-lg" />
     </template>
     <p v-if="error" role="alert" class="mb-4 text-sm text-destructive">{{ error }}</p>
     <form v-if="draft" id="automation-plan-form" class="grid gap-4" @submit.prevent="save">
@@ -100,17 +101,24 @@ function date(value) {
         </Field>
       </fieldset>
     </form>
-    <div v-else-if="!error" role="status" aria-label="读取计划中" class="grid gap-4">
+    <div v-else-if="!error" role="status" aria-label="读取计划中" class="grid">
       <div class="grid gap-4 sm:grid-cols-2">
-        <div v-for="i in 5" :key="i" class="grid gap-2">
-          <Skeleton class="h-4 w-36" />
-          <Skeleton class="h-9 w-full" />
+        <div
+          v-for="(w, idx) in ['w-44', 'w-36', 'w-36', 'w-40', 'w-44']"
+          :key="idx"
+          class="flex w-full flex-col gap-2"
+        >
+          <div class="flex h-[19.25px] items-center"><Skeleton :class="['h-3.5 rounded', w]" /></div>
+          <div v-if="idx === 2" class="flex h-5 items-center"><Skeleton class="h-5 w-9 rounded-full" /></div>
+          <Skeleton v-else class="h-8 w-full rounded-lg" />
         </div>
       </div>
-      <div class="mt-2 grid gap-3">
-        <div v-for="i in 3" :key="i" class="flex justify-between gap-2 border-t pt-3">
-          <Skeleton class="h-4 w-20" />
-          <Skeleton class="h-4 w-32" />
+      <div class="mt-4 grid gap-3 text-sm">
+        <div v-for="i in 3" :key="i" class="grid gap-1 border-t pt-3">
+          <div class="flex h-5 items-center justify-between gap-2">
+            <Skeleton class="h-3.5 w-16 rounded" />
+            <Skeleton class="h-3.5 w-24 rounded" />
+          </div>
         </div>
       </div>
     </div>

@@ -79,6 +79,7 @@ async function retry(item) {
     <template #actions>
       <IconAction icon="plug" variant="outline" show-label="sm" label="测试已保存的备份目标" text="测试连接" :disabled="busy || !snapshot || (snapshot.kind === 'directory' ? !snapshot.directory : !snapshot.url)" @click="test" />
       <IconAction v-if="draft" type="submit" form="backup-remote-settings" show-label icon="save" :label="busy ? '处理中…' : '保存异地备份设置'" :text="busy ? '处理中…' : '保存设置'" :disabled="busy" />
+      <Skeleton v-else-if="!error" class="h-7 w-[86px] rounded-lg" />
     </template>
     <p v-if="error" role="alert" class="mb-4 text-sm text-destructive">{{ error }}</p>
     <form v-if="draft" id="backup-remote-settings" @submit.prevent="save">
@@ -99,16 +100,19 @@ async function retry(item) {
         <p class="text-sm text-muted-foreground">手动和自动备份成功后在后台同步。目标下使用本面板的独立子目录，失败时保留本地备份，可在备份页重试。</p>
       </FieldGroup>
     </form>
-    <div v-else-if="!error" role="status" aria-label="正在读取异地备份设置" class="grid gap-4">
-      <div class="flex items-center justify-between gap-4">
-        <Skeleton class="h-4 w-28" />
-        <Skeleton class="h-5 w-9 rounded-full" />
+    <FieldGroup v-else-if="!error" role="status" aria-label="正在读取异地备份设置">
+      <Field orientation="horizontal">
+        <div class="flex h-5 flex-auto items-center"><Skeleton class="h-3.5 w-24 rounded" /></div>
+        <Skeleton class="h-5 w-9 shrink-0 rounded-full" />
+      </Field>
+      <Field v-for="(w, idx) in ['w-16', 'w-28', 'w-28']" :key="idx">
+        <div class="flex h-[19.25px] items-center"><Skeleton :class="['h-3.5 rounded', w]" /></div>
+        <Skeleton class="h-8 w-full rounded-lg" />
+      </Field>
+      <div class="flex h-5 items-center">
+        <Skeleton class="h-3.5 w-3/4 max-w-lg rounded" />
       </div>
-      <div v-for="i in 3" :key="i" class="grid gap-2">
-        <Skeleton class="h-4 w-28" />
-        <Skeleton class="h-9 w-full" />
-      </div>
-    </div>
+    </FieldGroup>
     <section v-if="snapshot?.results?.length" class="mt-4 border-t pt-4" aria-label="最近备份同步">
       <h3 class="mb-3 text-sm font-medium">最近同步</h3>
       <ul class="grid gap-3">

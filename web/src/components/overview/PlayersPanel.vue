@@ -36,7 +36,10 @@ let disposed = false;
 
 const labelOf = name => shardLabel(name, rooms.current?.locations?.[name]);
 
+const initialLoading = computed(() => !rooms.loaded && !rooms.current);
+
 const emptyState = computed(() => {
+  if (initialLoading.value) return null;
   if (!rooms.current) return { title: '请先选择房间', desc: '在房间管理中创建或切换一个房间' };
   if (!rooms.statusLoaded) return { title: '等待分片状态', desc: '正在同步当前房间的运行状态' };
   if (!canQuery.value && rooms.statuses.some(status => status.state === 'running')) {
@@ -184,7 +187,15 @@ function preventWhileBusy(event) {
         <IconAction variant="outline" icon="refresh" :label="loading ? '查询中…' : '刷新玩家'" :disabled="!canQuery || loading || busy" @click="reload" />
       </template>
 
-      <div v-if="emptyState" class="flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-center">
+      <div v-if="initialLoading" role="status" aria-label="正在加载玩家状态" class="flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-center">
+        <Skeleton class="size-9 rounded-full" />
+        <div class="grid justify-items-center gap-1.5">
+          <Skeleton class="h-4 w-24 rounded" />
+          <Skeleton class="h-3 w-44 rounded" />
+        </div>
+      </div>
+
+      <div v-else-if="emptyState" class="flex flex-1 flex-col items-center justify-center gap-2 rounded-lg border border-dashed border-border/80 bg-muted/20 px-4 py-5 text-center">
         <span class="grid size-9 place-items-center rounded-full bg-muted text-muted-foreground">
           <PhUsers class="size-4" aria-hidden="true" />
         </span>

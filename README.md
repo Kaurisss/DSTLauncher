@@ -111,18 +111,19 @@ go build -o dst-windows.exe .
 用 Docker Compose 单容器部署（一个面板进程管理全部房间/分片）：
 
 ```bash
-cp .env.example .env            # 按需修改 PANEL_UID/GID、DST_SERVER_DIR
+cp .env.example .env            # 设置 DST_PANEL_PASSWORD，按需修改 UID/GID 和 DST_SERVER_DIR
 mkdir -p ./data && sudo chown -R 1000:1000 ./data   # 与 PANEL_UID/GID 一致
 docker compose up -d --build
 docker compose logs -f
 ```
 
+- **公网 HTTPS**：把 `PANEL_DOMAIN` 填成已解析到服务器的域名，然后运行 `docker compose --profile public up -d --build`。Caddy 会自动申请和续期 HTTPS 证书；服务器防火墙放行 TCP `80` / `443`，公网不开放 `16800`。
 - **网络**：用 bridge + 显式端口映射（**不用** `network_mode: host`）。
   - Docker Desktop（Windows/macOS）的 host 网络指向 WSL2/虚拟机自己的 loopback，宿主机浏览器访问不到；
   - 面板端口只映射到宿主 `127.0.0.1:16800`，默认不对外暴露；
   - 游戏/协调/Steam 四类端口按范围映射（各 100 个），房间端口由面板动态分配；
   - 超出映射范围的分片玩家会连不上，多开时按同样步长追加范围。
-- **访问面板**：浏览器打开 `http://127.0.0.1:16800`。远程服务器用 SSH 隧道 `ssh -L 16800:127.0.0.1:16800 user@host`。面板用户名和密码可在设置页、`-username` / `-password` 参数或 `DST_PANEL_USERNAME` / `DST_PANEL_PASSWORD` 中配置，旧配置默认用户名为 `admin`；需要公网时前置带 TLS+认证的反向代理。
+- **访问面板**：本机部署打开 `http://127.0.0.1:16800`。远程服务器用 SSH 隧道 `ssh -L 16800:127.0.0.1:16800 user@host`。公网部署时把 Caddy、Nginx 或其他 TLS 反向代理转发到宿主机的 `127.0.0.1:16800`，不要直接暴露面板端口。面板用户名和密码可在 `.env`、设置页、`-username` / `-password` 参数或 `DST_PANEL_USERNAME` / `DST_PANEL_PASSWORD` 中配置，旧配置默认用户名为 `admin`。
 - **首次开服**：在线房间先在房间设置中填写 Klei 令牌，再回概览点击「安装并启动」。面板自动下载 SteamCMD 和服务端，显示安装进度，成功后继续启动所选房间/分片；请保持页面打开。失败会显示原因，可重新点击续传；只下载不开服可用「仅安装服务器」。
 - **持久化**：全部可变数据在 `./data`（容器内 `/data`），含存档、模组、日志、`panel.json`、SteamCMD 与面板自带安装的游戏服务端。备份/迁移直接归档 `data/`。
 - **优雅关服**：`init: true` 转发 SIGTERM，`stop_grace_period: 2m` 给各分片执行 `c_save()` → `c_shutdown()` 的时间，超时才强制结束进程组。

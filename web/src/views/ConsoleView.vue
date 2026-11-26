@@ -14,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useLogs } from '@/composables/useLogs.js';
 import { useProcessControl } from '@/composables/useProcessControl.js';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -84,7 +85,35 @@ async function copyLogs() {
 
 <template>
   <UiCard flush fill role="region" aria-label="实时控制台" class="min-w-0">
-    <Empty v-if="!rooms.current || !rooms.shards.length" class="flex-1 justify-center">
+    <div v-if="!rooms.loaded && !rooms.current" role="status" aria-label="正在加载控制台" class="flex min-h-0 flex-1 flex-col">
+      <div class="flex items-center justify-between gap-2 border-b border-border/75 bg-muted/30 px-3 py-2">
+        <div class="flex items-center gap-2">
+          <Skeleton class="h-7 w-24 rounded-md" />
+          <Skeleton class="h-7 w-24 rounded-md" />
+          <Skeleton class="h-5 w-12 rounded-full" />
+        </div>
+        <div class="flex items-center gap-1.5">
+          <Skeleton class="h-7 w-16 rounded-md" />
+          <Skeleton class="h-7 w-20 rounded-md" />
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-2 border-b border-border/60 bg-card px-3 py-2">
+        <Skeleton class="h-7.5 w-64 rounded-md" />
+        <Skeleton class="h-7 w-36 rounded-md" />
+      </div>
+      <div class="flex-1 p-4">
+        <div class="grid gap-2">
+          <Skeleton v-for="w in ['w-3/4', 'w-2/3', 'w-4/5', 'w-1/2', 'w-3/5']" :key="w" :class="['h-3.5 rounded', w]" />
+        </div>
+      </div>
+      <div class="flex items-center gap-2 border-t border-border/75 px-3 py-2.5">
+        <Skeleton class="h-8 w-20 rounded-md" />
+        <Skeleton class="h-8 flex-1 rounded-md" />
+        <Skeleton class="h-8 w-16 rounded-md" />
+      </div>
+    </div>
+
+    <Empty v-else-if="!rooms.current || !rooms.shards.length" class="flex-1 justify-center">
       <EmptyDescription>还没有可用的房间或启用分片，请先在「房间管理」中配置。</EmptyDescription>
       <EmptyContent>
         <Button size="sm" variant="outline" @click="ui.openRoomEditor()">前往房间管理</Button>
@@ -117,9 +146,9 @@ async function copyLogs() {
             v-else
             variant="default"
             show-label="md"
-            :icon="system.installed ? 'play' : 'download'"
-            :label="rooms.starting ? '请稍候…' : (system.installed ? '启动此分片' : '安装并启动')"
-            :text="rooms.starting ? '请稍候…' : (system.installed ? '启动' : '安装并启动')"
+            :icon="system.loaded && !system.installed ? 'download' : 'play'"
+            :label="rooms.starting ? '请稍候…' : (system.loaded && !system.installed ? '安装并启动' : '启动此分片')"
+            :text="rooms.starting ? '请稍候…' : (system.loaded && !system.installed ? '安装并启动' : '启动')"
             :disabled="rooms.starting"
             @click="proc.start(active)"
           />

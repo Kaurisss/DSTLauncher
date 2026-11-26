@@ -5,7 +5,7 @@
 // 世界规则（settings）与世界生成（worldgen）分开成两个标签页展示；
 // 服务器运行中整个页面冻结——游戏只在启动时读这份文件，改了也不生效。
 
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from 'vue';
 import { useElementSize } from '@vueuse/core';
 import { PhLockSimple, PhMagnifyingGlass, PhX } from '@phosphor-icons/vue';
 import { PopoverClose, PopoverContent, PopoverPortal, PopoverRoot, PopoverTrigger, TabsContent, TabsList, TabsRoot, TabsTrigger } from 'reka-ui';
@@ -24,6 +24,7 @@ import {
   Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import OptionGroupPanel from '@/components/world/OptionGroupPanel.vue';
+import { useSlidingIndicator } from '@/composables/useSlidingIndicator.js';
 import { worldApi } from '@/lib/api.js';
 import { iconOf, preloadIconUrls } from '@/lib/worldIcons.js';
 import { useRoomsStore } from '@/stores/rooms.js';
@@ -36,6 +37,7 @@ const ui = useUiStore();
 
 const shard = ref('');
 const loadedShard = ref('');
+const displayedShard = ref('');
 const view = ref(null);
 const loading = ref(false);
 const saving = ref(false);
@@ -63,6 +65,8 @@ const activeGroupId = ref('');
 const content = ref(null);
 const groupPanel = ref(null);
 const groupNav = ref(null);
+const shardTabsRef = ref(null);
+const categorySegRef = ref(null);
 const header = ref(null);
 const { height: headerHeight } = useElementSize(header, { width: 0, height: 0 }, { box: 'border-box' });
 
@@ -231,10 +235,28 @@ const selectedGroup = computed(() =>
 
 const hasActiveFilter = computed(() => !!keyword.value.trim() || onlyChanged.value);
 
-watch([shard, category], () => { activeGroupId.value = ''; });
-watch(selectedGroup, async group => {
-  preloadIcons(group ? [group] : []);
-  await nextTick();
+const shardIndicator = useSlidingIndicator(
+  shardTabsRef,
+  '.shard-tab[data-state="active"]',
+  () => [shard.value, rooms.shards.join(','), rooms.shards.map(s => isShardDirty(s)).join(',')],
+);
+const categoryIndicator = useSlidingIndicator(
+  categorySegRef,
+  '.seg-btn.is-active',
+  () => [category.value, !!view.value, worldGenerated.value, categoryCounts.value.settings, categoryCounts.value.worldgen],
+);
+const groupIndicator = useSlidingIndicator(
+  groupNav,
+  'button[aria-current="true"]',
+  () => [selectedGroup.value?.id, category.value, displayedShard.value, activeGroups.value.length, changedCount.value],
+);
+
+function onGroupBeforeEnter() {
+  const list = content.value?.$el?.querySelector('[data-slot="world-options-scroll"]');
+  if (list) list.scrollTo({ top: 0 });
+}
+
+function scrollToGroupPanel() {
   if (!groupPanel.value || !content.value?.$el) return;
   const list = content.value.$el.querySelector('[data-slot="world-options-scroll"]');
   if (!list) return;
@@ -248,6 +270,11 @@ watch(selectedGroup, async group => {
   // 极矮视口优先显示第一项，避免分组标题把搜索结果挤到可视区外。
   const firstRowBottom = firstRow.getBoundingClientRect().bottom - origin;
   list.scrollTo({ top: Math.max(top, firstRowBottom - list.clientHeight) });
+}
+
+watch([shard, category], () => { activeGroupId.value = ''; });
+watch(selectedGroup, group => {
+  preloadIcons(group ? [group] : []);
 }, { immediate: true });
 
 function pickGroup(id) {
@@ -301,6 +328,7 @@ function restoreFromCache(name) {
   const st = shardCache[name];
   if (!st) return false;
   loadedShard.value = name;
+  displayedShard.value = name;
   view.value = st.view;
   originalOverrides.value = { ...st.originalOverrides };
   original.enabled = st.original.enabled;
@@ -316,6 +344,7 @@ function restoreFromCache(name) {
 
 function clearShardCache() {
   loadedShard.value = '';
+  displayedShard.value = '';
   Object.keys(shardCache).forEach(k => delete shardCache[k]);
 }
 
@@ -348,6 +377,7 @@ async function load(target = shard.value) {
   if (!roomId || !target) {
     view.value = null;
     loadedShard.value = '';
+    displayedShard.value = '';
     return;
   }
   const seq = ++loadSeq;
@@ -362,6 +392,7 @@ async function load(target = shard.value) {
       loadError.value = err.message;
       view.value = null;
       loadedShard.value = '';
+      displayedShard.value = '';
     }
   } finally {
     if (seq === loadSeq) loading.value = false;
@@ -561,7 +592,19 @@ onMounted(() => selectShard(rooms.shards[0]));
       <div ref="header" class="world-control-header z-10 shrink-0">
         <div class="world-heading-row">
           <div class="world-shard-controls">
-            <TabsList v-if="rooms.shards.length" class="world-shard-tabs" aria-label="配置分片">
+            <TabsList
+              v-if="rooms.shards.length"
+              ref="shardTabsRef"
+              class="world-shard-tabs"
+              :class="{ 'has-indicator': shardIndicator.ready.value }"
+              aria-label="配置分片"
+            >
+              <span
+                aria-hidden="true"
+                class="tab-pill-indicator"
+                :class="{ 'is-animated': shardIndicator.animated.value }"
+                :style="shardIndicator.style.value"
+              />
               <TabsTrigger v-for="s in rooms.shards" :key="s" :value="s" class="shard-tab" :disabled="saving">
                 <span>{{ labelOf(s) }}</span>
                 <span v-if="isShardDirty(s)" class="shard-tab-dirty" aria-hidden="true" />
@@ -613,7 +656,13 @@ onMounted(() => selectShard(rooms.shards[0]));
         </div>
         <div v-if="view && !loadError" class="world-toolbar">
           <div class="world-category-controls">
-            <div class="seg" role="group" aria-label="配置类别">
+            <div ref="categorySegRef" class="seg" :class="{ 'has-indicator': categoryIndicator.ready.value }" role="group" aria-label="配置类别">
+              <span
+                aria-hidden="true"
+                class="tab-pill-indicator"
+                :class="{ 'is-animated': categoryIndicator.animated.value }"
+                :style="categoryIndicator.style.value"
+              />
               <button
                 class="seg-btn"
                 :class="{ 'is-active': category === 'settings' }"
@@ -722,7 +771,12 @@ onMounted(() => selectShard(rooms.shards[0]));
           <p class="text-xs text-muted-foreground">检查面板服务与存档目录权限后可重试读取当前分片配置。</p>
           <Button size="sm" variant="outline" class="mt-1" @click="load(shard)">重新加载</Button>
         </div>
-        <div v-else-if="view" data-slot="page-scroll" class="flex h-full min-h-0 flex-col overflow-hidden">
+        <div
+          v-else-if="view"
+          data-slot="page-scroll"
+          class="flex h-full min-h-0 flex-col overflow-hidden transition-opacity duration-150"
+          :class="{ 'opacity-65': loading && loadedShard !== shard }"
+        >
           <div v-if="!levelDataInUse" role="region" aria-label="预设与启用" class="world-presets-bar shrink-0">
             <div class="flex flex-wrap items-end gap-x-4 gap-y-2">
               <Field class="min-w-[180px] flex-1 max-w-xs gap-1.5">
@@ -772,7 +826,19 @@ onMounted(() => selectShard(rooms.shards[0]));
             </div>
           </div>
           <div class="world-workspace">
-            <nav v-if="activeGroups.length" ref="groupNav" class="world-group-nav" aria-label="配置分组">
+            <nav
+              v-if="activeGroups.length"
+              ref="groupNav"
+              class="world-group-nav"
+              :class="{ 'has-indicator': groupIndicator.ready.value }"
+              aria-label="配置分组"
+            >
+              <span
+                aria-hidden="true"
+                class="world-group-indicator"
+                :class="{ 'is-animated': groupIndicator.animated.value }"
+                :style="groupIndicator.style.value"
+              />
               <button
                 v-for="g in activeGroups"
                 :key="g.id"
@@ -789,25 +855,28 @@ onMounted(() => selectShard(rooms.shards[0]));
               </button>
             </nav>
             <div class="world-group-content" data-slot="world-options-scroll" tabindex="0" role="region" aria-label="世界配置选项">
-              <Empty v-if="!selectedGroup">
-                <EmptyDescription>{{ onlyChanged && keyword.trim() ? '当前搜索条件下没有已改动的选项' : onlyChanged ? '当前分类下还没有已改动的选项' : '没有找到匹配的配置项' }}</EmptyDescription>
-                <EmptyContent v-if="hasActiveFilter" class="flex-row flex-wrap justify-center gap-2">
-                  <Button v-if="keyword.trim()" size="sm" variant="outline" @click="keyword = ''">清空搜索</Button>
-                  <Button v-if="onlyChanged" size="sm" variant="outline" @click="onlyChanged = false">显示全部选项</Button>
-                  <Button v-if="keyword.trim() && onlyChanged" size="sm" variant="ghost" @click="clearFilters">重置筛选</Button>
-                </EmptyContent>
-              </Empty>
-              <OptionGroupPanel
-                v-else
-                id="world-active-group"
-                ref="groupPanel"
-                :group="selectedGroup"
-                :value-of="valueOf"
-                :is-changed="isChanged"
-                :disabled="loading || saving || frozen || (worldGenerated && category === 'worldgen')"
-                @change="onOptionChange"
-                @reset-group="resetGroup"
-              />
+              <Transition name="panel-switch" mode="out-in" @before-enter="onGroupBeforeEnter" @after-enter="scrollToGroupPanel">
+                <Empty v-if="!selectedGroup" :key="`${displayedShard}:${category}:empty`">
+                  <EmptyDescription>{{ onlyChanged && keyword.trim() ? '当前搜索条件下没有已改动的选项' : onlyChanged ? '当前分类下还没有已改动的选项' : '没有找到匹配的配置项' }}</EmptyDescription>
+                  <EmptyContent v-if="hasActiveFilter" class="flex-row flex-wrap justify-center gap-2">
+                    <Button v-if="keyword.trim()" size="sm" variant="outline" @click="keyword = ''">清空搜索</Button>
+                    <Button v-if="onlyChanged" size="sm" variant="outline" @click="onlyChanged = false">显示全部选项</Button>
+                    <Button v-if="keyword.trim() && onlyChanged" size="sm" variant="ghost" @click="clearFilters">重置筛选</Button>
+                  </EmptyContent>
+                </Empty>
+                <OptionGroupPanel
+                  v-else
+                  id="world-active-group"
+                  :key="`${displayedShard}:${category}:${selectedGroup.id}`"
+                  ref="groupPanel"
+                  :group="selectedGroup"
+                  :value-of="valueOf"
+                  :is-changed="isChanged"
+                  :disabled="loading || saving || frozen || (worldGenerated && category === 'worldgen')"
+                  @change="onOptionChange"
+                  @reset-group="resetGroup"
+                />
+              </Transition>
             </div>
           </div>
         </div>

@@ -163,6 +163,58 @@ code {
 .fade-enter-from { opacity: 0; transform: translateY(6px); }
 .fade-enter-active { transition: opacity .2s ease, transform .2s ease; }
 
+/* 分区 / 标签页内容切换（短退出、柔和入场，仅在允许动效时位移） */
+.panel-switch-enter-active {
+  transition: opacity 150ms ease-out;
+}
+.panel-switch-leave-active {
+  transition: opacity 90ms ease-out;
+}
+.panel-switch-enter-from,
+.panel-switch-leave-to {
+  opacity: 0;
+}
+
+/* 视图级切换（房间列表 <-> 编辑房间） */
+.view-switch-enter-active {
+  transition: opacity 160ms ease-out;
+}
+.view-switch-leave-active {
+  transition: opacity 100ms ease-out;
+}
+.view-switch-enter-from,
+.view-switch-leave-to {
+  opacity: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .panel-switch-enter-active {
+    transition: opacity 180ms cubic-bezier(0.2, 0, 0, 1), transform 180ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  .panel-switch-leave-active {
+    transition: opacity 100ms ease-out, transform 100ms ease-out;
+  }
+  .panel-switch-enter-from {
+    transform: translateY(6px);
+  }
+  .panel-switch-leave-to {
+    transform: translateY(-4px);
+  }
+
+  .view-switch-enter-active {
+    transition: opacity 200ms cubic-bezier(0.2, 0, 0, 1), transform 200ms cubic-bezier(0.2, 0, 0, 1);
+  }
+  .view-switch-leave-active {
+    transition: opacity 110ms ease-out, transform 110ms ease-out;
+  }
+  .view-switch-enter-from {
+    transform: translateY(8px) scale(0.99);
+  }
+  .view-switch-leave-to {
+    transform: translateY(-4px) scale(0.995);
+  }
+}
+
 .toast-enter-from,
 .toast-leave-to { opacity: 0; transform: translateX(16px) scale(.97); }
 .toast-enter-active,

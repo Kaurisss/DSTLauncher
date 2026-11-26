@@ -10,6 +10,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import RoomConnectBar from '@/components/overview/RoomConnectBar.vue';
 import ShardList from '@/components/overview/ShardList.vue';
 import HostResources from '@/components/overview/HostResources.vue';
@@ -34,6 +35,8 @@ const proc = useProcessControl();
 
 const quickBusy = ref('');
 
+const initialLoading = computed(() => !rooms.loaded && !rooms.current);
+const needsInstall = computed(() => system.loaded && !system.installed);
 const master = computed(() => rooms.current?.shards?.find(shard => shard.isMaster && !shard.disabled));
 const masterRunning = computed(() => master.value && rooms.statuses.some(status => status.shard === master.value.name && status.state === 'running'));
 const anyRunning = computed(() => rooms.statuses.some(status => status.state === 'running'));
@@ -167,6 +170,7 @@ async function runQuick(action) {
         :process-sub="resSub"
         :process-cpu="res.cpu"
         :process-running="res.count > 0"
+        :process-loading="initialLoading"
       />
     </div>
 
@@ -180,8 +184,8 @@ async function runQuick(action) {
           <IconAction
             :variant="anyRunning ? 'outline' : 'default'"
             show-label
-            :icon="system.installed ? 'play' : 'download'"
-            :label="rooms.starting ? '准备开服中…' : (system.installed ? '全部启动' : '安装并启动')"
+            :icon="needsInstall ? 'download' : 'play'"
+            :label="rooms.starting ? '准备开服中…' : (needsInstall ? '安装并启动' : '全部启动')"
             :disabled="!rooms.current || rooms.starting"
             @click="proc.start('')"
           />
@@ -204,7 +208,13 @@ async function runQuick(action) {
         </template>
         <div class="flex min-h-0 flex-1 flex-col justify-between gap-3">
           <ShardList />
-          <div v-if="rooms.current" role="group" aria-label="快捷运维" class="grid gap-2 border-t border-border/75 pt-3">
+          <div v-if="initialLoading" role="status" aria-label="正在加载快捷运维" class="grid gap-2 border-t border-border/75 pt-3">
+            <span class="text-[11.5px] font-medium text-muted-foreground">快捷运维</span>
+            <div class="flex flex-wrap items-center gap-1.5">
+              <Skeleton v-for="w in ['w-[84px]', 'w-[84px]', 'w-[60px]', 'w-[84px]', 'w-[84px]', 'w-[84px]']" :key="w" :class="['h-7 rounded-md', w]" />
+            </div>
+          </div>
+          <div v-else-if="rooms.current" role="group" aria-label="快捷运维" class="grid gap-2 border-t border-border/75 pt-3">
             <span class="text-[11.5px] font-medium text-muted-foreground">快捷运维</span>
             <div class="flex flex-wrap items-center gap-1.5">
               <IconAction

@@ -67,6 +67,7 @@ async function test() {
     <template #actions>
       <IconAction icon="send" variant="outline" show-label="sm" label="测试已保存的通知设置" text="测试通知" :disabled="busy || !snapshot?.url" @click="test" />
       <IconAction v-if="draft" type="submit" form="notification-settings" show-label icon="save" :label="busy ? '处理中…' : '保存通知设置'" :text="busy ? '处理中…' : '保存设置'" :disabled="busy" />
+      <Skeleton v-else-if="!error" class="h-7 w-[86px] rounded-lg" />
     </template>
     <p v-if="error" role="alert" class="mb-4 text-sm text-destructive">{{ error }}</p>
     <form v-if="draft" id="notification-settings" @submit.prevent="save">
@@ -87,20 +88,42 @@ async function test() {
         <p class="text-sm text-muted-foreground">向接收端发送 JSON。测试使用已保存的设置；签名接入方式见项目说明。</p>
       </FieldGroup>
     </form>
-    <div v-else-if="!error" role="status" aria-label="正在读取通知设置" class="grid gap-4">
-      <div class="flex items-center justify-between gap-4">
-        <Skeleton class="h-4 w-20" />
-        <Skeleton class="h-5 w-9 rounded-full" />
+    <FieldGroup v-else-if="!error" role="status" aria-label="正在读取通知设置">
+      <Field orientation="horizontal">
+        <div class="flex h-5 flex-auto items-center"><Skeleton class="h-3.5 w-16 rounded" /></div>
+        <Skeleton class="h-5 w-9 shrink-0 rounded-full" />
+      </Field>
+      <Field v-for="(w, idx) in ['w-24', 'w-16']" :key="idx">
+        <div class="flex h-[19.25px] items-center"><Skeleton :class="['h-3.5 rounded', w]" /></div>
+        <Skeleton class="h-8 w-full rounded-lg" />
+      </Field>
+      <div class="grid gap-3">
+        <div class="flex h-5 items-center"><Skeleton class="h-3.5 w-16 rounded" /></div>
+        <div
+          v-for="(w, idx) in ['w-36', 'w-24', 'w-16', 'w-24', 'w-24', 'w-24', 'w-16']"
+          :key="idx"
+          class="flex h-5 items-center gap-2"
+        >
+          <Skeleton class="size-4 shrink-0 rounded-[4px]" />
+          <Skeleton :class="['h-3.5 rounded', w]" />
+        </div>
       </div>
-      <div v-for="i in 2" :key="i" class="grid gap-2">
-        <Skeleton class="h-4 w-24" />
-        <Skeleton class="h-9 w-full" />
+      <div class="grid gap-3">
+        <div class="flex h-5 items-center"><Skeleton class="h-3.5 w-16 rounded" /></div>
+        <div class="flex h-5 items-center"><Skeleton class="h-3.5 w-80 max-w-full rounded" /></div>
+        <div
+          v-for="i in Math.max(rooms.list.length, 1)"
+          :key="i"
+          class="flex h-5 items-center gap-2"
+        >
+          <Skeleton class="size-4 shrink-0 rounded-[4px]" />
+          <Skeleton class="h-3.5 w-32 rounded" />
+        </div>
       </div>
-      <div class="grid gap-2 pt-1">
-        <Skeleton class="h-4 w-20" />
-        <Skeleton v-for="i in 4" :key="i" class="h-4 w-40" />
+      <div class="flex h-5 items-center">
+        <Skeleton class="h-3.5 w-72 max-w-full rounded" />
       </div>
-    </div>
+    </FieldGroup>
     <section v-if="snapshot?.results.length" class="mt-4 border-t pt-4" aria-label="最近通知结果">
       <h3 class="mb-3 text-sm font-medium">最近投递结果</h3>
       <ul class="grid gap-3">

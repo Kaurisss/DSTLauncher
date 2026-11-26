@@ -8,6 +8,7 @@ import { Empty, EmptyContent, EmptyDescription } from '@/components/ui/empty';
 import WorldState from '@/components/overview/WorldState.vue';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { worldStateApi } from '@/lib/api.js';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
@@ -144,7 +145,29 @@ async function refreshSnapshots(id, requestGeneration) {
 </script>
 
 <template>
-  <Empty v-if="!rooms.current">
+  <section
+    v-if="!rooms.loaded && !rooms.current"
+    role="status"
+    aria-label="正在加载分片列表"
+    class="shard-grid grid gap-2.5 sm:grid-cols-2"
+  >
+    <div v-for="i in 4" :key="i" class="shard-row">
+      <div class="shard-row-head">
+        <div class="shard-main">
+          <Skeleton class="size-2 rounded-full" />
+          <Skeleton class="h-4 w-10 rounded" />
+          <Skeleton class="h-5 w-12 rounded-full" />
+        </div>
+        <Skeleton class="h-7 w-[60px] rounded-md" />
+      </div>
+      <div class="flex flex-col gap-1.5 pt-0.5">
+        <Skeleton class="h-3.5 w-28 rounded" />
+        <Skeleton class="h-3 w-36 rounded" />
+      </div>
+    </div>
+  </section>
+
+  <Empty v-else-if="!rooms.current">
     <EmptyDescription>请先在「房间管理」页新建一个房间</EmptyDescription>
     <EmptyContent>
       <Button size="sm" variant="outline" @click="ui.openRoomEditor()">前往新建房间</Button>
@@ -186,7 +209,7 @@ async function refreshSnapshots(id, requestGeneration) {
             <IconAction variant="destructive" show-label="sm" icon="stop" label="停止" :disabled="rooms.starting" @click="proc.stop(s.shard)" />
             <IconAction variant="outline" show-label="sm" icon="restart" label="重启" :disabled="rooms.starting || system.installing" @click="proc.restart(s.shard)" />
           </template>
-          <IconAction v-else variant="outline" show-label="sm" :icon="system.installed ? 'play' : 'download'" :label="rooms.starting ? '请稍候…' : (system.installed ? '启动' : '安装并启动')" :disabled="rooms.starting" @click="proc.start(s.shard)" />
+          <IconAction v-else variant="outline" show-label="sm" :icon="system.loaded && !system.installed ? 'download' : 'play'" :label="rooms.starting ? '请稍候…' : (system.loaded && !system.installed ? '安装并启动' : '启动')" :disabled="rooms.starting" @click="proc.start(s.shard)" />
         </span>
       </div>
       <WorldState :snapshot="s.snapshot" :loading="loadingSnapshots" :error="snapshotError" />

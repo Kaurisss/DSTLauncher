@@ -17,6 +17,7 @@ defineProps({
   processSub: { type: String, default: '未运行' },
   processCpu: { type: Number, default: 0 },
   processRunning: { type: Boolean, default: false },
+  processLoading: { type: Boolean, default: false },
 });
 
 const snapshot = ref(null);
@@ -86,14 +87,15 @@ onUnmounted(() => {
         <!-- 宿主机内存 + 存档盘两列监控 -->
         <div class="grid flex-1 gap-2.5 sm:grid-cols-2">
           <div class="flex min-w-0 flex-col justify-between rounded-lg border border-border/80 bg-muted/25 px-3 py-2.5">
-            <div class="flex items-baseline justify-between gap-2">
+            <div class="flex items-center justify-between gap-2">
               <span class="text-[11.5px] font-medium text-muted-foreground">宿主机内存</span>
-              <span v-if="memory" class="truncate text-[11px] text-muted-foreground tabular-nums">
+              <Skeleton v-if="loading" class="h-3 w-24 rounded" />
+              <span v-else-if="memory" class="truncate text-[11px] text-muted-foreground tabular-nums">
                 {{ fmtSize(memoryUsed) }} / {{ fmtSize(memory.totalBytes) }}
               </span>
             </div>
-            <div v-if="loading" role="status" aria-label="读取宿主机内存" class="mt-1.5 grid gap-2">
-              <Skeleton class="h-5 w-16" />
+            <div v-if="loading" role="status" aria-label="读取宿主机内存" class="mt-1 grid gap-2">
+              <div class="flex h-[22.5px] items-center"><Skeleton class="h-4.5 w-14 rounded" /></div>
               <Skeleton class="h-1 w-full rounded-full" />
             </div>
             <template v-else>
@@ -116,14 +118,15 @@ onUnmounted(() => {
                 class="flex min-w-0 flex-col justify-between rounded-lg border border-border/80 bg-muted/25 px-3 py-2.5"
                 :tabindex="snapshot?.diskPath ? 0 : undefined"
               >
-                <div class="flex items-baseline justify-between gap-2">
+                <div class="flex items-center justify-between gap-2">
                   <span class="text-[11.5px] font-medium text-muted-foreground">存档盘</span>
-                  <span v-if="disk" class="truncate text-[11px] text-muted-foreground tabular-nums">
+                  <Skeleton v-if="loading" class="h-3 w-28 rounded" />
+                  <span v-else-if="disk" class="truncate text-[11px] text-muted-foreground tabular-nums">
                     余 {{ fmtSize(disk.availableBytes) }} / {{ fmtSize(disk.totalBytes) }}
                   </span>
                 </div>
-                <div v-if="loading" role="status" aria-label="读取存档盘空间" class="mt-1.5 grid gap-2">
-                  <Skeleton class="h-5 w-16" />
+                <div v-if="loading" role="status" aria-label="读取存档盘空间" class="mt-1 grid gap-2">
+                  <div class="flex h-[22.5px] items-center"><Skeleton class="h-4.5 w-14 rounded" /></div>
                   <Skeleton class="h-1 w-full rounded-full" />
                 </div>
                 <template v-else>
@@ -146,14 +149,17 @@ onUnmounted(() => {
 
         <!-- 当前房间进程资源占用 -->
         <div class="flex min-w-0 flex-col justify-between rounded-lg border border-border/80 bg-muted/25 px-3 py-2.5">
-          <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+          <div class="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
             <span class="text-[11.5px] font-medium text-muted-foreground">当前房间进程占用</span>
-            <div class="flex items-baseline gap-2.5 tabular-nums">
+            <Skeleton v-if="processLoading" class="h-4 w-20 rounded" />
+            <div v-else class="flex items-baseline gap-2.5 tabular-nums">
               <span class="text-sm font-semibold text-foreground">{{ processValue }}</span>
               <span class="text-xs text-muted-foreground">{{ processSub }}</span>
             </div>
           </div>
+          <Skeleton v-if="processLoading" class="mt-2 h-1 w-full rounded-full" />
           <Progress
+            v-else
             :class="['mt-2 h-1', processCpu > 50 && '[&>[data-slot=progress-indicator]]:bg-amber-500']"
             :model-value="processRunning ? Math.min(100, processCpu) : 0"
             aria-label="进程 CPU 占比"

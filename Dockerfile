@@ -78,7 +78,8 @@ ENTRYPOINT ["/usr/bin/tini", "--"]
 # 容器内绑 0.0.0.0（bridge 网络下必须如此，否则端口映射收不到包）；
 # 「不对外暴露」由 compose 的端口映射限制在宿主 127.0.0.1 来保证，
 # 而不是靠这里的 bind 地址。
-# 当前 API 无鉴权：远程访问请用 SSH 隧道，或前置带 TLS+认证的反向代理。
+# 面板通过 DST_PANEL_USERNAME / DST_PANEL_PASSWORD 进行登录鉴权。
+# 公网访问时应在宿主机前置 TLS 反向代理，面板端口只绑定到宿主机 127.0.0.1。
 CMD ["/opt/dst-panel/dst-panel", "-bind", "0.0.0.0", "-port", "16800", "-data-dir", "/data"]
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \

@@ -1,23 +1,20 @@
 <script setup>
-import { computed, ref } from 'vue';
-import { PhDesktop, PhMoon, PhSignOut, PhSun } from '@phosphor-icons/vue';
+import { computed } from 'vue';
+import { PhDesktop, PhMoon, PhSun } from '@phosphor-icons/vue';
 
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { SidebarTrigger } from '@/components/ui/sidebar';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { useAuthStore } from '@/stores/auth.js';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useUiStore } from '@/stores/ui.js';
 import { useTheme } from '@/composables/useTheme.js';
-import { guard, toast } from '@/lib/toast.js';
+import { toast } from '@/lib/toast.js';
 import { GAME_MODE_LABEL } from '@/lib/format.js';
 
-const auth = useAuthStore();
 const rooms = useRoomsStore();
 const ui = useUiStore();
 const theme = useTheme();
-const loggingOut = ref(false);
 
 const pageTitle = computed(() => ui.activeTabMeta?.label || '控制台');
 const groupLabel = computed(() => (ui.isGlobalTab ? '全局管理' : '当前房间'));
@@ -40,16 +37,6 @@ function isRoomRunning(room) {
 function onTheme() {
   theme.cycle();
   toast(`主题：${theme.label.value}`);
-}
-
-async function onLogout() {
-  if (loggingOut.value) return;
-  loggingOut.value = true;
-  try {
-    await guard(() => auth.logout(), { success: '已退出登录' });
-  } finally {
-    loggingOut.value = false;
-  }
 }
 </script>
 
@@ -140,23 +127,6 @@ async function onLogout() {
           </Button>
         </TooltipTrigger>
         <TooltipContent>{{ themeTitle }}</TooltipContent>
-      </Tooltip>
-
-      <Tooltip v-if="auth.enabled">
-        <TooltipTrigger as-child>
-          <Button
-            variant="outline"
-            size="sm"
-            class="h-7.5 shrink-0 gap-1.5 rounded-lg border-border/80 bg-background ps-2 pe-2.5 text-xs text-muted-foreground shadow-none hover:bg-muted/60 hover:text-foreground"
-            aria-label="退出登录"
-            :disabled="loggingOut"
-            @click="onLogout"
-          >
-            <PhSignOut class="size-3.5" aria-hidden="true" />
-            <span class="hidden sm:inline">退出登录</span>
-          </Button>
-        </TooltipTrigger>
-        <TooltipContent>退出登录</TooltipContent>
       </Tooltip>
     </div>
   </header>

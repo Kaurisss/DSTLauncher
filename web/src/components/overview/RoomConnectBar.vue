@@ -44,6 +44,7 @@ const saving = ref(false);
 const saveError = ref('');
 
 const room = computed(() => rooms.current);
+const initialLoading = computed(() => !rooms.loaded && !room.value);
 const enabledShards = computed(() => (room.value?.shards || []).filter(s => !s.disabled));
 const shardTotal = computed(() => enabledShards.value.length);
 const shardRunning = computed(() => rooms.statuses.filter(s => s.state === 'running').length);
@@ -258,7 +259,11 @@ onMounted(() => {
     <template #title>
       <span class="inline-flex flex-wrap items-center gap-1.5">
         <span>房间概览</span>
-        <template v-if="room">
+        <template v-if="initialLoading">
+          <Skeleton class="h-5 w-11 rounded-full" />
+          <Skeleton class="h-5 w-14 rounded-full" />
+        </template>
+        <template v-else-if="room">
           <Badge variant="secondary" class="h-5 px-2 text-[11px] font-medium">{{ modeLabel }}</Badge>
           <Badge variant="outline" class="h-5 gap-1 px-2 text-[11px] font-normal text-muted-foreground">
             <PhWifiHigh class="size-3" aria-hidden="true" />
@@ -272,7 +277,11 @@ onMounted(() => {
       </span>
     </template>
     <template #actions>
-      <template v-if="room">
+      <template v-if="initialLoading">
+        <Skeleton class="h-7 w-[74px] rounded-md" />
+        <Skeleton class="h-7 w-[86px] rounded-md" />
+      </template>
+      <template v-else-if="room">
         <Button variant="outline" size="sm" class="h-7 gap-1.5 ps-2 pe-2.5 text-xs" @click="ui.select('console')">
           <PhTerminalWindow class="size-3.5" aria-hidden="true" />
           <span>控制台</span>
@@ -284,7 +293,42 @@ onMounted(() => {
       </template>
     </template>
 
-    <Empty v-if="!room" class="flex-1 justify-center">
+    <div v-if="initialLoading" role="status" aria-label="正在加载房间概览" class="flex min-h-0 flex-1 flex-col justify-between gap-3">
+      <div class="grid grid-cols-3 gap-2.5">
+        <div
+          v-for="item in ['运行分片', '已启用模组', '游戏版本']"
+          :key="item"
+          class="flex min-w-0 flex-col justify-between rounded-lg border border-border/80 bg-muted/25 px-3 py-2.5"
+        >
+          <span class="text-[11.5px] font-medium text-muted-foreground">{{ item }}</span>
+          <div class="mt-1 flex h-[22.5px] items-center">
+            <Skeleton class="h-4.5 w-14 rounded" />
+          </div>
+          <div class="mt-0.5 flex h-[16.5px] items-center">
+            <Skeleton class="h-3 w-16 rounded" />
+          </div>
+        </div>
+      </div>
+
+      <div class="overview-connect-box grid gap-2 rounded-lg border border-border/80 bg-muted/25 p-2.5">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex items-center gap-1.5">
+            <span class="text-[11.5px] font-medium text-muted-foreground">直连代码</span>
+            <Skeleton class="h-7 w-40 rounded-md" />
+          </div>
+          <Skeleton class="h-6 w-14 rounded-md" />
+        </div>
+        <div class="flex min-w-0 items-center justify-between gap-1.5 rounded-md border border-border/75 bg-background px-2.5 py-1.5">
+          <Skeleton class="h-4 w-52 rounded" />
+          <div class="flex shrink-0 items-center gap-1">
+            <Skeleton class="size-6 rounded-md" />
+            <Skeleton class="h-6 w-12 rounded-md" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <Empty v-else-if="!room" class="flex-1 justify-center">
       <EmptyDescription>请先在「房间管理」页新建一个房间</EmptyDescription>
       <EmptyContent>
         <Button size="sm" variant="outline" @click="ui.openRoomEditor()">前往新建房间</Button>
@@ -317,12 +361,18 @@ onMounted(() => {
 
         <div class="flex min-w-0 flex-col justify-between rounded-lg border border-border/80 bg-muted/25 px-3 py-2.5">
           <span class="text-[11.5px] font-medium text-muted-foreground">游戏版本</span>
-          <div class="mt-1 truncate font-mono text-base font-semibold leading-tight tracking-tight tabular-nums">
-            {{ system.version ? `v${system.version}` : '—' }}
-          </div>
-          <span class="mt-0.5 truncate text-[11px] text-muted-foreground">
-            {{ system.installed ? '服务端已就绪' : '未安装服务端' }}
-          </span>
+          <template v-if="!system.loaded">
+            <div class="mt-1 flex h-[22.5px] items-center"><Skeleton class="h-4 w-16 rounded" /></div>
+            <div class="mt-0.5 flex h-[16.5px] items-center"><Skeleton class="h-3 w-14 rounded" /></div>
+          </template>
+          <template v-else>
+            <div class="mt-1 truncate font-mono text-base font-semibold leading-tight tracking-tight tabular-nums">
+              {{ system.version ? `v${system.version}` : '—' }}
+            </div>
+            <span class="mt-0.5 truncate text-[11px] text-muted-foreground">
+              {{ system.installed ? '服务端已就绪' : '未安装服务端' }}
+            </span>
+          </template>
         </div>
       </div>
 

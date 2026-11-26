@@ -1,0 +1,3 @@
+{$PANEL_DOMAIN} {
+    reverse_proxy dst-panel:16800
+}

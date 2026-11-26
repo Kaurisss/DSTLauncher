@@ -7,6 +7,7 @@ import { installApi, serverApi } from '@/lib/api.js';
 import { toast } from '@/lib/toast.js';
 
 export const useSystemStore = defineStore('system', () => {
+  const loaded = ref(false);
   const installed = ref(false);
   const installing = ref(false);
   const canceled = ref(false);
@@ -32,6 +33,7 @@ export const useSystemStore = defineStore('system', () => {
   let wasInstalling = false;
 
   function apply(d) {
+    loaded.value = true;
     installed.value = !!d.installed;
     installing.value = !!d.installing;
     canceled.value = !!d.canceled;
@@ -148,7 +150,7 @@ export const useSystemStore = defineStore('system', () => {
   }
 
   return {
-    installed, installing, canceled, canceling, progress, error, output, version,
+    loaded, installed, installing, canceled, canceling, progress, error, output, version,
     external, root, executable, source, arch,
     server, loadServer, saveServer,
     refresh, startInstall, cancelInstall, ensureInstalled, update,

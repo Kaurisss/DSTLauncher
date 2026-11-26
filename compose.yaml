@@ -5,8 +5,8 @@
 #
 # 网络：用 bridge + 显式端口映射，而不是 network_mode: host。
 # 原因：Docker Desktop（Windows/macOS）的 host 网络指向 WSL2/虚拟机自己的
-# loopback，宿主机浏览器访问不到；即使在 Linux 上 host 网络也会把无鉴权的
-# 面板直接暴露到所有网卡。显式映射到宿主 127.0.0.1 既跨平台可用，也默认安全。
+# loopback，宿主机浏览器访问不到。显式映射到宿主 127.0.0.1 既跨平台可用，
+# 也方便把面板交给宿主机上的 HTTPS 反向代理。
 #
 # 房间端口由 internal/room/store.go 动态分配，四个区间：
 #   游戏 11000+ / 分片协调 21000+ / Steam master 31000+ / Steam auth 41000+
@@ -32,10 +32,12 @@ services:
     stop_grace_period: 2m
     environment:
       DST_DATA_DIR: /data
+      DST_PANEL_USERNAME: ${DST_PANEL_USERNAME:-admin}
+      DST_PANEL_PASSWORD: ${DST_PANEL_PASSWORD:?请在 .env 中设置 DST_PANEL_PASSWORD}
       # 可选：指定已安装的 DST 专用服务器目录（含 bin64/ 的那一层，留空则由面板用 SteamCMD 安装到 /data/steamapps/common/...）
       DST_SERVER_DIR: ${DST_SERVER_DIR:-}
     ports:
-      # 面板只绑宿主回环：当前 API 无鉴权，不要改成 0.0.0.0。
+      # 面板只绑宿主回环，公网访问请通过 HTTPS 反向代理。
       # 远程访问用 SSH 隧道：ssh -L 16800:127.0.0.1:16800 user@host
       - "127.0.0.1:16800:16800"
       # 游戏端口（UDP）：玩家直连这些端口
@@ -59,3 +61,25 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  caddy:
+    image: caddy:2-alpine
+    profiles: ["public"]
+    restart: unless-stopped
+    depends_on:
+      dst-panel:
+        condition: service_healthy
+    environment:
+      PANEL_DOMAIN: ${PANEL_DOMAIN:-}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

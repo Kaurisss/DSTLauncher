@@ -15,6 +15,7 @@ import { Field, FieldDescription, FieldGroup, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { NativeSelect, NativeSelectOption } from '@/components/ui/native-select';
 import { Separator } from '@/components/ui/separator';
+import { Skeleton } from '@/components/ui/skeleton';
 import UiProgress from '@/components/ui/UiProgress.vue';
 import { useRoomsStore } from '@/stores/rooms.js';
 import { useSystemStore } from '@/stores/system.js';
@@ -115,6 +116,32 @@ onMounted(async () => {
       <p class="text-sm text-muted-foreground">
         {{ rooms.starting ? '安装成功后自动开服，请保持此页面打开。取消会保留已下载文件，可随时继续。' : '完成后会自动刷新。取消会保留已下载文件，可随时继续。' }}
       </p>
+    </template>
+
+    <template v-else-if="!system.loaded && !server && !system.installed && !system.error && !system.canceled">
+      <div role="status" aria-label="正在读取服务器安装信息" class="flex flex-col gap-4">
+        <div class="flex items-center justify-between gap-2">
+          <div class="flex h-5 items-center"><Skeleton class="h-4 w-36 rounded" /></div>
+          <Skeleton class="h-5 w-11 rounded-full" />
+        </div>
+        <div class="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 text-sm">
+          <span class="text-muted-foreground">来源</span>
+          <div class="flex h-5 items-center"><Skeleton class="h-3.5 w-64 max-w-full rounded" /></div>
+          <span class="text-muted-foreground">游戏版本</span>
+          <div class="flex h-5 items-center"><Skeleton class="h-3.5 w-20 rounded" /></div>
+        </div>
+        <div class="flex h-5 items-center"><Skeleton class="h-3.5 w-80 max-w-full rounded" /></div>
+        <div class="flex h-5 items-center"><Skeleton class="h-3.5 w-96 max-w-full rounded" /></div>
+        <Separator />
+        <div class="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 text-sm">
+          <span class="text-muted-foreground">模组目录</span>
+          <div class="flex h-5 items-center"><Skeleton class="h-3.5 w-72 max-w-full rounded" /></div>
+        </div>
+        <div class="flex h-5 items-center gap-1.5">
+          <Skeleton class="size-3.5 rounded" />
+          <Skeleton class="h-3.5 w-28 rounded" />
+        </div>
+      </div>
     </template>
 
     <template v-else-if="system.installed">

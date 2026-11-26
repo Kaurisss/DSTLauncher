@@ -24,6 +24,7 @@ const preparing = ref(false);
 const uploader = ref({ open: false, roomId: null, key: 0 });
 const deleting = ref(false);
 const editingRoom = computed(() => rooms.list.find(room => room.id === editor.value.roomId) || null);
+let pendingFocusId = null;
 
 onMounted(async () => {
   await guard(() => rooms.load());
@@ -36,6 +37,16 @@ function reload() {
   guard(() => rooms.load());
 }
 
+async function onViewEnter() {
+  await nextTick();
+  document.querySelector('#page-content [data-slot="page-scroll"]')?.scrollTo({ top: 0 });
+  if (pendingFocusId) {
+    const focusId = pendingFocusId;
+    pendingFocusId = null;
+    document.getElementById(focusId)?.focus({ preventScroll: true });
+  }
+}
+
 async function openEditor(roomId = null, section = 'general') {
   if (preparing.value) return;
   preparing.value = true;
@@ -44,21 +55,16 @@ async function openEditor(roomId = null, section = 'general') {
       const { ok } = await guard(() => rooms.loadMeta());
       if (!ok) return;
     }
+    pendingFocusId = section === 'network' ? 'f_token' : 'f_name';
     editor.value = { open: true, roomId: roomId ? Number(roomId) : null, section, key: editor.value.key + 1 };
-    await nextTick();
-    document.querySelector('#page-content [data-slot="page-scroll"]')?.scrollTo({ top: 0 });
-    const focusId = section === 'network' ? 'f_token' : 'f_name';
-    document.getElementById(focusId)?.focus({ preventScroll: true });
   } finally {
     preparing.value = false;
   }
 }
 
-async function closeEditor() {
+function closeEditor() {
+  pendingFocusId = 'new-room-button';
   editor.value.open = false;
-  await nextTick();
-  document.querySelector('#page-content [data-slot="page-scroll"]')?.scrollTo({ top: 0 });
-  document.getElementById('new-room-button')?.focus({ preventScroll: true });
 }
 
 function onSelect(id) {
@@ -102,49 +108,51 @@ async function onRemove(id) {
 
 <template>
   <div class="flex min-h-0 flex-1 flex-col">
-    <template v-if="editor.open">
-      <RoomEditor
-        v-if="!editor.roomId || editingRoom"
-        :key="editor.key"
-        :room="editingRoom"
-        :meta="rooms.meta"
-        :initial-section="editor.section"
-        @close="closeEditor"
-        @saved="closeEditor"
-      >
-        <template v-if="editingRoom" #access>
-          <RoomAdmins :key="editingRoom.id" :room="editingRoom" />
-          <RoomPlayerLists :key="`lists-${editingRoom.id}`" :room="editingRoom" />
-        </template>
-      </RoomEditor>
-      <UiCard v-else>
-        <template #title>房间已不存在</template>
-        <template #actions><IconAction variant="outline" show-label icon="chevron" icon-class="rotate-180" label="返回房间列表" @click="closeEditor" /></template>
-      </UiCard>
-    </template>
-
-    <UiCard v-else flush fill>
-      <UiToolbar aria-label="房间工具栏" leading-class="flex-none">
-        <Badge variant="secondary" class="whitespace-nowrap tabular-nums">共 {{ rooms.list.length }} 个房间</Badge>
-        <template #actions>
-          <RoomProfilesDialog @created="onProfileCreated" />
-          <MigrationDialog />
-          <IconAction id="new-room-button" show-label="sm" icon="plus" label="新建房间" :disabled="preparing" @click="openEditor()" />
-          <IconAction variant="outline" show-label="sm" icon="upload" label="上传存档" @click="openUpload()" />
-          <IconAction variant="outline" icon="refresh" label="刷新" @click="reload" />
-        </template>
-      </UiToolbar>
-      <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="房间列表">
-        <RoomGrid
-          :rooms="rooms.list"
-          :current-id="rooms.currentId"
-          @select="onSelect"
-          @edit="openEditor"
-          @remove="onRemove"
-          @upload="openUpload"
-        />
+    <Transition name="view-switch" mode="out-in" @enter="onViewEnter">
+      <div v-if="editor.open" :key="`editor-${editor.key}`" class="flex min-h-0 flex-1 flex-col">
+        <RoomEditor
+          v-if="!editor.roomId || editingRoom"
+          :key="editor.key"
+          :room="editingRoom"
+          :meta="rooms.meta"
+          :initial-section="editor.section"
+          @close="closeEditor"
+          @saved="closeEditor"
+        >
+          <template v-if="editingRoom" #access>
+            <RoomAdmins :key="editingRoom.id" :room="editingRoom" />
+            <RoomPlayerLists :key="`lists-${editingRoom.id}`" :room="editingRoom" />
+          </template>
+        </RoomEditor>
+        <UiCard v-else>
+          <template #title>房间已不存在</template>
+          <template #actions><IconAction variant="outline" show-label icon="chevron" icon-class="rotate-180" label="返回房间列表" @click="closeEditor" /></template>
+        </UiCard>
       </div>
-    </UiCard>
+
+      <UiCard v-else key="list" flush fill>
+        <UiToolbar aria-label="房间工具栏" leading-class="flex-none">
+          <Badge variant="secondary" class="whitespace-nowrap tabular-nums">共 {{ rooms.list.length }} 个房间</Badge>
+          <template #actions>
+            <RoomProfilesDialog @created="onProfileCreated" />
+            <MigrationDialog />
+            <IconAction id="new-room-button" show-label="sm" icon="plus" label="新建房间" :disabled="preparing" @click="openEditor()" />
+            <IconAction variant="outline" show-label="sm" icon="upload" label="上传存档" @click="openUpload()" />
+            <IconAction variant="outline" icon="refresh" label="刷新" @click="reload" />
+          </template>
+        </UiToolbar>
+        <div data-slot="page-scroll" class="min-h-0 flex-1 overflow-y-auto overscroll-contain p-[var(--panel-padding)]" tabindex="0" role="region" aria-label="房间列表">
+          <RoomGrid
+            :rooms="rooms.list"
+            :current-id="rooms.currentId"
+            @select="onSelect"
+            @edit="openEditor"
+            @remove="onRemove"
+            @upload="openUpload"
+          />
+        </div>
+      </UiCard>
+    </Transition>
 
     <SaveUploadPanel
       v-if="uploader.open"

@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Field, FieldLabel } from '@/components/ui/field';
 import IconAction from '@/components/ui/IconAction.vue';
 import { Input } from '@/components/ui/input';
+import { useSlidingIndicator } from '@/composables/useSlidingIndicator.js';
 import { useTheme } from '@/composables/useTheme.js';
 import { hostApi, workshopApi } from '@/lib/api.js';
 import { guard } from '@/lib/toast.js';
@@ -35,6 +36,11 @@ const section = computed({
   get: () => (validKeys.has(ui.settingsSection) ? ui.settingsSection : 'maintenance'),
   set: value => { ui.settingsSection = value; },
 });
+
+const navRef = ref(null);
+const navIndicator = useSlidingIndicator(navRef, 'button[aria-current="page"]', () => section.value);
+const themeSegRef = ref(null);
+const themeIndicator = useSlidingIndicator(themeSegRef, '.seg-btn.is-active', () => [section.value, theme.mode.value]);
 
 const currentPwd = ref('');
 const newPwd = ref('');
@@ -87,13 +93,21 @@ async function saveApiKey() {
 
 <template>
   <div class="grid items-start gap-4 md:grid-cols-[12.5rem_minmax(0,1fr)]">
-    <nav aria-label="设置导航" class="grid gap-1">
+    <nav ref="navRef" aria-label="设置导航" class="relative grid gap-1">
+      <span
+        aria-hidden="true"
+        class="sliding-nav-indicator pointer-events-none absolute top-0 left-0 z-0 rounded-md bg-muted"
+        :class="{ 'is-animated': navIndicator.animated.value }"
+        :style="navIndicator.style.value"
+      />
       <button
         v-for="item in sections"
         :key="item.key"
         type="button"
-        class="rounded-md px-2.5 py-2 text-left text-sm transition-colors hover:bg-muted"
-        :class="{ 'bg-muted font-medium': section === item.key }"
+        class="relative z-10 rounded-md px-2.5 py-2 text-left text-sm transition-colors"
+        :class="section === item.key
+          ? (navIndicator.ready.value ? 'font-medium text-foreground' : 'bg-muted font-medium text-foreground')
+          : 'text-muted-foreground hover:bg-muted/70 hover:text-foreground'"
         :aria-current="section === item.key ? 'page' : undefined"
         @click="section = item.key"
       >
@@ -101,143 +115,151 @@ async function saveApiKey() {
       </button>
     </nav>
 
-    <div class="grid min-w-0 gap-4">
-      <template v-if="section === 'maintenance'">
-        <AutomationPanel />
-        <BackupRemoteSettings />
-      </template>
+    <Transition name="panel-switch" mode="out-in">
+      <div :key="section" class="grid min-w-0 gap-4">
+        <template v-if="section === 'maintenance'">
+          <AutomationPanel />
+          <BackupRemoteSettings />
+        </template>
 
-      <NotificationSettings v-else-if="section === 'notifications'" />
+        <NotificationSettings v-else-if="section === 'notifications'" />
 
-      <template v-else-if="section === 'server'">
-        <UiCard>
-          <template #title>服务器文件与架构</template>
-          <InstallPanel />
-        </UiCard>
+        <template v-else-if="section === 'server'">
+          <UiCard>
+            <template #title>服务器文件与架构</template>
+            <InstallPanel />
+          </UiCard>
 
-        <UiCard>
-          <template #title>创意工坊 API Key</template>
-          <template #actions>
-            <a
-              href="https://steamcommunity.com/dev/apikey"
-              target="_blank"
-              rel="noopener noreferrer"
-              class="text-xs text-primary hover:underline"
-            >
-              申请 Key
-            </a>
-            <IconAction type="submit" form="settings-api-key-form" show-label icon="save" :label="savingKey ? '保存中…' : '保存 Key'" :disabled="savingKey" />
-          </template>
+          <UiCard>
+            <template #title>创意工坊 API Key</template>
+            <template #actions>
+              <a
+                href="https://steamcommunity.com/dev/apikey"
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-xs text-primary hover:underline"
+              >
+                申请 Key
+              </a>
+              <IconAction type="submit" form="settings-api-key-form" show-label icon="save" :label="savingKey ? '保存中…' : '保存 Key'" :disabled="savingKey" />
+            </template>
 
-          <form id="settings-api-key-form" class="grid max-w-md gap-4" @submit.prevent="saveApiKey">
-            <Field>
-              <FieldLabel for="set-steam-key">Steam Web API Key</FieldLabel>
-              <Input
-                id="set-steam-key"
-                v-model="apiKey"
-                type="password"
-                autocomplete="off"
-                placeholder="用于创意工坊关键词搜索；按 ID 查询与下载无需配置"
+            <form id="settings-api-key-form" class="grid max-w-md gap-4" @submit.prevent="saveApiKey">
+              <Field>
+                <FieldLabel for="set-steam-key">Steam Web API Key</FieldLabel>
+                <Input
+                  id="set-steam-key"
+                  v-model="apiKey"
+                  type="password"
+                  autocomplete="off"
+                  placeholder="用于创意工坊关键词搜索；按 ID 查询与下载无需配置"
+                />
+              </Field>
+            </form>
+          </UiCard>
+        </template>
+
+        <template v-else>
+          <UiCard>
+            <template #title>登录凭据</template>
+            <template #actions>
+              <Badge :variant="auth.enabled ? 'ok' : 'muted'">
+                {{ auth.envManaged ? '启动参数锁定' : (auth.enabled ? '已启用' : '未启用') }}
+              </Badge>
+              <IconAction v-if="auth.enabled" variant="destructive" show-label icon="logout" label="退出登录" @click="logout" />
+              <IconAction v-if="!auth.envManaged" type="submit" form="settings-password-form" show-label icon="save" :label="savingPwd ? '保存中…' : '保存凭据'" :disabled="savingPwd || !username.trim() || (!auth.enabled && !newPwd.trim()) || (auth.enabled && !currentPwd)" />
+            </template>
+
+            <p v-if="auth.envManaged" class="text-sm text-muted-foreground">
+              当前用户名或密码由启动参数（<code>-username</code>、<code>-password</code>）或环境变量（<code>DST_PANEL_USERNAME</code>、<code>DST_PANEL_PASSWORD</code>）指定。
+            </p>
+
+            <form v-else id="settings-password-form" class="grid max-w-md gap-4" @submit.prevent="savePassword">
+              <Field>
+                <FieldLabel for="set-username">用户名</FieldLabel>
+                <Input
+                  id="set-username"
+                  v-model="username"
+                  autocomplete="username"
+                />
+              </Field>
+              <Field v-if="auth.enabled">
+                <FieldLabel for="set-cur-pwd">当前密码</FieldLabel>
+                <Input
+                  id="set-cur-pwd"
+                  v-model="currentPwd"
+                  type="password"
+                  autocomplete="current-password"
+                />
+              </Field>
+              <Field>
+                <FieldLabel for="set-new-pwd">{{ auth.enabled ? '新密码' : '访问密码' }}</FieldLabel>
+                <Input
+                  id="set-new-pwd"
+                  v-model="newPwd"
+                  type="password"
+                  autocomplete="new-password"
+                  :placeholder="auth.enabled ? '至少 4 个字符；留空保存则关闭密码' : '至少 4 个字符'"
+                />
+              </Field>
+            </form>
+          </UiCard>
+
+          <UiCard>
+            <template #title>界面主题</template>
+            <div ref="themeSegRef" class="seg" :class="{ 'has-indicator': themeIndicator.ready.value }">
+              <span
+                aria-hidden="true"
+                class="tab-pill-indicator"
+                :class="{ 'is-animated': themeIndicator.animated.value }"
+                :style="themeIndicator.style.value"
               />
-            </Field>
-          </form>
-        </UiCard>
-      </template>
-
-      <template v-else>
-        <UiCard>
-          <template #title>登录凭据</template>
-          <template #actions>
-            <Badge :variant="auth.enabled ? 'ok' : 'muted'">
-              {{ auth.envManaged ? '启动参数锁定' : (auth.enabled ? '已启用' : '未启用') }}
-            </Badge>
-            <IconAction v-if="auth.enabled" variant="destructive" show-label icon="logout" label="退出登录" @click="logout" />
-            <IconAction v-if="!auth.envManaged" type="submit" form="settings-password-form" show-label icon="save" :label="savingPwd ? '保存中…' : '保存凭据'" :disabled="savingPwd || !username.trim() || (!auth.enabled && !newPwd.trim()) || (auth.enabled && !currentPwd)" />
-          </template>
-
-          <p v-if="auth.envManaged" class="text-sm text-muted-foreground">
-            当前用户名或密码由启动参数（<code>-username</code>、<code>-password</code>）或环境变量（<code>DST_PANEL_USERNAME</code>、<code>DST_PANEL_PASSWORD</code>）指定。
-          </p>
-
-          <form v-else id="settings-password-form" class="grid max-w-md gap-4" @submit.prevent="savePassword">
-            <Field>
-              <FieldLabel for="set-username">用户名</FieldLabel>
-              <Input
-                id="set-username"
-                v-model="username"
-                autocomplete="username"
-              />
-            </Field>
-            <Field v-if="auth.enabled">
-              <FieldLabel for="set-cur-pwd">当前密码</FieldLabel>
-              <Input
-                id="set-cur-pwd"
-                v-model="currentPwd"
-                type="password"
-                autocomplete="current-password"
-              />
-            </Field>
-            <Field>
-              <FieldLabel for="set-new-pwd">{{ auth.enabled ? '新密码' : '访问密码' }}</FieldLabel>
-              <Input
-                id="set-new-pwd"
-                v-model="newPwd"
-                type="password"
-                autocomplete="new-password"
-                :placeholder="auth.enabled ? '至少 4 个字符；留空保存则关闭密码' : '至少 4 个字符'"
-              />
-            </Field>
-          </form>
-        </UiCard>
-
-        <UiCard>
-          <template #title>界面主题</template>
-          <div class="seg">
-            <button
-              v-for="opt in [
-                { key: 'auto', label: '跟随系统' },
-                { key: 'light', label: '浅色' },
-                { key: 'dark', label: '深色' },
-              ]"
-              :key="opt.key"
-              type="button"
-              class="seg-btn"
-              :class="{ 'is-active': theme.mode.value === opt.key }"
-              :aria-pressed="theme.mode.value === opt.key"
-              @click="theme.set(opt.key)"
-            >
-              {{ opt.label }}
-            </button>
-          </div>
-        </UiCard>
-
-        <UiCard>
-          <template #title>运行信息</template>
-          <dl class="grid gap-3 text-sm">
-            <div class="grid gap-1">
-              <dt class="text-muted-foreground">面板版本</dt>
-              <dd>{{ rooms.meta?.panelVersion || '未知' }}</dd>
+              <button
+                v-for="opt in [
+                  { key: 'auto', label: '跟随系统' },
+                  { key: 'light', label: '浅色' },
+                  { key: 'dark', label: '深色' },
+                ]"
+                :key="opt.key"
+                type="button"
+                class="seg-btn"
+                :class="{ 'is-active': theme.mode.value === opt.key }"
+                :aria-pressed="theme.mode.value === opt.key"
+                @click="theme.set(opt.key)"
+              >
+                {{ opt.label }}
+              </button>
             </div>
-            <div class="grid gap-1">
-              <dt class="text-muted-foreground">面板配置</dt>
-              <dd class="break-all font-mono text-xs">{{ system.server?.configPath || '—' }}</dd>
-            </div>
-            <div class="grid gap-1">
-              <dt class="text-muted-foreground">存档目录</dt>
-              <dd class="break-all font-mono text-xs">{{ saveDir || '—' }}</dd>
-            </div>
-            <div class="grid gap-1">
-              <dt class="text-muted-foreground">服务器目录</dt>
-              <dd class="break-all font-mono text-xs">{{ system.server?.root || '未安装' }}</dd>
-            </div>
-            <div class="grid gap-1">
-              <dt class="text-muted-foreground">模组目录</dt>
-              <dd class="break-all font-mono text-xs">{{ system.server?.ugcDir || '—' }}</dd>
-            </div>
-          </dl>
-          <p class="mt-4 text-sm text-muted-foreground">监听地址和端口由启动参数决定，改完需要重新打开面板。</p>
-        </UiCard>
-      </template>
-    </div>
+          </UiCard>
+
+          <UiCard>
+            <template #title>运行信息</template>
+            <dl class="grid gap-3 text-sm">
+              <div class="grid gap-1">
+                <dt class="text-muted-foreground">面板版本</dt>
+                <dd>{{ rooms.meta?.panelVersion || '未知' }}</dd>
+              </div>
+              <div class="grid gap-1">
+                <dt class="text-muted-foreground">面板配置</dt>
+                <dd class="break-all font-mono text-xs">{{ system.server?.configPath || '—' }}</dd>
+              </div>
+              <div class="grid gap-1">
+                <dt class="text-muted-foreground">存档目录</dt>
+                <dd class="break-all font-mono text-xs">{{ saveDir || '—' }}</dd>
+              </div>
+              <div class="grid gap-1">
+                <dt class="text-muted-foreground">服务器目录</dt>
+                <dd class="break-all font-mono text-xs">{{ system.server?.root || '未安装' }}</dd>
+              </div>
+              <div class="grid gap-1">
+                <dt class="text-muted-foreground">模组目录</dt>
+                <dd class="break-all font-mono text-xs">{{ system.server?.ugcDir || '—' }}</dd>
+              </div>
+            </dl>
+            <p class="mt-4 text-sm text-muted-foreground">监听地址和端口由启动参数决定，改完需要重新打开面板。</p>
+          </UiCard>
+        </template>
+      </div>
+    </Transition>
   </div>
 </template>
