@@ -19,6 +19,9 @@ import (
 // FileName 是配置文件名，位于程序目录（与 exe 同级）。
 const FileName = "panel.json"
 
+// DefaultUsername 是旧配置没有用户名时使用的登录名。
+const DefaultUsername = "admin"
+
 // Config 是面板级的本机配置。
 type Config struct {
 	// ServerDir 为空表示「自动探测 Steam 库」。
@@ -29,6 +32,8 @@ type Config struct {
 	// SteamApiKey 是免费的 Steam Web API Key，用于创意工坊关键词搜索。
 	// 留空只影响搜索：按 ID/链接查详情与下载不受影响（那些接口免 key）。
 	SteamApiKey string `json:"steamApiKey,omitempty"`
+	// Username 是面板登录用户名。旧配置为空时按 DefaultUsername 处理。
+	Username string `json:"username,omitempty"`
 	// PasswordHash 是面板登录密码的摘要（salt:hash）；为空表示未开启密码保护。
 	PasswordHash string `json:"passwordHash,omitempty"`
 }
@@ -72,6 +77,7 @@ func Read(workDir string) (Config, error) {
 	c.ServerDir = strings.TrimSpace(c.ServerDir)
 	c.Arch = strings.TrimSpace(c.Arch)
 	c.SteamApiKey = strings.TrimSpace(c.SteamApiKey)
+	c.Username = strings.TrimSpace(c.Username)
 	c.PasswordHash = strings.TrimSpace(c.PasswordHash)
 	return *c, nil
 }

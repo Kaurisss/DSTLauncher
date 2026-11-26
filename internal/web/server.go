@@ -42,6 +42,7 @@ type Options struct {
 	WorkDir  string // 程序目录，用于读写 panel.json
 	UgcDir   string // 共享工坊模组目录（-ugc_directory）
 	Version  string // 面板版本号，展示在侧边栏，便于确认「跑的是哪个构建」
+	Username string // 启动参数或环境变量指定的面板登录用户名
 	Password string // 启动参数或环境变量指定的面板访问密码（优先于 panel.json）
 }
 
@@ -58,6 +59,7 @@ type Server struct {
 	confDir        string
 	workDir        string
 	version        string
+	envUsername    string
 	envPassword    string
 	authSecret     []byte
 	authMu         sync.Mutex
@@ -109,6 +111,7 @@ func NewServer(o Options) *Server {
 		confDir:        o.ConfDir,
 		workDir:        o.WorkDir,
 		version:        o.Version,
+		envUsername:    strings.TrimSpace(o.Username),
 		envPassword:    strings.TrimSpace(o.Password),
 		authSecret:     generateSecret(),
 		authConfigSeen: o.WorkDir != "" && panelcfg.Exists(o.WorkDir),

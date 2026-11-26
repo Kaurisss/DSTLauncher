@@ -51,6 +51,7 @@ const ui = useUiStore();
 const rooms = useRoomsStore();
 const logs = useLogs();
 
+const loginUsername = ref('admin');
 const loginPwd = ref('');
 const loggingIn = ref(false);
 const loginError = ref('');
@@ -97,11 +98,11 @@ onUnauthorized(() => {
 });
 
 async function submitLogin() {
-  if (!loginPwd.value || loggingIn.value || loginWait.value) return;
+  if (!loginUsername.value.trim() || !loginPwd.value || loggingIn.value || loginWait.value) return;
   loggingIn.value = true;
   loginError.value = '';
   try {
-    await auth.login(loginPwd.value);
+    await auth.login(loginUsername.value.trim(), loginPwd.value);
     loginPwd.value = '';
     await guard(() => rooms.load());
     guard(() => rooms.loadMeta());
@@ -140,6 +141,7 @@ watch(
 
 onMounted(async () => {
   auth.load().then(status => {
+    if (status?.username) loginUsername.value = status.username;
     if (status?.retryAfter) startLoginCooldown(status.retryAfter);
   });
   // 首次加载会设置 currentId，从而触发上面的 watcher 完成状态刷新与日志连接
@@ -172,6 +174,14 @@ onUnmounted(() => {
         </div>
       </div>
       <div class="grid gap-1.5">
+        <label for="login-username" class="text-xs font-medium text-muted-foreground">用户名</label>
+        <Input
+          id="login-username"
+          v-model="loginUsername"
+          autocomplete="username"
+        />
+      </div>
+      <div class="grid gap-1.5">
         <label for="login-password" class="text-xs font-medium text-muted-foreground">面板访问密码</label>
         <Input
           id="login-password"
@@ -180,9 +190,9 @@ onUnmounted(() => {
           autocomplete="current-password"
         />
       </div>
-      <p v-if="loginWait" role="status" class="text-xs text-destructive">密码错误次数过多，请 {{ loginWait }} 秒后再试</p>
+      <p v-if="loginWait" role="status" class="text-xs text-destructive">登录失败次数过多，请 {{ loginWait }} 秒后再试</p>
       <p v-else-if="loginError" role="alert" class="text-xs text-destructive">{{ loginError }}</p>
-      <Button type="submit" :disabled="loggingIn || !loginPwd || loginWait > 0">
+      <Button type="submit" :disabled="loggingIn || !loginUsername.trim() || !loginPwd || loginWait > 0">
         {{ loggingIn ? '验证中…' : loginWait ? `${loginWait} 秒后重试` : '登录' }}
       </Button>
     </form>

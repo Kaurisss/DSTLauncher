@@ -28,7 +28,7 @@ const sections = [
   { key: 'maintenance', label: '自动维护与异地备份', desc: '定时备份、更新计划与异地同步' },
   { key: 'notifications', label: '事件通知', desc: 'Webhook 告警与测试' },
   { key: 'server', label: '服务器与创意工坊', desc: '服务端安装路径、架构与 API Key' },
-  { key: 'system', label: '安全、外观与关于', desc: '访问密码、界面主题与运行信息' },
+  { key: 'system', label: '安全、外观与关于', desc: '登录凭据、界面主题与运行信息' },
 ];
 const validKeys = new Set(sections.map(s => s.key));
 const section = computed({
@@ -38,6 +38,7 @@ const section = computed({
 
 const currentPwd = ref('');
 const newPwd = ref('');
+const username = ref('admin');
 const savingPwd = ref(false);
 
 const apiKey = ref('');
@@ -45,7 +46,8 @@ const savingKey = ref(false);
 const saveDir = ref('');
 
 onMounted(async () => {
-  auth.load();
+  const authStatus = await auth.load();
+  if (authStatus?.username) username.value = authStatus.username;
   rooms.loadMeta().catch(() => {});
   system.loadServer().catch(() => {});
   hostApi.stats().then(data => { saveDir.value = data?.diskPath || ''; }).catch(() => {});
@@ -57,8 +59,8 @@ async function savePassword() {
   if (savingPwd.value) return;
   savingPwd.value = true;
   const { ok } = await guard(
-    () => auth.setPassword(currentPwd.value, newPwd.value),
-    { success: newPwd.value.trim() ? '面板密码已保存' : '已关闭密码保护' },
+    () => auth.setPassword(username.value, currentPwd.value, newPwd.value),
+    { success: newPwd.value.trim() ? '登录凭据已保存' : '已关闭密码保护' },
   );
   savingPwd.value = false;
   if (ok) {
@@ -144,20 +146,28 @@ async function saveApiKey() {
 
       <template v-else>
         <UiCard>
-          <template #title>访问密码</template>
+          <template #title>登录凭据</template>
           <template #actions>
             <Badge :variant="auth.enabled ? 'ok' : 'muted'">
               {{ auth.envManaged ? '启动参数锁定' : (auth.enabled ? '已启用' : '未启用') }}
             </Badge>
             <IconAction v-if="auth.enabled" variant="destructive" show-label icon="logout" label="退出登录" @click="logout" />
-            <IconAction v-if="!auth.envManaged" type="submit" form="settings-password-form" show-label icon="save" :label="savingPwd ? '保存中…' : '保存密码'" :disabled="savingPwd || (!auth.enabled && !newPwd.trim()) || (auth.enabled && !currentPwd)" />
+            <IconAction v-if="!auth.envManaged" type="submit" form="settings-password-form" show-label icon="save" :label="savingPwd ? '保存中…' : '保存凭据'" :disabled="savingPwd || !username.trim() || (!auth.enabled && !newPwd.trim()) || (auth.enabled && !currentPwd)" />
           </template>
 
           <p v-if="auth.envManaged" class="text-sm text-muted-foreground">
-            当前密码由启动参数（<code>-password</code>）或环境变量（<code>DST_PANEL_PASSWORD</code>）指定。
+            当前用户名或密码由启动参数（<code>-username</code>、<code>-password</code>）或环境变量（<code>DST_PANEL_USERNAME</code>、<code>DST_PANEL_PASSWORD</code>）指定。
           </p>
 
           <form v-else id="settings-password-form" class="grid max-w-md gap-4" @submit.prevent="savePassword">
+            <Field>
+              <FieldLabel for="set-username">用户名</FieldLabel>
+              <Input
+                id="set-username"
+                v-model="username"
+                autocomplete="username"
+              />
+            </Field>
             <Field v-if="auth.enabled">
               <FieldLabel for="set-cur-pwd">当前密码</FieldLabel>
               <Input

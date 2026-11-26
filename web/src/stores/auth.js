@@ -6,12 +6,14 @@ import { authApi } from '@/lib/api.js';
 export const useAuthStore = defineStore('auth', () => {
   const enabled = ref(false);
   const authenticated = ref(true);
+  const username = ref('admin');
   const envManaged = ref(false);
 
   function apply(st) {
     if (!st || typeof st.enabled !== 'boolean') return;
     enabled.value = !!st.enabled;
     authenticated.value = st.enabled ? !!st.authenticated : true;
+    if (typeof st.username === 'string' && st.username.trim()) username.value = st.username;
     envManaged.value = !!st.envManaged;
   }
 
@@ -30,8 +32,8 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  async function login(password) {
-    const st = await authApi.login(password);
+  async function login(loginUsername, password) {
+    const st = await authApi.login(loginUsername, password);
     apply(st);
     return st;
   }
@@ -42,8 +44,8 @@ export const useAuthStore = defineStore('auth', () => {
     return st;
   }
 
-  async function setPassword(currentPassword, newPassword) {
-    const st = await authApi.setPassword(currentPassword, newPassword);
+  async function setPassword(loginUsername, currentPassword, newPassword) {
+    const st = await authApi.setPassword(loginUsername, currentPassword, newPassword);
     apply(st);
     return st;
   }
@@ -51,6 +53,7 @@ export const useAuthStore = defineStore('auth', () => {
   return {
     enabled,
     authenticated,
+    username,
     envManaged,
     markUnauthorized,
     load,

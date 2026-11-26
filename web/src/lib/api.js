@@ -110,11 +110,11 @@ async function readNDJSON(res, onEvent) {
 
 export const authApi = {
   status: () => request('/api/auth/status'),
-  login: password => request('/api/auth/login', { method: 'POST', body: { password } }),
+  login: (username, password) => request('/api/auth/login', { method: 'POST', body: { username, password } }),
   logout: () => request('/api/auth/logout', { method: 'POST' }),
-  setPassword: (currentPassword, newPassword) => request('/api/auth/password', {
+  setPassword: (username, currentPassword, newPassword) => request('/api/auth/password', {
     method: 'PUT',
-    body: { currentPassword, newPassword },
+    body: { username, currentPassword, newPassword },
   }),
 };
 

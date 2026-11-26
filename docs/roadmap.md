@@ -7,7 +7,7 @@
 ## 一、优先推荐落地项（Top 3）
 
 ### 1. 安全鉴权与宿主机资源预警（已完成）
-- [x] **面板密码登录**：支持设置页管理密码、`-password` 参数和 `DST_PANEL_PASSWORD` 环境变量；业务 API 使用 HttpOnly Cookie 会话鉴权。
+- [x] **面板用户名密码登录**：支持设置页管理用户名和密码、`-username` / `-password` 参数以及 `DST_PANEL_USERNAME` / `DST_PANEL_PASSWORD` 环境变量；旧配置默认用户名为 `admin`，业务 API 使用 HttpOnly Cookie 会话鉴权。
 - [x] **宿主机内存与存档盘空间**：概览页每 5 秒刷新宿主机内存使用率、已用/总内存，以及存档目录所在磁盘的可用/总容量；没有房间时仍可查看。Windows 使用原生 API，Linux 使用 `/proc/meminfo` 与 `statfs`，无新增依赖。
 - [x] **低资源提醒**：内存使用率达到 90%，或存档盘可用空间低于 10% / 5 GB 时展示提醒；采样失败单独显示错误，不显示虚假零值。只提示，不自动停止分片或清理存档。
 

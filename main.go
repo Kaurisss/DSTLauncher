@@ -85,6 +85,7 @@ func main() {
 		serverDir   = flag.String("serverdir", "", "专用服务器根目录（含 bin/ 的 \"Don't Starve Together Dedicated Server\"）。留空则自动探测 Steam 库；也可用环境变量 DST_SERVER_DIR，或直接在 Web 面板里配置")
 		arch        = flag.String("arch", "", "服务器架构：auto（优先 64 位，默认）/ 64 / 32。留空则用面板里配置的值")
 		dataDir     = flag.String("data-dir", "", "运行数据根目录（存档/日志/模组/面板配置）。留空则用可执行文件同级目录；也可用环境变量 DST_DATA_DIR，容器里指向持久化挂载卷")
+		username    = flag.String("username", "", "面板登录用户名；留空则读取环境变量 DST_PANEL_USERNAME 或 panel.json，默认 admin")
 		password    = flag.String("password", "", "面板访问密码；留空则读取环境变量 DST_PANEL_PASSWORD 或 panel.json")
 	)
 	flag.Parse()
@@ -236,6 +237,10 @@ func main() {
 	if panelPassword == "" {
 		panelPassword = strings.TrimSpace(os.Getenv("DST_PANEL_PASSWORD"))
 	}
+	panelUsername := strings.TrimSpace(*username)
+	if panelUsername == "" {
+		panelUsername = strings.TrimSpace(os.Getenv("DST_PANEL_USERNAME"))
+	}
 
 	api := web.NewServer(web.Options{
 		Mgr:      mgr,
@@ -247,6 +252,7 @@ func main() {
 		WorkDir:  workDir,
 		UgcDir:   ugcDir,
 		Version:  appVersion,
+		Username: panelUsername,
 		Password: panelPassword,
 	})
 	// 模组下载清单是安装级的，启动时按所有房间重算一次并集，

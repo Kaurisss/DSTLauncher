@@ -28,7 +28,7 @@ func TestHostStatsRequiresAuthAndIsReadOnly(t *testing.T) {
 	if rec.Code != http.StatusUnauthorized {
 		t.Fatalf("资源接口应受鉴权保护: %d", rec.Code)
 	}
-	rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "secret123"}, nil)
+	rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": "secret123"}, nil)
 	if body["code"] != float64(200) {
 		t.Fatalf("登录失败: %v", body)
 	}

@@ -76,6 +76,7 @@ func TestAuthLifecycleAndCookieInvalidation(t *testing.T) {
 
 	// 2. 设置新密码，返回有效会话 Cookie
 	rec, body = doJSON(t, h, http.MethodPut, "/api/auth/password", map[string]string{
+		"username":    "alice",
 		"newPassword": "secret123",
 	}, nil)
 	if body["code"] != float64(200) {
@@ -106,8 +107,9 @@ func TestAuthLifecycleAndCookieInvalidation(t *testing.T) {
 		t.Fatalf("携带有效 Cookie 应放行: status=%d body=%v", rec.Code, body)
 	}
 
-	// 5. 修改密码后，旧 Cookie 立即失效，新 Cookie 有效
+	// 5. 修改用户名和密码后，旧 Cookie 立即失效，新 Cookie 有效
 	rec, body = doJSON(t, h, http.MethodPut, "/api/auth/password", map[string]string{
+		"username":        "bob",
 		"currentPassword": "secret123",
 		"newPassword":     "newpass456",
 	}, cookies1)
@@ -139,25 +141,105 @@ func TestAuthLifecycleAndCookieInvalidation(t *testing.T) {
 	}
 }
 
+func TestAuthUsernameAndLegacyConfig(t *testing.T) {
+	srv := newAuthTestServer(t, "")
+	hash, err := HashPassword("secret123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := panelcfg.Save(srv.workDir, panelcfg.Config{PasswordHash: hash}); err != nil {
+		t.Fatal(err)
+	}
+	h := srv.Handler()
+
+	rec, body := doJSON(t, h, http.MethodGet, "/api/auth/status", nil, nil)
+	data := body["data"].(map[string]interface{})
+	if data["username"] != "admin" {
+		t.Fatalf("旧配置应使用 admin 用户名: %v", data)
+	}
+	rec, body = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{
+		"username": "operator",
+		"password": "secret123",
+	}, nil)
+	if body["code"] == float64(200) || len(rec.Result().Cookies()) != 0 {
+		t.Fatalf("错误用户名不应登录成功: %v", body)
+	}
+	rec, body = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{
+		"username": "admin",
+		"password": "secret123",
+	}, nil)
+	if body["code"] != float64(200) || len(rec.Result().Cookies()) == 0 {
+		t.Fatalf("旧配置使用 admin 应登录成功: %v", body)
+	}
+}
+
+func TestAuthConfiguredUsername(t *testing.T) {
+	srv := newAuthTestServer(t, "")
+	hash, err := HashPassword("secret123")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := panelcfg.Save(srv.workDir, panelcfg.Config{Username: "operator", PasswordHash: hash}); err != nil {
+		t.Fatal(err)
+	}
+	h := srv.Handler()
+
+	rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{
+		"username": "admin",
+		"password": "secret123",
+	}, nil)
+	if body["code"] == float64(200) || len(rec.Result().Cookies()) != 0 {
+		t.Fatalf("配置用户名不匹配时不应登录成功: %v", body)
+	}
+	rec, body = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{
+		"username": "operator",
+		"password": "secret123",
+	}, nil)
+	if body["code"] != float64(200) || len(rec.Result().Cookies()) == 0 {
+		t.Fatalf("配置用户名登录失败: %v", body)
+	}
+}
+
+func TestAuthEnvironmentUsername(t *testing.T) {
+	srv := newAuthTestServer(t, "secret123")
+	srv.envUsername = "operator"
+	h := srv.Handler()
+
+	rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{
+		"username": "admin",
+		"password": "secret123",
+	}, nil)
+	if body["code"] == float64(200) || len(rec.Result().Cookies()) != 0 {
+		t.Fatalf("环境用户名不匹配时不应登录成功: %v", body)
+	}
+	rec, body = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{
+		"username": "operator",
+		"password": "secret123",
+	}, nil)
+	if body["code"] != float64(200) || len(rec.Result().Cookies()) == 0 {
+		t.Fatalf("环境用户名登录失败: %v", body)
+	}
+}
+
 func TestAuthLoginLockout(t *testing.T) {
 	srv := newAuthTestServer(t, "fixedpass")
 	h := srv.Handler()
 	synctest.Test(t, func(t *testing.T) {
 		for i := 1; i < maxLoginFailures; i++ {
-			rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "wrong"}, nil)
-			if rec.Code != http.StatusOK || body["message"] != "密码错误" {
+			rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": "wrong"}, nil)
+			if rec.Code != http.StatusOK || body["message"] != "用户名或密码错误" {
 				t.Fatalf("未达阈值时应允许重试: %d %v", rec.Code, body)
 			}
 		}
 		for _, wait := range []int{30, 60, 120, 240, 480, 900, 900} {
-			rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "wrong"}, nil)
+			rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": "wrong"}, nil)
 			if rec.Code != http.StatusTooManyRequests || body["code"] != float64(429) || rec.Header().Get("Retry-After") != strconv.Itoa(wait) {
 				t.Fatalf("应返回递增冷却 %ds: status=%d headers=%v body=%v", wait, rec.Code, rec.Header(), body)
 			}
 			deadline := srv.lockUntil
 			time.Sleep(8 * time.Second)
 			for _, password := range []string{"wrong", "fixedpass"} {
-				rec, _ = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": password}, nil)
+				rec, _ = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": password}, nil)
 				if rec.Code != http.StatusTooManyRequests || rec.Header().Get("Retry-After") != strconv.Itoa(wait-8) || len(rec.Result().Cookies()) != 0 || !srv.lockUntil.Equal(deadline) {
 					t.Fatalf("冷却期请求必须拒绝且不能重置截止时间: %d %v", rec.Code, rec.Header())
 				}
@@ -168,12 +250,12 @@ func TestAuthLoginLockout(t *testing.T) {
 			}
 			time.Sleep(time.Duration(wait-8) * time.Second)
 		}
-		rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "fixedpass"}, nil)
+		rec, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": "fixedpass"}, nil)
 		if body["code"] != float64(200) || len(rec.Result().Cookies()) == 0 {
 			t.Fatalf("冷却结束后应可正确登录: %v", body)
 		}
 		for i := 0; i < maxLoginFailures; i++ {
-			rec, _ = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "wrong"}, nil)
+			rec, _ = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": "wrong"}, nil)
 		}
 		if rec.Header().Get("Retry-After") != "30" {
 			t.Fatalf("成功登录后应清零惩罚: %v", rec.Header())
@@ -199,7 +281,7 @@ func TestAuthConcurrentLoginLockout(t *testing.T) {
 		go func() {
 			defer pending.Done()
 			<-start
-			rec, _ := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "wrong"}, nil)
+			rec, _ := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": "wrong"}, nil)
 			responses <- rec.Code
 		}()
 	}
@@ -229,7 +311,7 @@ func TestAuthRejectsCrossOriginRequests(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			login, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": password}, nil)
+			login, body := doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": password}, nil)
 			if body["code"] != float64(200) {
 				t.Fatalf("登录失败: %v", body)
 			}
@@ -276,7 +358,7 @@ func TestAuthRejectsCrossOriginRequests(t *testing.T) {
 				})
 			}
 			for _, path := range []string{"/api/auth/login", "/api/auth/logout", "/api/auth/password"} {
-				req := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(`{"password":"fixedpass"}`))
+				req := httptest.NewRequest(http.MethodPost, path, bytes.NewBufferString(`{"username":"admin","password":"fixedpass"}`))
 				req.Header.Set("Sec-Fetch-Site", "cross-site")
 				rec := httptest.NewRecorder()
 				h.ServeHTTP(rec, req)
@@ -293,7 +375,7 @@ func TestAuthConfigFailureKeepsAPIsProtected(t *testing.T) {
 		t.Run(failure, func(t *testing.T) {
 			srv := newAuthTestServer(t, "")
 			h := srv.Handler()
-			login, body := doJSON(t, h, http.MethodPut, "/api/auth/password", map[string]string{"newPassword": "secret123"}, nil)
+			login, body := doJSON(t, h, http.MethodPut, "/api/auth/password", map[string]string{"username": "admin", "newPassword": "secret123"}, nil)
 			if body["code"] != float64(200) {
 				t.Fatalf("设置密码失败: %v", body)
 			}
@@ -330,7 +412,7 @@ func TestAuthConfigFailureKeepsAPIsProtected(t *testing.T) {
 					t.Fatalf("启动时配置异常也应拒绝访问: status=%d", rec.Code)
 				}
 			}
-			login, body = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"password": "secret123"}, nil)
+			login, body = doJSON(t, h, http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": "secret123"}, nil)
 			if body["code"] == float64(200) || len(login.Result().Cookies()) != 0 {
 				t.Fatalf("配置异常时不应签发会话: %v", body)
 			}
@@ -364,7 +446,7 @@ func TestAuthConfigWriteDoesNotOverwriteUnreadableConfig(t *testing.T) {
 	if err := os.WriteFile(panelcfg.Path(srv.workDir), content, 0600); err != nil {
 		t.Fatal(err)
 	}
-	login, _ := doJSON(t, srv.Handler(), http.MethodPost, "/api/auth/login", map[string]string{"password": "fixedpass"}, nil)
+	login, _ := doJSON(t, srv.Handler(), http.MethodPost, "/api/auth/login", map[string]string{"username": "admin", "password": "fixedpass"}, nil)
 	_, body := doJSON(t, srv.Handler(), http.MethodPut, "/api/workshop/key", map[string]string{"steamApiKey": "fixture"}, login.Result().Cookies())
 	if body["code"] == float64(200) {
 		t.Fatalf("读取失败时不应保存配置: %v", body)

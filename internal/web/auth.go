@@ -63,17 +63,47 @@ func VerifyPassword(stored, password string) bool {
 	return subtle.ConstantTimeCompare([]byte(got), []byte(parts[1])) == 1
 }
 
-// activePasswordFactor 返回当前生效的密码凭据指纹，用于绑定会话签名：
-// 密码一旦修改或清空，旧 Cookie 签名自动失效。
-func (s *Server) activePasswordFactor() (string, error) {
+func configuredUsername(cfg panelcfg.Config) string {
+	if cfg.Username != "" {
+		return cfg.Username
+	}
+	return panelcfg.DefaultUsername
+}
+
+// activeAuth 返回当前生效的登录配置和会话签名因子。
+// 用户名或密码变化时，旧 Cookie 会自动失效。
+func (s *Server) activeAuth() (panelcfg.Config, string, string, bool, error) {
+	cfg := panelcfg.Config{}
+	username := strings.TrimSpace(s.envUsername)
+	envManaged := s.envUsername != "" || s.envPassword != ""
+	if username == "" {
+		username = panelcfg.DefaultUsername
+	}
 	if s.envPassword != "" {
-		return "env:" + s.envPassword, nil
+		return cfg, username, "env:" + username + "|" + s.envPassword, envManaged, nil
 	}
 	if s.workDir == "" {
-		return "", nil
+		return cfg, username, "", envManaged, nil
 	}
-	cfg, err := s.loadPanelConfig()
-	return cfg.PasswordHash, err
+	var err error
+	cfg, err = s.loadPanelConfig()
+	if err != nil {
+		return panelcfg.Config{}, "", "", envManaged, err
+	}
+	if s.envUsername == "" {
+		username = configuredUsername(cfg)
+	}
+	factor := ""
+	if cfg.PasswordHash != "" {
+		factor = "cfg:" + username + "|" + cfg.PasswordHash
+	}
+	return cfg, username, factor, envManaged, nil
+}
+
+// activePasswordFactor 返回当前生效的密码凭据指纹，用于绑定会话签名。
+func (s *Server) activePasswordFactor() (string, error) {
+	_, _, factor, _, err := s.activeAuth()
+	return factor, err
 }
 
 func (s *Server) loadPanelConfig() (panelcfg.Config, error) {
@@ -92,7 +122,7 @@ func (s *Server) loadPanelConfig() (panelcfg.Config, error) {
 }
 
 func (s *Server) authEnabled() bool {
-	factor, err := s.activePasswordFactor()
+	_, _, factor, _, err := s.activeAuth()
 	return err != nil || factor != ""
 }
 
@@ -203,12 +233,14 @@ func (s *Server) handleAuthStatus(w http.ResponseWriter, r *http.Request) {
 	s.loginMu.Lock()
 	retryAfter := s.loginRetryAfter()
 	s.loginMu.Unlock()
+	_, username, _, envManaged, err := s.activeAuth()
 	respond(w, 200, map[string]interface{}{
 		"enabled":       s.authEnabled(),
 		"authenticated": s.isAuthenticated(r),
-		"envManaged":    s.envPassword != "",
+		"username":      username,
+		"envManaged":    envManaged,
 		"retryAfter":    retryAfter,
-	}, nil)
+	}, err)
 }
 
 func (s *Server) loginRetryAfter() int {
@@ -217,7 +249,7 @@ func (s *Server) loginRetryAfter() int {
 
 func rejectLoginCooldown(w http.ResponseWriter, wait int) {
 	w.Header().Set("Retry-After", strconv.Itoa(wait))
-	rejectAPI(w, http.StatusTooManyRequests, fmt.Sprintf("密码错误次数过多，请 %d 秒后再试", wait))
+	rejectAPI(w, http.StatusTooManyRequests, fmt.Sprintf("登录失败次数过多，请 %d 秒后再试", wait))
 }
 
 func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
@@ -226,6 +258,7 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var body struct {
+		Username string `json:"username"`
 		Password string `json:"password"`
 	}
 	if err := decodeJSON(w, r, &body, 4096); err != nil {
@@ -240,16 +273,19 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	factor, err := s.activePasswordFactor()
+	cfg, username, factor, envManaged, err := s.activeAuth()
 	if err != nil {
 		respond(w, 200, nil, err)
 		return
 	}
 	valid := true
-	if s.envPassword != "" {
-		valid = subtle.ConstantTimeCompare([]byte(body.Password), []byte(s.envPassword)) == 1
-	} else if factor != "" {
-		valid = VerifyPassword(factor, body.Password)
+	if factor != "" {
+		valid = subtle.ConstantTimeCompare([]byte(strings.TrimSpace(body.Username)), []byte(username)) == 1
+		if envManaged && s.envPassword != "" {
+			valid = valid && subtle.ConstantTimeCompare([]byte(body.Password), []byte(s.envPassword)) == 1
+		} else {
+			valid = valid && VerifyPassword(cfg.PasswordHash, body.Password)
+		}
 	}
 	if !valid {
 		if s.failCount < maxLoginFailures {
@@ -261,7 +297,7 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 			rejectLoginCooldown(w, s.loginRetryAfter())
 			return
 		}
-		respond(w, 200, nil, fmt.Errorf("密码错误"))
+		respond(w, 200, nil, fmt.Errorf("用户名或密码错误"))
 		return
 	}
 
@@ -275,7 +311,8 @@ func (s *Server) handleAuthLogin(w http.ResponseWriter, r *http.Request) {
 	respond(w, 200, map[string]interface{}{
 		"enabled":       s.authEnabled(),
 		"authenticated": true,
-		"envManaged":    s.envPassword != "",
+		"username":      username,
+		"envManaged":    envManaged,
 	}, nil)
 }
 
@@ -285,11 +322,13 @@ func (s *Server) handleAuthLogout(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	clearSessionCookie(w)
+	_, username, _, envManaged, err := s.activeAuth()
 	respond(w, 200, map[string]interface{}{
 		"enabled":       s.authEnabled(),
 		"authenticated": !s.authEnabled(),
-		"envManaged":    s.envPassword != "",
-	}, nil)
+		"username":      username,
+		"envManaged":    envManaged,
+	}, err)
 }
 
 func (s *Server) handleAuthPassword(w http.ResponseWriter, r *http.Request) {
@@ -297,8 +336,8 @@ func (s *Server) handleAuthPassword(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, nil, fmt.Errorf("仅支持 PUT"))
 		return
 	}
-	if s.envPassword != "" {
-		respond(w, 200, nil, fmt.Errorf("密码由启动参数或环境变量指定，无法在面板内修改"))
+	if s.envUsername != "" || s.envPassword != "" {
+		respond(w, 200, nil, fmt.Errorf("用户名或密码由启动参数或环境变量指定，无法在面板内修改"))
 		return
 	}
 	if s.workDir == "" {
@@ -307,8 +346,9 @@ func (s *Server) handleAuthPassword(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var body struct {
-		CurrentPassword string `json:"currentPassword"`
-		NewPassword     string `json:"newPassword"`
+		Username        *string `json:"username"`
+		CurrentPassword string  `json:"currentPassword"`
+		NewPassword     string  `json:"newPassword"`
 	}
 	if err := decodeJSON(w, r, &body, 4096); err != nil {
 		respond(w, 200, nil, fmt.Errorf("请求格式错误"))
@@ -324,6 +364,19 @@ func (s *Server) handleAuthPassword(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, nil, fmt.Errorf("当前密码不正确"))
 		return
 	}
+	username := configuredUsername(cfg)
+	if body.Username != nil {
+		username = strings.TrimSpace(*body.Username)
+		if username == "" {
+			respond(w, 200, nil, fmt.Errorf("用户名不能为空"))
+			return
+		}
+		if len([]rune(username)) > 64 {
+			respond(w, 200, nil, fmt.Errorf("用户名不能超过 64 个字符"))
+			return
+		}
+	}
+	cfg.Username = username
 
 	newPwd := strings.TrimSpace(body.NewPassword)
 	if newPwd == "" {
@@ -336,6 +389,7 @@ func (s *Server) handleAuthPassword(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, map[string]interface{}{
 			"enabled":       false,
 			"authenticated": true,
+			"username":      username,
 			"envManaged":    false,
 		}, nil)
 		return
@@ -358,10 +412,11 @@ func (s *Server) handleAuthPassword(w http.ResponseWriter, r *http.Request) {
 	s.authMu.Lock()
 	s.authConfigSeen = true
 	s.authMu.Unlock()
-	s.setSessionCookie(w, hash)
+	s.setSessionCookie(w, "cfg:"+username+"|"+hash)
 	respond(w, 200, map[string]interface{}{
 		"enabled":       true,
 		"authenticated": true,
+		"username":      username,
 		"envManaged":    false,
 	}, nil)
 }
