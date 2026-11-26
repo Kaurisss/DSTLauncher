@@ -509,6 +509,25 @@ func TestValidateRejectsInvalidValues(t *testing.T) {
 	}
 }
 
+func TestIslandWorldTypesValidateAndInfer(t *testing.T) {
+	for _, worldType := range []string{WorldTypeShipwrecked, WorldTypeVolcano} {
+		t.Run(worldType, func(t *testing.T) {
+			r := validRoom()
+			r.Shards[1].WorldType = worldType
+			if err := r.Validate(); err != nil {
+				t.Fatalf("岛屿冒险世界类型不应被拒绝: %v", err)
+			}
+		})
+	}
+
+	if got := InferWorldType("Island"); got != WorldTypeShipwrecked {
+		t.Errorf("Island 应推断为海难，实际 %q", got)
+	}
+	if got := InferWorldType("Volcano"); got != WorldTypeVolcano {
+		t.Errorf("Volcano 应推断为火山，实际 %q", got)
+	}
+}
+
 func readFile(t *testing.T, path string) string {
 	t.Helper()
 	data, err := os.ReadFile(path)

@@ -62,7 +62,7 @@ beforeEach(() => {
 after(() => { logs.disconnect(); logs.clearAll(); });
 
 test('分片显示名按存档 location：森林/洞穴/海难/火山，不显示目录名', async () => {
-  const { shardLabel, roomShardLabel } = await vite.ssrLoadModule('/src/lib/format.js');
+  const { CHARACTERS, shardLabel, roomShardLabel } = await vite.ssrLoadModule('/src/lib/format.js');
   assert.equal(shardLabel('Master', 'forest'), '森林');
   assert.equal(shardLabel('Caves', 'cave'), '洞穴');
   assert.equal(shardLabel('Island', 'shipwrecked'), '海难');
@@ -89,6 +89,15 @@ test('分片显示名按存档 location：森林/洞穴/海难/火山，不显�
   assert.ok(!list.includes('>Master<') && !list.includes('>Caves<'), '不应显示目录名');
   const card = await renderToString(createSSRApp(RoomCard, { room: rooms.list[0] }).use(pinia));
   for (const text of ['海难', '洞穴', '火山']) assert.ok(card.includes(text), `房间卡片缺少 ${text}`);
+
+  for (const prefab of ['walani', 'wilbur', 'woodlegs', 'wilba', 'wheeler']) {
+    assert.ok(CHARACTERS[prefab], `缺少岛屿冒险角色名：${prefab}`);
+    const avatar = readFileSync(new URL(`../public/character-avatars/${prefab}.png`, import.meta.url));
+    assert.ok(avatar.length > 24, `岛屿冒险角色头像不可读取：${prefab}`);
+    assert.ok(avatar.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10])), `头像不是 PNG：${prefab}`);
+    assert.equal(avatar.readUInt32BE(16), 96, `头像宽度应为 96：${prefab}`);
+    assert.equal(avatar.readUInt32BE(20), 96, `头像高度应为 96：${prefab}`);
+  }
 });
 
 test('房间卡片使用整卡选择按钮，独立操作与分片信息保持可用', async () => {

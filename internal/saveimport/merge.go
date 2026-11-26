@@ -61,6 +61,15 @@ func MergeInto(p *Parsed, target *room.Room) *room.Room {
 		// 端口必须整套沿用：只改一部分会让 Normalize 给缺失项兜底成默认值，
 		// 那些默认值在其他房间眼里就是冲突端口
 		out.Shards = append([]room.Shard(nil), target.Shards...)
+		worldTypes := make(map[string]string, len(src.Shards))
+		for _, shard := range src.Shards {
+			worldTypes[shard.Name] = shard.WorldType
+		}
+		for i := range out.Shards {
+			if worldType := worldTypes[out.Shards[i].Name]; worldType != "" {
+				out.Shards[i].WorldType = worldType
+			}
+		}
 	}
 
 	return out

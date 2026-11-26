@@ -236,7 +236,11 @@ func ensureWorldPresets(root, confDir string, r *Room) error {
 		if config.FileExists(worldsettings.LevelDataPath(clusterDir, name)) {
 			continue
 		}
-		if err := worldsettings.WriteFile(clusterDir, name, worldsettings.NewShardDefault(s.WorldType)); err != nil {
+		location, _, err := worldsettings.LocationFromFiles(clusterDir, name, s.WorldType)
+		if err != nil {
+			return fmt.Errorf("读取 %s 的世界类型失败: %w", name, err)
+		}
+		if err := worldsettings.WriteFile(clusterDir, name, worldsettings.NewShardDefault(location)); err != nil {
 			return fmt.Errorf("写入 %s 的世界预设失败: %w", name, err)
 		}
 	}

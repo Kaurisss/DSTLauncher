@@ -33,11 +33,16 @@ type overrideLiteral struct {
 }
 
 // DefaultPreset 返回某世界类型的默认预设。
-// 地表与洞穴的预设不可混用：地表用 SURVIVAL_TOGETHER 一系，洞穴只有 DST_CAVE 一系。
-// 参数是世界类型（forest / cave），不是分片名。
+// 参数是世界类型，不是分片名。
 func DefaultPreset(location string) string {
-	if NormalizeLocation(location) == LocationCave {
+	switch loc := NormalizeLocation(location); loc {
+	case LocationCave:
 		return "DST_CAVE"
+	case LocationShipwrecked, LocationVolcano:
+		_, worldgen := IAFallbackPresets(loc)
+		if worldgen != "" {
+			return worldgen
+		}
 	}
 	return "SURVIVAL_TOGETHER"
 }
@@ -45,10 +50,16 @@ func DefaultPreset(location string) string {
 // NewOverrideFor 返回某世界类型的初始配置（等同游戏默认）。
 func NewOverrideFor(location string) *Override {
 	p := DefaultPreset(location)
+	settings := p
+	if loc := NormalizeLocation(location); IsIALocation(loc) {
+		if preset, _ := IAFallbackPresets(loc); preset != "" {
+			settings = preset
+		}
+	}
 	return &Override{
 		Enabled:        true,
 		WorldGenPreset: p,
-		SettingsPreset: p,
+		SettingsPreset: settings,
 		Overrides:      map[string]string{},
 	}
 }

@@ -168,3 +168,34 @@ func TestWriteIntoPreservesExistingSaveWithoutSourceSave(t *testing.T) {
 		}
 	}
 }
+
+func TestMergeIntoKeepsSourceWorldTypeWhenOverwritingRoom(t *testing.T) {
+	source := &Parsed{
+		Room: &room.Room{
+			Shards: []room.Shard{{
+				Name:      "Island",
+				WorldType: room.WorldTypeShipwrecked,
+			}},
+		},
+	}
+	target := &room.Room{
+		ID: 7,
+		Shards: []room.Shard{{
+			Name:               "Island",
+			WorldType:          room.WorldTypeForest,
+			GameID:             3,
+			ServerPort:         11003,
+			MasterServerPort:   31003,
+			AuthenticationPort: 41003,
+		}},
+	}
+
+	merged := MergeInto(source, target)
+	if len(merged.Shards) != 1 || merged.Shards[0].WorldType != room.WorldTypeShipwrecked {
+		t.Fatalf("覆盖导入不应丢掉源世界类型: %+v", merged.Shards)
+	}
+	if merged.Shards[0].GameID != target.Shards[0].GameID ||
+		merged.Shards[0].ServerPort != target.Shards[0].ServerPort {
+		t.Fatalf("覆盖导入不应改动目标分片机器字段: %+v", merged.Shards[0])
+	}
+}

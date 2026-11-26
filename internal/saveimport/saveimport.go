@@ -50,8 +50,8 @@ type ShardSave struct {
 	// 面板不再把它归一化成 Master/Caves：多层世界里分片叫什么都可以，
 	// 但名字必须与目录名一致（面板按 name 建目录、拼 -shard 参数）。
 	Name string
-	// WorldType 是 forest / cave，决定世界生成预设与可用设置项。
-	// 取自 leveldataoverride 的预设，缺失时按名字推断。
+	// WorldType 是世界位置标识，决定世界生成预设与可用设置项。
+	// 优先取 leveldataoverride 的 location，缺失时再按预设或名字推断。
 	WorldType string
 	// GameID 是存档里的世界 id（server.ini [SHARD] id）。
 	// 玩家的传送门记的是 id，导入时尽量沿用，避免导进来却传不过去。

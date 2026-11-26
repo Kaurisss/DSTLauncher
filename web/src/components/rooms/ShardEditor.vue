@@ -28,6 +28,7 @@ const props = defineProps({
   roomIsNew: { type: Boolean, default: false },
   /** 嵌入带统一分区标题的编辑器时隐藏自身头部 */
   hideHeader: { type: Boolean, default: false },
+  locations: { type: Object, default: () => ({}) },
 });
 
 const shards = defineModel('shards', { type: Array, required: true });
@@ -47,6 +48,10 @@ function canRename(s) {
 
 function typeLabel(value) {
   return WORLD_TYPE_LABEL[value] || value || WORLD_TYPE_LABEL.forest;
+}
+
+function displayedWorldType(s) {
+  return props.locations[s.name] || s.worldType;
 }
 
 function addShard() {
@@ -134,7 +139,7 @@ async function removeShard(index) {
           </template>
           <template v-else>
             <span class="truncate font-mono text-sm font-semibold text-foreground">{{ s.name }}</span>
-            <Badge variant="secondary" class="text-[11px] font-normal">{{ typeLabel(s.worldType) }}</Badge>
+            <Badge variant="secondary" class="text-[11px] font-normal">{{ typeLabel(displayedWorldType(s)) }}</Badge>
           </template>
 
           <Badge

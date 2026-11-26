@@ -149,15 +149,26 @@ func TestWorldConfigVolcano(t *testing.T) {
 // 没有 leveldataoverride.lua 的分片仍然走 worldgenoverride 流程。
 func TestWorldConfigFallsBackToWorldgenOverride(t *testing.T) {
 	api, rm := newWorldConfigServer(t, []string{"Master"}, nil)
+	cluster := rm.ClusterDir(api.rootDir, api.confDir)
+	if err := worldsettings.WriteFile(cluster, "Master", &worldsettings.Override{
+		Enabled:        true,
+		WorldGenPreset: "SHIPWRECKED_ENDLESS",
+		Overrides:      map[string]string{},
+	}); err != nil {
+		t.Fatal(err)
+	}
 	view := getWorldConfig(t, api, itoa(rm.ID), "Master")
 	if view.LevelDataSet {
 		t.Error("没有 leveldataoverride.lua 时不应标记为已使用")
 	}
-	if view.Location != worldsettings.LocationForest {
-		t.Errorf("应回落到房间配置的 forest，实际 %q", view.Location)
+	if view.Location != worldsettings.LocationShipwrecked {
+		t.Errorf("应从 worldgen 预设识别为海难，实际 %q", view.Location)
 	}
-	if len(view.Groups) == 0 {
-		t.Error("原版选项不应为空")
+	if view.Mod != "island-adventures" {
+		t.Errorf("应识别为岛屿冒险，实际 %q", view.Mod)
+	}
+	if locations := api.shardLocations(rm); locations["Master"] != worldsettings.LocationShipwrecked {
+		t.Errorf("房间列表应返回 worldgen 预设位置，实际 %v", locations)
 	}
 }
 

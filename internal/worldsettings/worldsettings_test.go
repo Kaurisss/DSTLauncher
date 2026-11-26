@@ -227,13 +227,15 @@ func TestOverrideValidate(t *testing.T) {
 // 世界类型归一化：正常传 WorldType，历史数据传分片名也要认。
 func TestNormalizeLocation(t *testing.T) {
 	cases := map[string]string{
-		"forest":     LocationForest,
-		"cave":       LocationCave,
-		"Master":     LocationForest,
-		"Caves":      LocationCave,
-		"MyCaves2":   LocationCave,
-		"Underworld": LocationForest,
-		"":           LocationForest,
+		"forest":       LocationForest,
+		"cave":         LocationCave,
+		"shipwrecked":  LocationShipwrecked,
+		"volcanoworld": LocationVolcano,
+		"Master":       LocationForest,
+		"Caves":        LocationCave,
+		"MyCaves2":     LocationCave,
+		"Underworld":   LocationForest,
+		"":             LocationForest,
 	}
 	for in, want := range cases {
 		if got := NormalizeLocation(in); got != want {
@@ -245,15 +247,30 @@ func TestNormalizeLocation(t *testing.T) {
 // 从世界预设反推类型：名字可以是任意值，预设才是世界内容的真相。
 func TestLocationFromPreset(t *testing.T) {
 	cases := map[string]string{
-		"DST_CAVE":          LocationCave,
-		"CAVE":              LocationCave,
-		"SURVIVAL_TOGETHER": LocationForest,
-		"":                  "",
+		"DST_CAVE":                 LocationCave,
+		"CAVE":                     LocationCave,
+		"SHIPWRECKED_ENDLESS":      LocationShipwrecked,
+		"SURVIVAL_VOLCANO_CLASSIC": LocationVolcano,
+		"SURVIVAL_TOGETHER":        LocationForest,
+		"":                         "",
 	}
 	for in, want := range cases {
 		if got := LocationFromPreset(in); got != want {
 			t.Errorf("LocationFromPreset(%q) = %q, 期望 %q", in, got, want)
 		}
+	}
+}
+
+func TestIslandFallbackPresets(t *testing.T) {
+	settings, worldgen := IAFallbackPresets(LocationShipwrecked)
+	if settings != "SHIPWRECKED_ENDLESS" || worldgen != "SHIPWRECKED_ENDLESS" {
+		t.Fatalf("海难默认预设错误: settings=%q worldgen=%q", settings, worldgen)
+	}
+	if got := DefaultPreset(LocationVolcano); got != "SURVIVAL_VOLCANO_CLASSIC" {
+		t.Fatalf("火山默认预设错误: %q", got)
+	}
+	if got := NewOverrideFor(LocationShipwrecked).SettingsPreset; got != "SHIPWRECKED_ENDLESS" {
+		t.Fatalf("海难设置预设错误: %q", got)
 	}
 }
 

@@ -226,10 +226,17 @@ func scanShards(clusterDir string, p *Parsed) ([]shardScan, error) {
 		if ov, src, ok := readOverride(dir); ok {
 			sc.Override, sc.HasOverride, sc.OverrideSrc = ov, true, src
 		}
-		// 世界类型：先按名字猜，存档带了世界配置时以预设为准——
-		// 名字叫 World3 的分片完全可能是洞穴
+		// 世界类型：先按名字猜，完整世界定义里的 location 优先。
+		// 名字叫 World3 的分片完全可能是洞穴或岛屿冒险世界。
 		sc.WorldType = room.InferWorldType(sc.Name)
-		if sc.HasOverride {
+		hasLevelDataLocation := false
+		if data, err := os.ReadFile(filepath.Join(dir, levelDataOverrideName)); err == nil {
+			if loc := worldsettings.ParseLevelData(string(data)).Location(); loc != "" {
+				sc.WorldType = loc
+				hasLevelDataLocation = true
+			}
+		}
+		if sc.HasOverride && !hasLevelDataLocation {
 			if loc := worldsettings.LocationFromPreset(sc.Override.WorldGenPreset); loc != "" {
 				sc.WorldType = loc
 			}
@@ -259,7 +266,6 @@ func scanShards(clusterDir string, p *Parsed) ([]shardScan, error) {
 	if !hasMaster && len(scans) > 0 {
 		p.warnf("存档里没有标记 is_master 的分片，已按主分片处理")
 		scans[0].IsMaster = true
-		scans[0].WorldType = worldsettings.LocationForest
 	}
 
 	// 重名只可能来自存档本身的脏数据（两个目录写了同一个 name），

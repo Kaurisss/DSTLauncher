@@ -127,6 +127,24 @@ test('分片约束：已有分片不可改名，主分片不可删除与停用',
   assert.equal(trashCount, 1, '只有非主分片有删除按钮');
 });
 
+test('已有分片显示存档中的实际世界类型', async () => {
+  const shards = [
+    { name: 'Master', worldType: 'forest', isMaster: true, disabled: false, gameId: 1 },
+    { name: 'Caves', worldType: 'forest', isMaster: false, disabled: false, gameId: 2 },
+  ];
+  const app = createSSRApp({
+    render: () => h(TooltipProvider, null, () => h(ShardEditor, {
+      shards,
+      locations: { Caves: 'volcanoworld' },
+      roomIsNew: false,
+    })),
+  });
+  app.use(pinia);
+  const html = await renderToString(app);
+
+  assert.ok(html.includes('火山'), '编辑房间时应显示存档中的火山类型');
+});
+
 test('分片移除确认：取消不删除，确认才删除', async () => {
   let list = [
     { name: 'Master', worldType: 'forest', isMaster: true },

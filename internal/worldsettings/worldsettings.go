@@ -37,7 +37,7 @@ type Option struct {
 	Label   string   `json:"label,omitempty"`
 	Default string   `json:"default"`
 	Order   int      `json:"order,omitempty"`
-	Worlds  []string `json:"worlds,omitempty"` // forest / cave，决定属于哪个分片
+	Worlds  []string `json:"worlds,omitempty"` // 世界位置，决定属于哪个分片
 	Values  []Value  `json:"values,omitempty"`
 
 	// Dynamic 表示取值由游戏运行时生成（如 task_set、start_location），
@@ -143,13 +143,17 @@ func GeneratedAt() string {
 
 // NormalizeLocation 把各种写法归一成游戏内部的世界位置标识。
 //
-// 正常路径传的是房间配置里的 WorldType（本就是 forest / cave），
+// 正常路径传的是房间配置里的 WorldType（本就是世界位置标识），
 // 这里额外接受分片名（Master / Caves / 任何含 cave 的自定义名），
 // 供导入存档、旧数据与手工调用兜底。
 func NormalizeLocation(v string) string {
 	switch strings.ToLower(strings.TrimSpace(v)) {
 	case LocationCave:
 		return LocationCave
+	case LocationShipwrecked:
+		return LocationShipwrecked
+	case LocationVolcano:
+		return LocationVolcano
 	case LocationForest, "":
 		return LocationForest
 	case "caves":
@@ -169,7 +173,7 @@ func LocationOf(shard string) string {
 	return NormalizeLocation(shard)
 }
 
-// LocationFromPreset 从世界预设名反推世界类型，认不出时返回空串。
+// LocationFromPreset 从世界预设名反推世界类型，认不出时回退为地表。
 // 导入存档时用：名字叫什么都可能，预设（DST_CAVE / SURVIVAL_TOGETHER）才是世界内容的真相。
 func LocationFromPreset(preset string) string {
 	p := strings.ToUpper(strings.TrimSpace(preset))
@@ -179,13 +183,19 @@ func LocationFromPreset(preset string) string {
 	if strings.Contains(p, "CAVE") {
 		return LocationCave
 	}
+	if strings.Contains(p, "SHIPWRECK") {
+		return LocationShipwrecked
+	}
+	if strings.Contains(p, "VOLCANO") {
+		return LocationVolcano
+	}
 	return LocationForest
 }
 
 // Groups 返回指定世界类型、指定类别下可用的分组（已过滤掉不适用的选项）。
 //
 // 过滤依据是选项自带的 world 字段——它由游戏自己标注，不用维护两份清单。
-// 第一个参数是世界类型（forest / cave），category 传空表示两类都要。
+// 第一个参数是世界类型，category 传空表示两类都要。
 func Groups(location, category string) []Group {
 	if err := Load(); err != nil {
 		return nil

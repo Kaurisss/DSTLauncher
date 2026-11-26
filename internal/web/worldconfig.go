@@ -97,9 +97,13 @@ func (s *Server) handleWorldConfig(w http.ResponseWriter, r *http.Request) {
 	}
 
 	clusterDir := rm.ClusterDir(s.rootDir, s.confDir)
-	// 世界类型以存档里的 location 为准：房间配置可能还写着 forest，
+	// 世界类型以磁盘上的实际配置为准：旧房间配置可能还写着 forest，
 	// 而实际分片是海难——按 rooms.json 过滤会掉走整批模组选项。
-	location := rm.WorldTypeOf(shard)
+	location, _, err := worldsettings.LocationFromFiles(clusterDir, shard, rm.WorldTypeOf(shard))
+	if err != nil {
+		respond(w, 200, nil, err)
+		return
+	}
 	ld, hasLevelData, err := worldsettings.ReadLevelData(clusterDir, shard)
 	if err != nil {
 		respond(w, 200, nil, err)

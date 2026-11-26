@@ -4,6 +4,8 @@ export const CHARACTERS = {
   waxwell: '麦斯威尔', wathgrithr: '薇格弗德', webber: '韦伯', winona: '薇诺娜',
   wortox: '沃拓克斯', wormwood: '沃姆伍德', warly: '沃利', wurt: '沃特',
   walter: '沃尔特', wanda: '旺达', wonkey: '芜猴',
+  walani: '瓦拉尼', wilbur: '威尔伯', woodlegs: '伍德莱格',
+  wilba: '薇尔芭', wheeler: '薇勒尔',
 };
 
 // 展示层的格式化与字典。

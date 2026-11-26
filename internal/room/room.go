@@ -1,7 +1,7 @@
 // Package room 管理"房间"。
 //
 //	房间 Room  = 一个 DST 集群，对应存档目录 <root>/<confDir>/Cluster_<ID>
-//	分片 Shard = 集群下的一个世界进程，Master（地表）与 Caves（洞穴）各是一个独立进程
+//	分片 Shard = 集群下的一个世界进程，每个世界都是一个独立进程
 //
 // 房间是配置的唯一事实来源：面板里的房间表单会据此生成
 // cluster.ini / server.ini / cluster_token.txt，因此不再需要手工编辑 ini。
@@ -19,8 +19,10 @@ import (
 // 世界生成预设与可用设置项，两者必须分开存：
 // 第三个世界完全可能叫 Caves2 或 Underworld，靠名字猜类型一定会错。
 const (
-	WorldTypeForest = "forest"
-	WorldTypeCave   = "cave"
+	WorldTypeForest      = "forest"
+	WorldTypeCave        = "cave"
+	WorldTypeShipwrecked = "shipwrecked"
+	WorldTypeVolcano     = "volcanoworld"
 )
 
 // Shard 是一个分片（世界）及其独占端口。
@@ -29,7 +31,7 @@ const (
 // 各分片会互相抢占端口导致后启动的一方直接失败。
 type Shard struct {
 	Name      string `json:"name"`      // 目录名 + -shard 参数
-	WorldType string `json:"worldType"` // forest / cave
+	WorldType string `json:"worldType"` // forest / cave / shipwrecked / volcanoworld
 	GameID    int    `json:"gameId"`    // server.ini [SHARD] id，玩家迁移按它寻址
 	IsMaster  bool   `json:"isMaster"`  // 全房间只能有一个
 
@@ -175,7 +177,7 @@ func (r *Room) MasterShard() string {
 	return "Master"
 }
 
-// WorldTypeOf 返回分片的世界类型（forest / cave）。
+// WorldTypeOf 返回分片的世界类型。
 // 分片不存在时按名字推断，供日志与历史数据兜底使用。
 func (r *Room) WorldTypeOf(name string) string {
 	if s, ok := r.Shard(name); ok && s.WorldType != "" {
@@ -187,10 +189,17 @@ func (r *Room) WorldTypeOf(name string) string {
 // InferWorldType 按分片名猜世界类型。
 // 只用于旧数据兜底与导入存档的初值，正常路径一律读 Shard.WorldType。
 func InferWorldType(name string) string {
-	if strings.Contains(strings.ToLower(name), "cave") {
+	lower := strings.ToLower(name)
+	switch {
+	case strings.Contains(lower, "volcano"):
+		return WorldTypeVolcano
+	case strings.Contains(lower, "island"), strings.Contains(lower, "shipwreck"):
+		return WorldTypeShipwrecked
+	case strings.Contains(lower, "cave"):
 		return WorldTypeCave
+	default:
+		return WorldTypeForest
 	}
-	return WorldTypeForest
 }
 
 // Key 返回进程层使用的唯一标识，同时也是集群目录名。
@@ -322,7 +331,7 @@ func (r *Room) normalizeShards() {
 		if s.Name == "" {
 			s.Name = fmt.Sprintf("World%d", i+1)
 		}
-		if s.WorldType != WorldTypeForest && s.WorldType != WorldTypeCave {
+		if !validWorldType(s.WorldType) {
 			s.WorldType = InferWorldType(s.Name)
 		}
 	}
@@ -454,8 +463,8 @@ func (r *Room) Validate() error {
 		}
 		seenName[strings.ToLower(s.Name)] = true
 
-		if s.WorldType != WorldTypeForest && s.WorldType != WorldTypeCave {
-			return fmt.Errorf("%s 的世界类型不合法: %q（只能是 forest 或 cave）", s.Name, s.WorldType)
+		if !validWorldType(s.WorldType) {
+			return fmt.Errorf("%s 的世界类型不合法: %q（只能是 forest、cave、shipwrecked 或 volcanoworld）", s.Name, s.WorldType)
 		}
 		if s.GameID <= 0 {
 			return fmt.Errorf("%s 的世界 ID 不合法: %d", s.Name, s.GameID)
@@ -492,6 +501,15 @@ func (r *Room) Validate() error {
 		return fmt.Errorf("必须有一个主分片（is_master = true）")
 	}
 	return nil
+}
+
+func validWorldType(value string) bool {
+	switch value {
+	case WorldTypeForest, WorldTypeCave, WorldTypeShipwrecked, WorldTypeVolcano:
+		return true
+	default:
+		return false
+	}
 }
 
 // windowsReservedNames 是 Windows 不允许用作目录名的保留名。

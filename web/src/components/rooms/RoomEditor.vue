@@ -571,6 +571,7 @@ async function save() {
               ref="shardEditorRef"
               v-model:shards="form.shards"
               :room-is-new="isNew"
+              :locations="room?.locations"
               hide-header
             />
 

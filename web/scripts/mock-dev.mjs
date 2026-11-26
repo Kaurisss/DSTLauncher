@@ -438,6 +438,38 @@ const ENABLE_VALUES = [
 ];
 
 function buildWorldGroups(location) {
+  if (location === 'shipwrecked' || location === 'volcanoworld') {
+    const volcano = location === 'volcanoworld';
+    return [
+      {
+        id: 'island_adventures',
+        label: '岛屿冒险',
+        category: 'settings',
+        options: [
+          { name: 'dragoonegg', label: volcano ? '火山爆发' : '龙蛋', default: 'default', values: STANDARD_VALUES },
+          { name: 'ia_boats', label: '小船', default: 'always', values: STANDARD_VALUES },
+          { name: 'ia_drowning', label: '溺水', default: 'always', values: STANDARD_VALUES },
+          ...(volcano
+            ? [{ name: 'coffeebush', label: '咖啡树', default: 'default', values: STANDARD_VALUES }]
+            : []),
+        ],
+      },
+      {
+        id: 'island_worldgen',
+        label: '世界生成',
+        category: 'worldgen',
+        options: [
+          { name: 'world_size', label: '世界大小', default: volcano ? 'small' : 'default', values: [{ data: 'small', label: '小' }, { data: 'medium', label: '中' }, { data: 'default', label: '大' }, { data: 'huge', label: '巨大' }] },
+          ...(volcano
+            ? [{ name: 'magma_rocks', label: '岩浆岩', default: 'default', values: STANDARD_VALUES }]
+            : [
+              { name: 'bamboo', label: '竹子', default: 'default', values: STANDARD_VALUES },
+              { name: 'grass', label: '草', default: 'default', values: STANDARD_VALUES },
+            ]),
+        ],
+      },
+    ];
+  }
   if (location === 'cave') {
     return [
       {
@@ -900,28 +932,43 @@ function getWorldConfig(state, roomId, shardName) {
     const shard = room?.shards.find(s => s.name === shardName);
     const location = room?.locations?.[shardName] || shard?.worldType || 'forest';
     const isModWorld = location === 'shipwrecked' || location === 'volcanoworld';
-    const preset = location === 'cave' ? 'DST_CAVE' : 'SURVIVAL_TOGETHER';
+    const presets = location === 'shipwrecked'
+      ? {
+        worldgen: [{ data: 'SHIPWRECKED_ENDLESS', label: '海难无尽' }, { data: 'SURVIVAL_SHIPWRECKED_CLASSIC', label: '海难' }],
+        settings: [{ data: 'SHIPWRECKED_ENDLESS', label: '海难无尽' }, { data: 'SHIPWRECKED_RELAXED', label: '海难轻松' }],
+      }
+      : location === 'volcanoworld'
+        ? {
+          worldgen: [{ data: 'SURVIVAL_VOLCANO_CLASSIC', label: '火山' }, { data: 'VOLCANO_PLUS', label: '火山加强' }],
+          settings: [{ data: 'SURVIVAL_VOLCANO_CLASSIC', label: '火山' }, { data: 'VOLCANO_PLUS', label: '火山加强' }],
+        }
+        : location === 'cave'
+          ? {
+            worldgen: [{ data: 'DST_CAVE', label: '洞穴' }, { data: 'DST_CAVE_PLUS', label: '洞穴增强' }],
+            settings: [{ data: 'DST_CAVE', label: '洞穴' }],
+          }
+          : {
+            worldgen: [{ data: 'SURVIVAL_TOGETHER', label: '生存' }, { data: 'ENDLESS', label: '无尽' }, { data: 'RELAXED', label: '轻松' }],
+            settings: [{ data: 'SURVIVAL_TOGETHER', label: '生存' }, { data: 'ENDLESS', label: '无尽' }, { data: 'RELAXED', label: '轻松' }],
+          };
     state.worldConfigs[key] = {
       file: `C:\\DSTServer\\dst_save\\Cluster_${roomId}\\${shardName}\\worldgenoverride.lua`,
       location,
-      mod: isModWorld ? 'island_adventures' : '',
+      mod: isModWorld ? 'island-adventures' : '',
       hasSave: !!room?.hasSave,
       levelDataInUse: false,
-      presets: {
-        worldgen: location === 'cave'
-          ? [{ data: 'DST_CAVE', label: '洞穴' }, { data: 'DST_CAVE_PLUS', label: '洞穴增强' }]
-          : [{ data: 'SURVIVAL_TOGETHER', label: '生存' }, { data: 'ENDLESS', label: '无尽' }, { data: 'RELAXED', label: '轻松' }],
-        settings: location === 'cave'
-          ? [{ data: 'DST_CAVE', label: '洞穴' }]
-          : [{ data: 'SURVIVAL_TOGETHER', label: '生存' }, { data: 'ENDLESS', label: '无尽' }, { data: 'RELAXED', label: '轻松' }],
-      },
+      presets,
       groups: buildWorldGroups(location),
       volcanoIslandOnly: [],
       config: {
         overrideEnabled: true,
-        worldgenPreset: preset,
-        settingsPreset: preset,
-        overrides: location === 'cave' ? { earthquakes: 'rare' } : { wildfires: 'never', portalresurection: 'default' },
+        worldgenPreset: presets.worldgen[0].data,
+        settingsPreset: presets.settings[0].data,
+        overrides: location === 'cave'
+          ? { earthquakes: 'rare' }
+          : isModWorld
+            ? { dragoonegg: 'default', ia_boats: 'always', ia_drowning: 'always' }
+            : { wildfires: 'never', portalresurection: 'default' },
       },
     };
   }

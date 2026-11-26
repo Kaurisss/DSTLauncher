@@ -75,20 +75,19 @@ func (s *Server) enabledModCount(rm *room.Room) int {
 	return len(seen)
 }
 
-// shardLocations 读出每个分片的实际世界位置。
+// shardLocations 读出每个分片配置文件里的实际世界位置。
 //
-// 没生成过世界（没有 leveldataoverride.lua）分片不出现在结果里，
-// 前端回落到房间配置的 worldType。
+// 没有世界配置文件的分片不出现在结果里，前端回落到房间配置的 worldType。
 func (s *Server) shardLocations(rm *room.Room) map[string]string {
 	out := make(map[string]string)
 	clusterDir := rm.ClusterDir(s.rootDir, s.confDir)
 	for _, sh := range rm.Shards {
-		ld, ok, err := worldsettings.ReadLevelData(clusterDir, sh.Name)
-		if err != nil || !ok {
+		location, found, err := worldsettings.LocationFromFiles(clusterDir, sh.Name, rm.WorldTypeOf(sh.Name))
+		if err != nil || !found {
 			continue
 		}
-		if loc := ld.Location(); loc != "" {
-			out[sh.Name] = loc
+		if location != "" {
+			out[sh.Name] = location
 		}
 	}
 	return out

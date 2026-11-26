@@ -210,6 +210,23 @@ func TestParseModernFormat(t *testing.T) {
 	}
 }
 
+func TestParseUsesIslandLocationFromLevelData(t *testing.T) {
+	dir := modernCluster(t)
+	writeFile(t, filepath.Join(dir, "Master", "leveldataoverride.lua"), `return {
+  id="SURVIVAL_SHIPWRECKED_CLASSIC",
+  location="shipwrecked",
+  overrides={},
+}`)
+
+	p, err := Parse(dir)
+	if err != nil {
+		t.Fatalf("Parse 失败: %v", err)
+	}
+	if got := p.Room.Shards[0].WorldType; got != room.WorldTypeShipwrecked {
+		t.Fatalf("海难位置被错误解析为 %q", got)
+	}
+}
+
 // legacyCluster 造一份早期格式的存档：cluster.ini 用扁平键名，
 // game_mode / server_password / max_snapshot_count 藏在 server.ini 里，
 // 且 Master 的 server.ini 没有 is_master。
