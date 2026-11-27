@@ -717,10 +717,10 @@ function createMockState(authEnabled) {
 
   const playersByRoom = {
     1: [
-      { userid: 'KU_A1B2C3D4', name: '阿明', prefab: 'wilson', shard: 'Master', days: 86, inWorld: true, ghost: false, admin: true, adminSaved: true },
-      { userid: 'KU_E5F6G7H8', name: '小铃铛', prefab: 'wendy', shard: 'Master', days: 54, inWorld: true, ghost: false, admin: false, adminSaved: false },
-      { userid: 'KU_J9K0L1M2', name: '铁皮罐头', prefab: 'wx78', shard: 'Master', days: 41, inWorld: true, ghost: true, admin: false, adminSaved: false },
-      { userid: 'KU_N3P4Q5R6', name: '大力士老王', prefab: 'wolfgang', shard: 'Caves', days: 32, inWorld: true, ghost: false, admin: false, adminSaved: true },
+      { userid: 'KU_A1B2C3D4', name: '阿明', prefab: 'wilson', shard: 'Master', days: 86, inWorld: true, ghost: false, admin: true, adminSaved: true, x: -36, z: 24 },
+      { userid: 'KU_E5F6G7H8', name: '小铃铛', prefab: 'wendy', shard: 'Master', days: 54, inWorld: true, ghost: false, admin: false, adminSaved: false, x: 64, z: -48 },
+      { userid: 'KU_J9K0L1M2', name: '铁皮罐头', prefab: 'wx78', shard: 'Master', days: 41, inWorld: true, ghost: true, admin: false, adminSaved: false, x: -84, z: 58 },
+      { userid: 'KU_N3P4Q5R6', name: '大力士老王', prefab: 'wolfgang', shard: 'Caves', days: 32, inWorld: true, ghost: false, admin: false, adminSaved: true, x: 52, z: 44 },
     ],
     2: [],
     3: [],
@@ -1349,7 +1349,21 @@ function createMockApiPlugin(state, delayMs) {
         // 在线玩家与名单
         if (pathname === '/api/players') {
           const roomId = Number(params.get('room'));
-          sendJson(res, { players: state.playersByRoom[roomId] || [], errors: {} });
+          const shardFilter = params.get('shard') || '';
+          const now = Date.now() / 1000;
+          const all = (state.playersByRoom[roomId] || []).map((player, idx) => {
+            if (typeof player.x !== 'number' || typeof player.z !== 'number') return player;
+            // 模拟玩家在地图上缓慢移动（每轮询一次位置略微变化）
+            const drift = player.ghost ? 0 : 12;
+            const angle = now * 0.22 + idx * 1.9;
+            return {
+              ...player,
+              x: Math.round((player.x + Math.cos(angle) * drift) * 100) / 100,
+              z: Math.round((player.z + Math.sin(angle) * drift) * 100) / 100,
+            };
+          });
+          const players = shardFilter ? all.filter(item => item.shard === shardFilter) : all;
+          sendJson(res, { players, errors: {} });
           return;
         }
         if (pathname === '/api/players/action' && method === 'POST') {

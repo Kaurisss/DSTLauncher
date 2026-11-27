@@ -21,15 +21,17 @@ var playersLua string
 var playerIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 
 type Player struct {
-	UserID     string `json:"userid"`
-	Name       string `json:"name"`
-	Prefab     string `json:"prefab"`
-	Days       *int   `json:"days"`
-	Shard      string `json:"shard"`
-	Ghost      bool   `json:"ghost"`
-	InWorld    bool   `json:"inWorld"`
-	Admin      bool   `json:"admin"`
-	AdminSaved bool   `json:"adminSaved"`
+	UserID     string   `json:"userid"`
+	Name       string   `json:"name"`
+	Prefab     string   `json:"prefab"`
+	Days       *int     `json:"days"`
+	Shard      string   `json:"shard"`
+	Ghost      bool     `json:"ghost"`
+	InWorld    bool     `json:"inWorld"`
+	Admin      bool     `json:"admin"`
+	AdminSaved bool     `json:"adminSaved"`
+	X          *float64 `json:"x,omitempty"`
+	Z          *float64 `json:"z,omitempty"`
 }
 
 type PlayerList struct {
@@ -65,14 +67,30 @@ func (p *process) observePlayerLog(line string) {
 
 // Players queries live shards in parallel; a failed shard must not look empty.
 func (m *Manager) Players(ctx context.Context, clusterKey string) (PlayerList, error) {
+	return m.players(ctx, clusterKey, "")
+}
+
+// PlayersInShard queries online players for a single shard in the cluster.
+func (m *Manager) PlayersInShard(ctx context.Context, clusterKey, shard string) (PlayerList, error) {
+	return m.players(ctx, clusterKey, shard)
+}
+
+func (m *Manager) players(ctx context.Context, clusterKey, shardFilter string) (PlayerList, error) {
 	result := PlayerList{Players: []Player{}, Errors: map[string]string{}}
 	cluster, ok := m.GetCluster(clusterKey)
 	if !ok {
 		return result, fmt.Errorf("房间不存在: %s", clusterKey)
 	}
+	shards := cluster.Shards
+	if shardFilter != "" {
+		if !slices.Contains(cluster.Shards, shardFilter) {
+			return result, fmt.Errorf("分片不存在或未启用: %s", shardFilter)
+		}
+		shards = []string{shardFilter}
+	}
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	for _, shard := range cluster.Shards {
+	for _, shard := range shards {
 		p, found := m.getProcess(clusterKey, shard)
 		if !found || !p.isAlive() {
 			continue

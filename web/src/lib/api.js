@@ -177,7 +177,7 @@ export const playerListApi = {
 };
 
 export const playerApi = {
-  list: roomId => request('/api/players', { params: { room: roomId } }),
+  list: (roomId, shard) => request('/api/players', { params: shard ? { room: roomId, shard } : { room: roomId } }),
   act: (roomId, body) => request('/api/players/action', {
     method: 'POST', params: { room: roomId }, body,
   }),

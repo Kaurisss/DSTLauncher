@@ -38,6 +38,14 @@ func TestPlayersRequireAuthAndExplicitRoom(t *testing.T) {
 	if players, ok := data["players"].([]interface{}); !ok || len(players) != 0 {
 		t.Fatalf("空列表应编码为数组: %v", data)
 	}
+	rec, body = doJSON(t, h, http.MethodGet, "/api/players?room=1&shard=Master", nil, nil)
+	if body["code"] != float64(200) || rec.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("带合法 shard 参数查询停止房间应返回空列表: %v", body)
+	}
+	_, body = doJSON(t, h, http.MethodGet, "/api/players?room=1&shard=NoSuchShard", nil, nil)
+	if body["code"] == float64(200) {
+		t.Fatalf("非法 shard 参数应返回错误: %v", body)
+	}
 	rec, _ = doJSON(t, h, http.MethodPost, "/api/players?room=1", nil, nil)
 	if rec.Code != http.StatusMethodNotAllowed {
 		t.Fatal("列表只接受 GET")

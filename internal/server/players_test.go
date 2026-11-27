@@ -88,12 +88,15 @@ func TestPlayersCorrelatesShardsAndKeepsPartialFailures(t *testing.T) {
 			m.emit(cluster, shard, "log", "[00:00:30]: "+marker+`:{"error":"not_ready"}`)
 			return
 		}
-		m.emit(cluster, shard, "log", marker+`:{"player":{"userid":"KU_test","name":"中文 ]: <script>","prefab":"wendy","days":3,"ghost":true,"inWorld":true}}`)
+		m.emit(cluster, shard, "log", marker+`:{"player":{"userid":"KU_test","name":"中文 ]: <script>","prefab":"wendy","days":3,"ghost":true,"inWorld":true,"x":-12.5,"z":48.25}}`)
 		m.emit(cluster, shard, "log", "[00:00:30]: "+marker+`:{"count":1}`)
 	})
 	got, err := m.Players(context.Background(), c.Key())
 	if err != nil || len(got.Players) != 1 || got.Players[0].Shard != "Surface" || got.Players[0].Name != "中文 ]: <script>" {
 		t.Fatalf("应只接受当前房间/分片的真实回复: %+v, %v", got, err)
+	}
+	if got.Players[0].X == nil || *got.Players[0].X != -12.5 || got.Players[0].Z == nil || *got.Players[0].Z != 48.25 {
+		t.Fatalf("应保留玩家世界坐标: %+v", got.Players[0])
 	}
 	if got.Errors["Below"] == "" {
 		t.Fatal("失败分片不应显示为空列表")
@@ -190,6 +193,28 @@ func TestPlayerGameRejectionsAndEmptyList(t *testing.T) {
 	}
 }
 
+func TestPlayersInShardQueriesOnlyRequestedShard(t *testing.T) {
+	queried := []string{}
+	m, c := playersFixture(t, func(m *Manager, cluster, shard, marker string) {
+		queried = append(queried, shard)
+		m.emit(cluster, shard, "log", marker+`:{"player":{"userid":"KU_zero","name":"Origin","prefab":"wilson","inWorld":true,"x":0,"z":0}}`)
+		m.emit(cluster, shard, "log", marker+`:{"count":1}`)
+	})
+	got, err := m.PlayersInShard(context.Background(), c.Key(), "Surface")
+	if err != nil || len(got.Errors) != 0 || len(got.Players) != 1 {
+		t.Fatalf("按分片查询失败: %+v, %v", got, err)
+	}
+	if len(queried) != 1 || queried[0] != "Surface" {
+		t.Fatalf("按分片查询不应触碰其他分片: %v", queried)
+	}
+	if got.Players[0].X == nil || *got.Players[0].X != 0 || got.Players[0].Z == nil || *got.Players[0].Z != 0 {
+		t.Fatalf("零坐标 (0, 0) 不应被丢弃: %+v", got.Players[0])
+	}
+	if _, err := m.PlayersInShard(context.Background(), c.Key(), "Unknown"); err == nil {
+		t.Fatal("非法分片名应被拒绝")
+	}
+}
+
 func TestPlayersRejectsIncompleteStream(t *testing.T) {
 	m, c := playersFixture(t, func(m *Manager, cluster, shard, marker string) {
 		m.emit(cluster, shard, "log", marker+`:{"count":1}`)
@@ -216,7 +241,7 @@ func TestPlayersLuaBehavior(t *testing.T) {
 	cases := []struct {
 		name, before, action, userid, target, check string
 	}{
-		{"list", "", "list", "", "", `local r=expectReply(); local players=getPlayers(); assert(r.count==2 and #players==2); local byid={}; for _,p in ipairs(players) do byid[p.userid]=p end; assert(byid.KU_host==nil); assert(byid.KU_alive.days==12 and byid.KU_alive.admin); assert(not string.find(byid.KU_alive.name,string.char(1),1,true)); assert(byid.KU_ghost.ghost and byid.KU_ghost.inWorld); assert(byid.KU_select==nil and byid.KU_remote==nil)`},
+		{"list", "", "list", "", "", `local r=expectReply(); local players=getPlayers(); assert(r.count==2 and #players==2); local byid={}; for _,p in ipairs(players) do byid[p.userid]=p end; assert(byid.KU_host==nil); assert(byid.KU_alive.days==12 and byid.KU_alive.admin and byid.KU_alive.x==10 and byid.KU_alive.z==20); assert(not string.find(byid.KU_alive.name,string.char(1),1,true)); assert(byid.KU_ghost.ghost and byid.KU_ghost.inWorld and byid.KU_ghost.x==10 and byid.KU_ghost.z==20); assert(byid.KU_select==nil and byid.KU_remote==nil)`},
 		{"shared_list_without_local_players", "AllPlayers={}", "list", "", "", `assert(expectReply().count==0 and #getPlayers()==0)`},
 		{"shared_list_with_only_ghost_local", "AllPlayers={AllPlayers[2]}", "list", "", "", `local players=getPlayers(); assert(expectReply().count==1 and #players==1 and players[1].userid=="KU_ghost")`},
 		{"kick", "", "kick", "KU_alive", "", `assert(expectReply().ok and TheNet.kicked=="KU_alive")`},

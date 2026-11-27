@@ -22,11 +22,20 @@ local function execute()
                 if player.components.age then
                     days = player.components.age:GetDisplayAgeInDays()
                 end
+                local x, z
+                if player.Transform then
+                    local px, _, pz = player.Transform:GetWorldPosition()
+                    if type(px) == "number" and type(pz) == "number" and px == px and pz == pz and px > -1e9 and px < 1e9 and pz > -1e9 and pz < 1e9 then
+                        x = math.floor(px * 100 + 0.5) / 100
+                        z = math.floor(pz * 100 + 0.5) / 100
+                    end
+                end
                 local item = {
                     userid = userid, name = name, prefab = client.prefab or "",
                     days = days and math.max(0, math.floor(days)) or nil,
                     ghost = player:HasTag("playerghost"),
                     inWorld = true, admin = client.admin == true,
+                    x = x, z = z,
                 }
                 print(request.tag .. ":" .. require("json").encode_compliant({player = item}))
                 count = count + 1

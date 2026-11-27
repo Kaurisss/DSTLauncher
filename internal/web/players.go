@@ -22,7 +22,13 @@ func (s *Server) handlePlayers(w http.ResponseWriter, r *http.Request) {
 		respond(w, 200, nil, err)
 		return
 	}
-	result, err := s.mgr.Players(r.Context(), rm.Key())
+	shard := query(r, "shard")
+	var result server.PlayerList
+	if shard != "" {
+		result, err = s.mgr.PlayersInShard(r.Context(), rm.Key(), shard)
+	} else {
+		result, err = s.mgr.Players(r.Context(), rm.Key())
+	}
 	if err != nil {
 		respond(w, 200, nil, err)
 		return

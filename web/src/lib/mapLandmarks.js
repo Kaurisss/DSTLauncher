@@ -1,5 +1,6 @@
 import { PhCrown, PhDiamond, PhDoorOpen, PhFlask, PhKeyhole, PhMountains, PhSparkle, PhSpiral } from '@phosphor-icons/vue';
 import { mapApi } from '@/lib/api.js';
+import { CHARACTERS } from '@/lib/format.js';
 
 // 彩色配对虫洞图标（共 22 组，对应 web/public/world-icons/dst/wormhole/mark_1..22.png）
 export const WORMHOLE_MARK_ICONS = Array.from({ length: 22 }, (_, i) => `dst/wormhole/mark_${i + 1}.png`);
@@ -110,4 +111,25 @@ const landmark = { icon: PhSparkle, color: '#87634c', priority: 2 };
 export function landmarkStyle(kind) { return styles[kind] || landmark; }
 export function landmarkCoordinates(point, map) {
   return `${Math.round((point.x - map.width / 2) * 4)}, ${Math.round((point.y - map.height / 2) * 4)}`;
+}
+
+/** 将游戏世界坐标 (x, z) 投影到地图网格坐标（与后端 internal/worldsettings/map.go 一致）。 */
+export function worldToMapPoint(x, z, map) {
+  if (!map || typeof x !== 'number' || typeof z !== 'number' || !Number.isFinite(x) || !Number.isFinite(z)) {
+    return null;
+  }
+  const mx = map.width / 2 + x / 4;
+  const my = map.height / 2 + z / 4;
+  if (Math.abs(mx) > 8192 || Math.abs(my) > 8192) return null;
+  return { x: mx, y: my };
+}
+
+export function formatWorldCoordinates(x, z) {
+  if (typeof x !== 'number' || typeof z !== 'number' || !Number.isFinite(x) || !Number.isFinite(z)) return '';
+  return `${Math.round(x)}, ${Math.round(z)}`;
+}
+
+export function playerAvatarUrl(prefab) {
+  const key = prefab && Object.hasOwn(CHARACTERS, prefab) ? prefab : 'unknown';
+  return `/character-avatars/${key}.png`;
 }
