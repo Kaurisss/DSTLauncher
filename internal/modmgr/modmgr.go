@@ -4,8 +4,8 @@
 //   - 创意工坊（UGC）：modoverrides.lua 中以 ["workshop-1234567890"] 形式引用
 //   - 本地模组：直接从 ugc_mods / mods 目录读取
 //
-// 配置下发的核心是读写 modoverrides.lua，这是 Lua table 格式，
-// 不用引入 Lua 解析器，只做结构化文本处理即可，避免引入额外依赖。
+// 配置下发的核心是读写 modoverrides.lua，这是 Lua table 格式。
+// modinfo.lua 只使用结构化文本处理和受限只读求值，避免执行外部操作或引入额外依赖。
 package modmgr
 
 import (
@@ -420,18 +420,32 @@ func (m *Manager) ConfigSchema(id string) ([]ConfigOption, error) {
 
 func parseConfigSchemaText(raw string) ([]ConfigOption, error) {
 	text := stripLuaComments(raw)
-	loc := configOptsAssignRe.FindStringIndex(text)
+	options, dynamicHandled, dynamicErr := parseDynamicConfigSchema(text)
+	if dynamicHandled && dynamicErr == nil {
+		return options, nil
+	}
+	loc := findConfigOptionsAssignment(text)
 	if loc == nil {
+		if dynamicErr != nil {
+			return nil, fmt.Errorf("动态解析 modinfo.lua 失败: %w", dynamicErr)
+		}
 		return nil, nil // 该模组无配置项
 	}
 	idx := loc[0]
+	literalConfig := strings.HasPrefix(strings.TrimSpace(text[loc[1]:]), "{")
 	start := strings.Index(text[loc[1]:], "{")
 	if start < 0 {
+		if dynamicErr != nil {
+			return nil, fmt.Errorf("动态解析 modinfo.lua 失败: %w", dynamicErr)
+		}
 		return nil, nil
 	}
 	start += loc[1]
 	end := matchBrace(text, start)
 	if end < 0 {
+		if dynamicErr != nil {
+			return nil, fmt.Errorf("动态解析 modinfo.lua 失败: %w", dynamicErr)
+		}
 		return nil, fmt.Errorf("configuration_options 块未闭合，modinfo.lua 可能损坏")
 	}
 
@@ -496,6 +510,9 @@ func parseConfigSchemaText(raw string) ([]ConfigOption, error) {
 			continue
 		}
 		out = append(out, opt)
+	}
+	if len(out) == 0 && dynamicErr != nil && !literalConfig {
+		return nil, fmt.Errorf("动态解析 modinfo.lua 失败: %w", dynamicErr)
 	}
 	return out, nil
 }

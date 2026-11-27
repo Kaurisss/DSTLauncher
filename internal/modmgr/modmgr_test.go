@@ -250,6 +250,158 @@ end`
 	}
 }
 
+func TestParseDynamicConfigSchemaFunctionCalls(t *testing.T) {
+	src := `
+local function AddOption(data, description)
+    return {data = data, description = description}
+end
+local BoolOpt = {
+    AddOption(false, "关闭"),
+    AddOption(true, "开启"),
+}
+local function AddConfig(name, label, default, options)
+    return {name = name, label = label, default = default, options = options}
+end
+configuration_options = {
+    AddConfig("mode", "模式", 1, {
+        AddOption(1, "简单"),
+        AddOption(2, "困难"),
+    }),
+    AddConfig("enabled", "启用", true, BoolOpt),
+}`
+	options, err := parseConfigSchemaText(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(options) != 2 {
+		t.Fatalf("配置项数量错误: %+v", options)
+	}
+	if options[0].Name != "mode" || options[0].Default != "1" || len(options[0].Choices) != 2 {
+		t.Fatalf("函数生成的配置项解析错误: %+v", options[0])
+	}
+	if options[1].Name != "enabled" || options[1].Type != "" || len(options[1].Choices) != 2 || options[1].Choices[1].Description != "开启" {
+		t.Fatalf("局部选项表解析错误: %+v", options[1])
+	}
+}
+
+func TestParseDynamicConfigSchemaLoopOptions(t *testing.T) {
+	src := `
+local options = {}
+for i = 0, 2 do
+    options[i + 1] = {description = "" .. (i * 5), data = i * 5}
+end
+configuration_options = {
+    {
+        name = "radius",
+        label = "半径",
+        options = options,
+        default = 0,
+    },
+}`
+	options, err := parseConfigSchemaText(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(options) != 1 || len(options[0].Choices) != 3 {
+		t.Fatalf("循环生成的选项解析错误: %+v", options)
+	}
+	if options[0].Choices[2].Data != "10" || options[0].Choices[2].Description != "10" {
+		t.Fatalf("循环生成的最后一个选项错误: %+v", options[0].Choices)
+	}
+}
+
+func TestParseDynamicConfigSchemaInitFunction(t *testing.T) {
+	src := `
+function Option(name, default, options)
+    return {name = name, label = STRINGS[name][1], options = options, default = default or false}
+end
+function Boolean(name, default)
+    return Option(name, default, {{data = false, description = STRINGS.FALSE}, {data = true, description = STRINGS.TRUE}})
+end
+function DoInit(locale)
+    STRINGS = LOCALE[locale:upper():sub(0, 2)]
+    local options = {
+        Boolean("enabled", false),
+        Option("mode", 1, {{data = 1, description = STRINGS.MODE[1]}, {data = 2, description = STRINGS.MODE[2]}}),
+    }
+    if configuration_options == nil then
+        configuration_options = options
+    end
+end
+LOCALE = {ZH = {FALSE = "关闭", TRUE = "开启", MODE = {"简单", "困难"}}}
+DoInit("zh")`
+	options, err := parseConfigSchemaText(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(options) != 2 || options[0].Name != "enabled" || options[0].Choices[1].Description != "开启" {
+		t.Fatalf("初始化函数生成的布尔项错误: %+v", options)
+	}
+	if options[1].Name != "mode" || options[1].Default != "1" || options[1].Choices[1].Description != "困难" {
+		t.Fatalf("初始化函数生成的下拉项错误: %+v", options)
+	}
+}
+
+func TestParseDynamicConfigSchemaStringKeywordAndUnknownDefault(t *testing.T) {
+	src := `
+function GetDefault()
+    return nil
+end
+local function AddConfig(name)
+    return {
+        name = name,
+        label = "end",
+        options = {{data = true, description = "end"}},
+        default = GetDefault(),
+    }
+end
+configuration_options = {AddConfig("enabled")}`
+	options, err := parseConfigSchemaText(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(options) != 1 || options[0].Label != "end" || !options[0].DefaultUnresolved {
+		t.Fatalf("字符串关键字或未解析默认值错误: %+v", options)
+	}
+}
+
+func TestParseDynamicConfigSchemaIpairs(t *testing.T) {
+	src := `
+local values = {}
+for i, value in ipairs({1, 2}) do
+    values[i] = {data = value, description = tostring(value)}
+end
+configuration_options = {{name = "mode", options = values, default = 1}}`
+	options, err := parseConfigSchemaText(src)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(options) != 1 || len(options[0].Choices) != 2 || options[0].Choices[1].Description != "2" {
+		t.Fatalf("ipairs 生成的配置项错误: %+v", options)
+	}
+}
+
+func TestParseDynamicConfigSchemaReportsUnsupportedFactory(t *testing.T) {
+	_, err := parseConfigSchemaText(`configuration_options = unknown_factory()`)
+	if err == nil {
+		t.Fatal("未知动态工厂应返回解析错误")
+	}
+}
+
+func TestParseDynamicConfigSchemaKeepsLiteralEmptyConfig(t *testing.T) {
+	options, err := parseConfigSchemaText(`unknown_call()
+configuration_options = {}`)
+	if err != nil || len(options) != 0 {
+		t.Fatalf("字面量空配置不应被无关代码影响: options=%+v err=%v", options, err)
+	}
+}
+
+func TestFormatLuaString(t *testing.T) {
+	if got := formatLuaString("%s %d %.2f %%", []any{"value", float64(3), 1.5}); got != "value 3 1.50 %" {
+		t.Fatalf("formatLuaString = %q", got)
+	}
+}
+
 // TestStringEscapesQuotes 确认含引号/反斜杠的取值不会破坏 Lua 语法。
 func TestStringEscapesQuotes(t *testing.T) {
 	o := NewOverrides()
